@@ -1,0 +1,73 @@
+@import "tailwindcss";
+
+@theme {
+  --color-surface: #ffffff;
+  --color-surface-muted: #f6f7f9;
+  --color-surface-sunken: #eceef1;
+  --color-line: #dfe2e7;
+  --color-ink: #14161a;
+  --color-ink-muted: #5f6672;
+  --color-accent: #3b6cf6;
+  --color-accent-soft: #e8eefe;
+  --color-danger: #d5382f;
+  --color-success: #1f8a4c;
+}
+
+:root {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-surface: #16181d;
+  --color-surface-muted: #1d2026;
+  --color-surface-sunken: #24282f;
+  --color-line: #2f343d;
+  --color-ink: #eef0f4;
+  --color-ink-muted: #969ead;
+  --color-accent: #6b93ff;
+  --color-accent-soft: #1e2a45;
+  --color-danger: #f4736a;
+  --color-success: #4cc47f;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background-color: var(--color-surface-muted);
+  color: var(--color-ink);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  overflow: hidden;
+}
+
+button {
+  cursor: pointer;
+}
+
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line) transparent;
+}
+
+.cm-editor {
+  height: 100%;
+  font-size: 13px;
+}
+
+.cm-editor .cm-scroller {
+  font-family: ui-monospace, "SF Mono", "JetBrains Mono", monospace;
+  line-height: 1.6;
+}
+
+.cm-editor.cm-focused {
+  outline: none;
+}
+
+.preview-page svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
