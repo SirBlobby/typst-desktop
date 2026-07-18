@@ -8,7 +8,7 @@
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
 [![SQLite](https://img.shields.io/badge/SQLite-003B57?logo=sqlite&logoColor=white)](https://www.sqlite.org/)
 
-A desktop editor for Typst. Your documents stay as plain files on your own drive, and can optionally sync to a [TypstDrive](../typstdrive) server so the same notes open on any device.
+A desktop editor for Typst. Your documents stay as plain files on your own drive, and can optionally sync to a [TypstDrive](https://github.com/SirBlobby/TypstDrive) server so the same notes open on any device.
 
 The Typst compiler is built into the app — there is nothing extra to install to write and export documents.
 
