@@ -6,6 +6,8 @@
     app,
     breadcrumbs,
     browseTo,
+    linkedDocument,
+    linkedSpace,
     openCloudFolder,
     openTarget,
     refreshCloud,
@@ -21,6 +23,8 @@
     onlink: (entry: BrowseEntry) => void;
     onviewimage: (paths: string[], index: number) => void;
     ondownloaddocument: (documentId: string, title: string) => void;
+    onremovedownload: (path: string) => void;
+    ondownloadfile: (fileId: string, name: string) => void;
     onclonespace: (spaceId: string, name: string) => void;
     ondeletespace: (spaceId: string) => void;
     onnewspace: () => void;
@@ -37,6 +41,8 @@
     onlink,
     onviewimage,
     ondownloaddocument,
+    onremovedownload,
+    ondownloadfile,
     onclonespace,
     ondeletespace,
     onnewspace,
@@ -44,6 +50,7 @@
   }: Props = $props();
 
   let menuFor = $state<string | null>(null);
+  let menuAt = $state({ x: 0, y: 0 });
 
   const trail = $derived(breadcrumbs());
 
@@ -66,6 +73,34 @@
   );
 
   let thumbs = $state<Record<string, { kind: string; data: string }>>({});
+  let cloudThumbs = $state<Record<string, { kind: string; data: string }>>({});
+
+  $effect(() => {
+    if (app.scope !== "cloud") return;
+
+    const pending = [
+      ...app.linkedDocuments.map((linked) => linked.path),
+      ...app.linkedSpaces.map((linked) => linked.path),
+    ];
+    let cancelled = false;
+
+    (async () => {
+      for (const path of pending) {
+        if (cancelled) return;
+        if (cloudThumbs[path]) continue;
+        try {
+          const result = await api.thumbnail(path);
+          if (!cancelled) cloudThumbs[path] = result;
+        } catch {
+          continue;
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  });
 
   $effect(() => {
     const pending = documents.map((entry) => entry.path);
@@ -89,14 +124,6 @@
     };
   });
 
-  const localSpaceIds = $derived(
-    new Set(
-      app.entries
-        .filter((entry) => entry.space_id)
-        .map((entry) => entry.space_id as string),
-    ),
-  );
-
   const iconFor: Record<EntryKind, string> = {
     project: "ph:folder-star",
     folder: "ph:folder",
@@ -110,6 +137,27 @@
     document: "text-[var(--color-accent)]",
     file: "text-[var(--color-ink-muted)]",
   };
+
+  function relativeTime(value: string | null): string {
+    if (!value) return "";
+    const then = new Date(value).getTime();
+    if (Number.isNaN(then)) return "";
+
+    const minutes = Math.round((Date.now() - then) / 60000);
+    if (minutes < 1) return "just now";
+    if (minutes < 60) return `${minutes}m ago`;
+    if (minutes < 1440) return `${Math.round(minutes / 60)}h ago`;
+    return `${Math.round(minutes / 1440)}d ago`;
+  }
+
+  function syncLabel(entry: BrowseEntry): string {
+    if (entry.sync_state === "pending") return "Local changes not yet synced";
+    if (entry.sync_state === "synced") {
+      const when = relativeTime(entry.last_synced_at);
+      return when ? `Synced ${when}` : "Synced";
+    }
+    return "Linked to the cloud";
+  }
 
   const imagePaths = $derived(
     app.entries
@@ -140,10 +188,132 @@
   }
 </script>
 
-{#snippet actions(entry: BrowseEntry, offset: string)}
+{#snippet cloudCard(
+  icon: string,
+  title: string,
+  meta: string,
+  link: { sync_state: string | null; path: string } | undefined,
+  onopen: (() => void) | null,
+  ondownload: () => void,
+  onremove: (() => void) | null,
+)}
+  <div
+    class="group flex flex-col overflow-hidden rounded-lg border border-[var(--color-line)] bg-[var(--color-surface)] transition hover:border-[var(--color-accent)] hover:shadow-sm"
+  >
+    {#if link && cloudThumbs[link.path]}
+      <div
+        class="flex h-24 items-center justify-center overflow-hidden border-b border-[var(--color-line)] bg-[var(--color-surface-muted)]"
+      >
+        {#if cloudThumbs[link.path].kind === "svg"}
+          <span
+            class="flex w-full items-start justify-center bg-white p-1 [&_svg]:h-auto [&_svg]:w-full"
+          >
+            {@html cloudThumbs[link.path].data}
+          </span>
+        {:else}
+          <img
+            src={cloudThumbs[link.path].data}
+            alt={title}
+            class="h-full w-full object-contain"
+          />
+        {/if}
+      </div>
+    {/if}
+
+    <div class="flex flex-col gap-2.5 p-3">
+    <div class="flex items-start gap-2">
+      <Icon {icon} class="shrink-0 text-xl text-[var(--color-accent)]" />
+      <div class="min-w-0 flex-1">
+        <p class="truncate text-xs font-medium" {title}>{title}</p>
+        <p class="truncate text-[10px] text-[var(--color-ink-muted)]">{meta}</p>
+      </div>
+
+      {#if link}
+        <span
+          class="flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-medium
+            {link.sync_state === 'pending'
+            ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent)]'
+            : 'bg-[var(--color-success)]/10 text-[var(--color-success)]'}"
+          title={link.sync_state === "pending"
+            ? "Local changes not yet synced"
+            : "On this device and up to date"}
+        >
+          <Icon
+            icon={link.sync_state === "pending"
+              ? "ph:cloud-arrow-up"
+              : "ph:cloud-check"}
+            class="text-[11px]"
+          />
+          {link.sync_state === "pending" ? "Unsynced" : "Synced"}
+        </span>
+      {/if}
+    </div>
+
+    <div class="flex gap-1">
+      {#if link && onopen}
+        <button
+          class="flex flex-1 items-center justify-center gap-1 rounded-md bg-[var(--color-accent)] px-2 py-1.5 text-[10px] font-medium text-white transition hover:opacity-90"
+          onclick={onopen}
+        >
+          <Icon icon="ph:pencil-simple" />
+          Open
+        </button>
+      {:else}
+        <button
+          class="flex flex-1 items-center justify-center gap-1 rounded-md border border-[var(--color-line)] px-2 py-1.5 text-[10px] transition hover:bg-[var(--color-surface-muted)]"
+          onclick={ondownload}
+        >
+          <Icon icon="ph:download-simple" />
+          Download
+        </button>
+      {/if}
+
+      {#if onremove}
+        <button
+          class="rounded-md border border-[var(--color-line)] px-2 py-1.5 text-[10px] text-[var(--color-ink-muted)] transition hover:border-[var(--color-danger)] hover:text-[var(--color-danger)]"
+          onclick={onremove}
+          aria-label="Remove"
+        >
+          <Icon icon="ph:trash" />
+        </button>
+      {/if}
+    </div>
+    </div>
+  </div>
+{/snippet}
+
+{#snippet syncBadge(entry: BrowseEntry)}
+  {#if entry.cloud_linked}
+    <span class="flex shrink-0 items-center" title={syncLabel(entry)}>
+      {#if entry.sync_state === "pending"}
+        <Icon
+          icon="ph:cloud-arrow-up"
+          class="text-sm text-[var(--color-accent)]"
+        />
+      {:else}
+        <Icon
+          icon="ph:cloud-check"
+          class="text-sm text-[var(--color-success)]"
+        />
+      {/if}
+    </span>
+  {/if}
+{/snippet}
+
+{#snippet actions(entry: BrowseEntry)}
   <button
-    class="absolute right-2 {offset} rounded p-1 text-[var(--color-ink-muted)] opacity-0 transition group-hover:opacity-100 hover:bg-[var(--color-surface-sunken)]"
-    onclick={() => (menuFor = menuFor === entry.path ? null : entry.path)}
+    data-card-menu
+    class="shrink-0 rounded p-1 text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
+    onclick={(event) => {
+      event.stopPropagation();
+      if (menuFor === entry.path) {
+        menuFor = null;
+        return;
+      }
+      const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+      menuAt = { x: rect.right, y: rect.bottom + 4 };
+      menuFor = entry.path;
+    }}
     aria-label="Actions"
   >
     <Icon icon="ph:dots-three-vertical" />
@@ -151,7 +321,8 @@
 
   {#if menuFor === entry.path}
     <div
-      class="absolute right-2 top-9 z-10 flex w-40 flex-col rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] py-1 text-xs shadow-lg"
+      class="fixed z-50 flex w-40 -translate-x-full flex-col rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] py-1 text-xs shadow-lg"
+      style="left: {menuAt.x}px; top: {menuAt.y}px"
     >
       {#if entry.kind === "project" || entry.kind === "document"}
         <button
@@ -206,6 +377,14 @@
     </div>
   {/if}
 {/snippet}
+
+<svelte:window
+  on:click={(event) => {
+    if (!(event.target as HTMLElement).closest("[data-card-menu]")) {
+      menuFor = null;
+    }
+  }}
+/>
 
 <div class="flex h-full flex-col bg-[var(--color-surface-muted)]">
   <div
@@ -350,12 +529,7 @@
                           >
                             {entry.name}
                           </span>
-                          {#if entry.space_id}
-                            <Icon
-                              icon="ph:cloud-check"
-                              class="shrink-0 text-xs text-[var(--color-success)]"
-                            />
-                          {/if}
+                          {@render syncBadge(entry)}
                         </span>
                         <span
                           class="block truncate text-[10px] text-[var(--color-ink-muted)]"
@@ -366,7 +540,7 @@
                       </span>
                     </button>
 
-                    {@render actions(entry, "top-2")}
+                    {@render actions(entry)}
                   </div>
                 {/each}
               </div>
@@ -413,23 +587,38 @@
                         {/if}
                       </span>
 
-                      <span class="flex flex-col gap-0.5 px-2.5 py-2">
-                        <span
-                          class="truncate text-xs font-medium"
-                          title={entry.name}
-                        >
-                          {entry.name}
-                        </span>
-                        <span class="text-[10px] text-[var(--color-ink-muted)]">
-                          {formatSize(entry.size)}
-                          {#if entry.modified}
-                            · {formatDate(entry.modified)}
-                          {/if}
-                        </span>
-                      </span>
                     </button>
 
-                    {@render actions(entry, "top-2")}
+                    <div class="flex items-center gap-1 px-2.5 py-2">
+                      <button
+                        class="flex min-w-0 flex-1 flex-col gap-0.5 text-left"
+                        onclick={() => activate(entry)}
+                      >
+                        <span class="flex items-center gap-1.5">
+                          <span
+                            class="min-w-0 flex-1 truncate text-xs font-medium"
+                            title={entry.name}
+                          >
+                            {entry.name}
+                          </span>
+                          {@render syncBadge(entry)}
+                        </span>
+                        <span class="text-[10px] text-[var(--color-ink-muted)]">
+                          {#if entry.cloud_linked && entry.sync_state === "pending"}
+                            Not synced
+                          {:else if entry.cloud_linked}
+                            Synced {relativeTime(entry.last_synced_at)}
+                          {:else}
+                            {formatSize(entry.size)}
+                            {#if entry.modified}
+                              · {formatDate(entry.modified)}
+                            {/if}
+                          {/if}
+                        </span>
+                      </button>
+
+                      {@render actions(entry)}
+                    </div>
                   </div>
                 {/each}
               </div>
@@ -456,30 +645,33 @@
           </button>
         </div>
       {:else}
-        <div class="mb-3 flex items-center gap-1 text-xs">
+        <div class="mb-4 flex items-center gap-2">
           <button
-            class="flex items-center gap-1.5 rounded px-2 py-1 transition hover:bg-[var(--color-surface)]
-              {app.cloudFolder === null ? 'font-medium' : 'text-[var(--color-ink-muted)]'}"
+            class="flex items-center gap-2 rounded-lg border px-3.5 py-2 text-xs font-medium transition
+              {app.cloudFolder !== 'shared'
+              ? 'border-[var(--color-accent)] bg-[var(--color-accent)] text-white shadow-sm'
+              : 'border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink-muted)] hover:border-[var(--color-accent)] hover:text-[var(--color-ink)]'}"
             onclick={() => openCloudFolder(null)}
           >
-            <Icon icon="ph:cloud" />
+            <Icon icon="ph:cloud-fill" class="text-base" />
             My Drive
           </button>
+
           <button
-            class="flex items-center gap-1.5 rounded px-2 py-1 transition hover:bg-[var(--color-surface)]
+            class="flex items-center gap-2 rounded-lg border px-3.5 py-2 text-xs font-medium transition
               {app.cloudFolder === 'shared'
-              ? 'font-medium'
-              : 'text-[var(--color-ink-muted)]'}"
+              ? 'border-[var(--color-accent)] bg-[var(--color-accent)] text-white shadow-sm'
+              : 'border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink-muted)] hover:border-[var(--color-accent)] hover:text-[var(--color-ink)]'}"
             onclick={() => openCloudFolder("shared")}
           >
-            <Icon icon="ph:users-three" />
+            <Icon icon="ph:users-three-fill" class="text-base" />
             Shared with me
           </button>
 
           {#if app.cloudLoading}
             <Icon
               icon="ph:circle-notch"
-              class="animate-spin text-[var(--color-accent)]"
+              class="animate-spin text-base text-[var(--color-accent)]"
             />
           {/if}
         </div>
@@ -512,33 +704,66 @@
           <div
             class="mb-4 grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3"
           >
-            {#each app.cloudDocuments as document (document.id)}
+            {#each app.cloudDocuments as entry (entry.id)}
+              {@const linked = linkedDocument(entry.id)}
+              {@render cloudCard(
+                "ph:file-text",
+                entry.title,
+                linked
+                  ? `Document · ${entry.role}`
+                  : `${entry.role} · ${formatDate(entry.updated_at)}`,
+                linked,
+                linked ? () => openTarget(linked.path) : null,
+                () => ondownloaddocument(entry.id, entry.title),
+                linked ? () => onremovedownload(linked.path) : null,
+              )}
+            {/each}
+          </div>
+        {/if}
+
+        {#if app.cloudFiles.length > 0}
+          <h2
+            class="mb-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]"
+          >
+            Images and fonts
+          </h2>
+          <div
+            class="mb-4 grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3"
+          >
+            {#each app.cloudFiles as file (file.id)}
               <div
-                class="flex flex-col gap-2 rounded-lg border border-[var(--color-line)] bg-[var(--color-surface)] p-3 transition hover:border-[var(--color-accent)]"
+                class="flex items-center gap-2.5 rounded-lg border border-[var(--color-line)] bg-[var(--color-surface)] p-3 transition hover:border-[var(--color-accent)]"
               >
                 <Icon
-                  icon="ph:file-text"
-                  class="text-xl text-[var(--color-accent)]"
+                  icon={api.isImagePath(file.name)
+                    ? "ph:image"
+                    : /\.(ttf|otf|ttc|otc)$/i.test(file.name)
+                      ? "ph:text-aa"
+                      : "ph:file"}
+                  class="shrink-0 text-xl text-[var(--color-accent)]"
                 />
-                <span class="truncate text-xs font-medium" title={document.title}>
-                  {document.title}
-                </span>
-                <span class="text-[10px] text-[var(--color-ink-muted)]">
-                  {document.role} · {formatDate(document.updated_at)}
-                </span>
+                <div class="min-w-0 flex-1">
+                  <p class="truncate text-xs font-medium" title={file.name}>
+                    {file.name}
+                  </p>
+                  <p class="truncate text-[10px] text-[var(--color-ink-muted)]">
+                    {formatDate(file.created_at)}
+                  </p>
+                </div>
                 <button
-                  class="mt-1 flex items-center justify-center gap-1 rounded border border-[var(--color-line)] px-2 py-1 text-[10px] hover:bg-[var(--color-surface-muted)]"
-                  onclick={() => ondownloaddocument(document.id, document.title)}
+                  class="shrink-0 rounded-md border border-[var(--color-line)] p-1.5 text-[var(--color-ink-muted)] transition hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]"
+                  onclick={() => ondownloadfile(file.id, file.name)}
+                  title="Add to shared assets on this device"
+                  aria-label="Download"
                 >
                   <Icon icon="ph:download-simple" />
-                  Download
                 </button>
               </div>
             {/each}
           </div>
         {/if}
 
-        {#if app.spaces.length === 0 && app.cloudDocuments.length === 0 && app.cloudFolders.length === 0}
+        {#if app.spaces.length === 0 && app.cloudDocuments.length === 0 && app.cloudFolders.length === 0 && app.cloudFiles.length === 0}
           <div
             class="flex flex-col items-center justify-center gap-3 py-16 text-[var(--color-ink-muted)]"
           >
@@ -556,47 +781,18 @@
         {/if}
         <div class="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3">
           {#each app.spaces as space (space.id)}
-            <div
-              class="group flex flex-col gap-2 rounded-lg border border-[var(--color-line)] bg-[var(--color-surface)] p-3 transition hover:border-[var(--color-accent)]"
-            >
-              <div class="flex items-center gap-2">
-                <Icon icon="ph:cloud" class="text-xl text-[var(--color-accent)]" />
-                {#if localSpaceIds.has(space.id)}
-                  <span title="Downloaded to this device" class="flex">
-                    <Icon
-                      icon="ph:hard-drives"
-                      class="text-sm text-[var(--color-success)]"
-                    />
-                  </span>
-                {/if}
-              </div>
-
-              <span class="truncate text-xs font-medium">{space.name}</span>
-              <span class="text-[10px] text-[var(--color-ink-muted)]">
-                {space.role} · {formatDate(space.updated_at)}
-              </span>
-
-              <div class="mt-1 flex gap-1">
-                {#if !localSpaceIds.has(space.id)}
-                  <button
-                    class="flex flex-1 items-center justify-center gap-1 rounded border border-[var(--color-line)] px-2 py-1 text-[10px] hover:bg-[var(--color-surface-muted)]"
-                    onclick={() => onclonespace(space.id, space.name)}
-                  >
-                    <Icon icon="ph:download-simple" />
-                    Download
-                  </button>
-                {/if}
-                {#if space.role === "owner"}
-                  <button
-                    class="rounded border border-[var(--color-line)] px-2 py-1 text-[10px] text-[var(--color-danger)] hover:bg-[var(--color-surface-muted)]"
-                    onclick={() => ondeletespace(space.id)}
-                    aria-label="Delete space"
-                  >
-                    <Icon icon="ph:trash" />
-                  </button>
-                {/if}
-              </div>
-            </div>
+            {@const linked = linkedSpace(space.id)}
+            {@render cloudCard(
+              "ph:folder-star",
+              space.name,
+              linked
+                ? `Project · ${space.role}`
+                : `${space.role} · ${formatDate(space.updated_at)}`,
+              linked,
+              linked ? () => openTarget(linked.path) : null,
+              () => onclonespace(space.id, space.name),
+              space.role === "owner" ? () => ondeletespace(space.id) : null,
+            )}
           {/each}
         </div>
       {/if}

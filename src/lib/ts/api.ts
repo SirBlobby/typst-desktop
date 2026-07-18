@@ -13,6 +13,7 @@ export interface Settings {
 export interface FileEntry {
   path: string;
   name: string;
+  is_dir: boolean;
   is_text: boolean;
   size: number;
 }
@@ -96,6 +97,8 @@ export interface BrowseEntry {
   space_id: string | null;
   last_synced_at: string | null;
   child_count: number;
+  cloud_linked: boolean;
+  sync_state: "synced" | "pending" | null;
 }
 
 export interface TargetInfo {
@@ -124,6 +127,15 @@ export const renameEntry = (path: string, newName: string) =>
 
 export const deleteEntry = (path: string) =>
   invoke<void>("delete_entry", { path });
+
+export const moveEntry = (path: string, destination: string) =>
+  invoke<string>("move_entry", { path, destination });
+
+export const duplicateEntry = (path: string) =>
+  invoke<string>("duplicate_entry", { path });
+
+export const absolutePath = (path: string) =>
+  invoke<string>("absolute_path", { path });
 
 export const uploadEntry = (
   parent: string,
@@ -288,6 +300,20 @@ export const cloudListDocuments = (folderId?: string | null) =>
 
 export const cloudListShared = () => invoke<SharedItems>("cloud_list_shared");
 
+export interface CloudFile {
+  id: string;
+  name: string;
+  mime_type: string;
+  folder_id: string | null;
+  created_at: string;
+}
+
+export const cloudListFiles = (folderId?: string | null) =>
+  invoke<CloudFile[]>("cloud_list_files", { folderId: folderId ?? null });
+
+export const cloudDownloadFile = (fileId: string) =>
+  invoke<string>("cloud_download_file", { fileId });
+
 export const cloudDownloadDocument = (documentId: string, parent: string) =>
   invoke<string>("cloud_download_document", { documentId, parent });
 
@@ -299,6 +325,26 @@ export const cloudResolveDocument = (
   content: string,
   serverHash: string,
 ) => invoke<void>("cloud_resolve_document", { path, content, serverHash });
+
+export interface LinkedDocument {
+  path: string;
+  document_id: string;
+  synced_at: string | null;
+  sync_state: "synced" | "pending" | null;
+}
+
+export interface LinkedSpace {
+  path: string;
+  space_id: string;
+  synced_at: string | null;
+  sync_state: "synced" | "pending" | null;
+}
+
+export const cloudLinkedDocuments = () =>
+  invoke<LinkedDocument[]>("cloud_linked_documents");
+
+export const cloudLinkedSpaces = () =>
+  invoke<LinkedSpace[]>("cloud_linked_spaces");
 
 export const cloudDocumentLink = (path: string) =>
   invoke<DocumentLink | null>("cloud_document_link", { path });

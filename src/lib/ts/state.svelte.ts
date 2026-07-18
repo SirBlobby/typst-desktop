@@ -3,11 +3,14 @@ import type {
   Account,
   BrowseEntry,
   CloudDocument,
+  CloudFile,
   CloudFolder,
   CompileResult,
   Conflict,
   Diagnostic,
   DocumentLink,
+  LinkedDocument,
+  LinkedSpace,
   Settings,
   SpaceSummary,
   TargetInfo,
@@ -29,7 +32,10 @@ interface AppState {
   cloudFolder: string | null | "shared";
   cloudFolders: CloudFolder[];
   cloudDocuments: CloudDocument[];
+  cloudFiles: CloudFile[];
   cloudLoading: boolean;
+  linkedDocuments: LinkedDocument[];
+  linkedSpaces: LinkedSpace[];
   documentLink: DocumentLink | null;
 
   target: TargetInfo | null;
@@ -60,7 +66,10 @@ export const app = $state<AppState>({
   cloudFolder: null,
   cloudFolders: [],
   cloudDocuments: [],
+  cloudFiles: [],
   cloudLoading: false,
+  linkedDocuments: [],
+  linkedSpaces: [],
   documentLink: null,
 
   target: null,
@@ -163,22 +172,28 @@ export async function refreshCloud() {
 
   app.cloudLoading = true;
   try {
+    app.linkedDocuments = await api.cloudLinkedDocuments().catch(() => []);
+    app.linkedSpaces = await api.cloudLinkedSpaces().catch(() => []);
+
     if (app.cloudFolder === "shared") {
       const shared = await api.cloudListShared();
       app.cloudDocuments = shared.documents;
       app.spaces = shared.spaces;
       app.cloudFolders = [];
+      app.cloudFiles = [];
     } else {
-      const [folders, documents, spaces] = await Promise.all([
+      const [folders, documents, spaces, files] = await Promise.all([
         api.cloudListFolders(),
         api.cloudListDocuments(app.cloudFolder),
         api.cloudListSpaces(),
+        api.cloudListFiles(app.cloudFolder),
       ]);
       app.cloudFolders = folders.filter(
         (folder) => (folder.parent_id ?? null) === app.cloudFolder,
       );
       app.cloudDocuments = documents;
       app.spaces = spaces;
+      app.cloudFiles = files;
     }
   } catch (error) {
     setError(error);
@@ -195,13 +210,42 @@ export async function openCloudFolder(id: string | null | "shared") {
 export async function downloadDocument(documentId: string, title: string) {
   try {
     const path = await api.cloudDownloadDocument(documentId, "");
-    app.scope = "local";
-    await browseTo("");
+    await refreshCloud();
     setStatus(`Downloaded '${title}' to this device`);
     return path;
   } catch (error) {
     setError(error);
     return null;
+  }
+}
+
+export function linkedDocument(documentId: string) {
+  return app.linkedDocuments.find(
+    (linked) => linked.document_id === documentId,
+  );
+}
+
+export async function downloadCloudFile(fileId: string, name: string) {
+  try {
+    await api.cloudDownloadFile(fileId);
+    setStatus(`'${name}' added to your shared assets`);
+  } catch (error) {
+    setError(error);
+  }
+}
+
+export function linkedSpace(spaceId: string) {
+  return app.linkedSpaces.find((linked) => linked.space_id === spaceId);
+}
+
+export async function removeDownloadedDocument(path: string) {
+  try {
+    await api.deleteEntry(path);
+    await api.cloudUnlinkDocument(path);
+    await refreshCloud();
+    setStatus("Removed from this device");
+  } catch (error) {
+    setError(error);
   }
 }
 

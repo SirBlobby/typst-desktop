@@ -848,3 +848,52 @@ pub fn push_document(
         Err(other) => Err(describe(other)),
     }
 }
+
+#[derive(Deserialize, Serialize, Clone)]
+pub struct CloudFile {
+    pub id: String,
+    pub name: String,
+    pub mime_type: String,
+    pub folder_id: Option<String>,
+    pub created_at: String,
+}
+
+#[derive(Deserialize)]
+pub struct CloudFileContent {
+    pub name: String,
+    pub content: String,
+}
+
+pub fn list_account_files(
+    server_url: &str,
+    token: &str,
+    folder_id: Option<&str>,
+) -> Result<Vec<CloudFile>, String> {
+    let mut request = agent()
+        .get(&endpoint(server_url, "/files"))
+        .set("Authorization", &format!("Bearer {}", token));
+
+    if let Some(folder) = folder_id {
+        request = request.query("folder_id", folder);
+    }
+
+    request
+        .call()
+        .map_err(describe)?
+        .into_json::<Vec<CloudFile>>()
+        .map_err(|e| e.to_string())
+}
+
+pub fn pull_account_file(
+    server_url: &str,
+    token: &str,
+    file_id: &str,
+) -> Result<CloudFileContent, String> {
+    agent()
+        .get(&endpoint(server_url, &format!("/files/{}", file_id)))
+        .set("Authorization", &format!("Bearer {}", token))
+        .call()
+        .map_err(describe)?
+        .into_json::<CloudFileContent>()
+        .map_err(|e| e.to_string())
+}

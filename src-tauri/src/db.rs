@@ -16,6 +16,7 @@ pub struct DocumentLink {
     pub base_hash: String,
     pub role: String,
     pub base_content: String,
+    pub synced_at: Option<String>,
 }
 
 const SCHEMA: [&str; 5] = [
@@ -41,7 +42,8 @@ const SCHEMA: [&str; 5] = [
         document_id TEXT NOT NULL,
         base_hash TEXT NOT NULL,
         role TEXT NOT NULL,
-        base_content TEXT
+        base_content TEXT,
+        synced_at TEXT
     )",
     "CREATE TABLE IF NOT EXISTS thumbnails (
         path TEXT PRIMARY KEY,
@@ -50,6 +52,9 @@ const SCHEMA: [&str; 5] = [
         source_modified INTEGER NOT NULL
     )",
 ];
+
+const MIGRATIONS: [&str; 1] =
+    ["ALTER TABLE document_links ADD COLUMN synced_at TEXT"];
 
 impl Store {
     pub fn open(app: &AppHandle) -> Result<Self, String> {
@@ -71,6 +76,10 @@ impl Store {
 
         for statement in SCHEMA {
             connection.execute(statement, []).map_err(|e| e.to_string())?;
+        }
+
+        for statement in MIGRATIONS {
+            let _ = connection.execute(statement, []);
         }
 
         Ok(Store {
@@ -283,14 +292,23 @@ impl Store {
     ) -> Result<(), String> {
         self.with(|connection| {
             connection.execute(
-                "INSERT INTO document_links (path, document_id, base_hash, role, base_content)
-                 VALUES (?1, ?2, ?3, ?4, ?5)
+                "INSERT INTO document_links
+                   (path, document_id, base_hash, role, base_content, synced_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)
                  ON CONFLICT(path) DO UPDATE SET
                    document_id = excluded.document_id,
                    base_hash = excluded.base_hash,
                    role = excluded.role,
-                   base_content = excluded.base_content",
-                params![path, document_id, base_hash, role, base_content],
+                   base_content = excluded.base_content,
+                   synced_at = excluded.synced_at",
+                params![
+                    path,
+                    document_id,
+                    base_hash,
+                    role,
+                    base_content,
+                    chrono::Utc::now().to_rfc3339()
+                ],
             )?;
             Ok(())
         })
@@ -300,7 +318,7 @@ impl Store {
         self.with(|connection| {
             connection
                 .query_row(
-                    "SELECT document_id, base_hash, role, base_content
+                    "SELECT document_id, base_hash, role, base_content, synced_at
                      FROM document_links WHERE path = ?1",
                     params![path],
                     |row| {
@@ -309,10 +327,43 @@ impl Store {
                             base_hash: row.get(1)?,
                             role: row.get(2)?,
                             base_content: row.get::<_, Option<String>>(3)?.unwrap_or_default(),
+                            synced_at: row.get(4)?,
                         })
                     },
                 )
                 .optional()
+        })
+    }
+
+    pub fn all_space_links(&self) -> Result<Vec<(String, String, Option<String>)>, String> {
+        self.with(|connection| {
+            let mut statement = connection.prepare(
+                "SELECT path, space_id, last_synced_at FROM projects
+                 WHERE space_id IS NOT NULL",
+            )?;
+            let rows = statement.query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, Option<String>>(2)?,
+                ))
+            })?;
+            rows.collect::<rusqlite::Result<Vec<_>>>()
+        })
+    }
+
+    pub fn all_document_links(&self) -> Result<Vec<(String, String, Option<String>)>, String> {
+        self.with(|connection| {
+            let mut statement = connection
+                .prepare("SELECT path, document_id, synced_at FROM document_links")?;
+            let rows = statement.query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, Option<String>>(2)?,
+                ))
+            })?;
+            rows.collect::<rusqlite::Result<Vec<_>>>()
         })
     }
 

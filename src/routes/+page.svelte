@@ -2,6 +2,7 @@
   import Icon from "@iconify/svelte";
   import { onMount } from "svelte";
   import { save } from "@tauri-apps/plugin-dialog";
+  import { revealItemInDir } from "@tauri-apps/plugin-opener";
   import { getCurrentWebview } from "@tauri-apps/api/webview";
 
   import FileViewer from "$lib/components/FileViewer.svelte";
@@ -32,6 +33,7 @@
     clearMessages,
     closeTarget,
     compile,
+    downloadCloudFile,
     downloadDocument,
     openFile,
     openTarget,
@@ -39,6 +41,7 @@
     refreshEntries,
     refreshSpaces,
     refreshTarget,
+    removeDownloadedDocument,
     runSync,
     saveAndCompile,
     scheduleAutosave,
@@ -58,8 +61,8 @@
     | { kind: "new-space" }
     | { kind: "delete-space"; id: string }
     | { kind: "clone-space"; id: string; name: string }
-    | { kind: "new-file" }
-    | { kind: "new-subfolder" }
+    | { kind: "new-file"; parent: string }
+    | { kind: "new-subfolder"; parent: string }
     | { kind: "rename-file"; path: string }
     | { kind: "delete-file"; path: string }
     | { kind: "login" }
@@ -72,6 +75,28 @@
   let dialog = $state<Dialog>({ kind: "none" });
   let editorView = $state<EditorView | null>(null);
   let imageViewer = $state<{ paths: string[]; index: number } | null>(null);
+  let selectedEntry = $state<string | null>(null);
+  let selectedIsDir = $state(false);
+  let treeDropTarget = $state<string | null>(null);
+
+  /** Folder that new files, folders, and imports go into. */
+  const selectedFolder = $derived(
+    !selectedEntry
+      ? ""
+      : selectedIsDir
+        ? selectedEntry
+        : selectedEntry.includes("/")
+          ? selectedEntry.slice(0, selectedEntry.lastIndexOf("/"))
+          : "",
+  );
+
+  function joinInTarget(parent: string, name: string): string {
+    return parent ? `${parent}/${name}` : name;
+  }
+
+  function targetChild(relative: string): string {
+    return `${app.target?.path}/${relative}`;
+  }
 
   const activeFile = $derived(
     app.target?.files.find((file) => file.path === app.activePath) ?? null,
@@ -151,13 +176,17 @@
       setStatus(`Downloaded '${name}' to this device`);
     });
 
-  async function importFiles() {
+  async function importFiles(folder?: string) {
     const sources = await pickFiles("all");
     if (sources.length === 0) return;
 
     try {
       if (app.view === "editor" && app.target) {
-        const imported = await api.importIntoTarget(app.target.path, sources);
+        const destination = folder ?? selectedFolder;
+        const imported = await api.importIntoFolder(
+          destination ? targetChild(destination) : app.target.path,
+          sources,
+        );
         await refreshTarget();
         await compile();
         setStatus(`Imported ${imported.length} file(s)`);
@@ -171,19 +200,46 @@
     }
   }
 
-  const createFileInTarget = (name: string) =>
+  const createFileInTarget = (parent: string, name: string) =>
     guard(async () => {
-      const path = name.includes(".") ? name : `${name}.typ`;
+      const file = name.includes(".") ? name : `${name}.typ`;
+      const path = joinInTarget(parent, file);
       await api.writeTargetFile(app.target!.path, path, "");
       await refreshTarget();
       await openFile(path);
     });
 
-  const createFolderInTarget = (path: string) =>
+  const createFolderInTarget = (parent: string, name: string) =>
     guard(async () => {
-      await api.createFolderEntry(app.target!.path, path);
+      await api.createFolderEntry(app.target!.path, joinInTarget(parent, name));
       await refreshTarget();
     });
+
+  const moveInTarget = (path: string, destination: string) =>
+    guard(async () => {
+      await api.moveEntry(targetChild(path), targetChild(destination));
+      await refreshTarget();
+      if (app.activePath === path) {
+        const name = path.split("/").pop() ?? path;
+        await openFile(joinInTarget(destination, name));
+      }
+      await compile();
+    });
+
+  const duplicateInTarget = (path: string) =>
+    guard(async () => {
+      await api.duplicateEntry(targetChild(path));
+      await refreshTarget();
+    });
+
+  async function revealInTarget(path: string) {
+    try {
+      const absolute = await api.absolutePath(targetChild(path));
+      await revealItemInDir(absolute);
+    } catch (error) {
+      setError(error);
+    }
+  }
 
   const renameFile = (path: string, next: string) =>
     guard(async () => {
@@ -283,14 +339,27 @@
     return null;
   }
 
-  async function dropPaths(paths: string[]) {
+  /** Folder row under the pointer, so an OS drop lands where it is aimed. */
+  function folderUnderPointer(x: number, y: number): string | null {
+    const element = document
+      .elementFromPoint(x, y)
+      ?.closest("[data-tree-path]") as HTMLElement | null;
+    if (!element) return null;
+    if (element.dataset.treeDir !== "true") return null;
+    return element.dataset.treePath ?? "";
+  }
+
+  async function dropPaths(paths: string[], folder: string | null) {
     const destination = dropDestination();
     if (!destination || paths.length === 0) return;
 
     try {
       const imported =
         destination.kind === "target"
-          ? await api.importIntoTarget(destination.path, paths)
+          ? await api.importIntoFolder(
+              folder ? targetChild(folder) : destination.path,
+              paths,
+            )
           : await api.importIntoFolder(destination.path, paths);
 
       if (destination.kind === "target") {
@@ -309,11 +378,21 @@
     const pending = getCurrentWebview().onDragDropEvent((event) => {
       if (event.payload.type === "over") {
         dropActive = dropDestination() !== null;
+        treeDropTarget =
+          app.view === "editor"
+            ? folderUnderPointer(
+                event.payload.position.x,
+                event.payload.position.y,
+              )
+            : null;
       } else if (event.payload.type === "drop") {
+        const folder = treeDropTarget;
         dropActive = false;
-        dropPaths(event.payload.paths);
+        treeDropTarget = null;
+        dropPaths(event.payload.paths, folder);
       } else {
         dropActive = false;
+        treeDropTarget = null;
       }
     });
 
@@ -485,6 +564,8 @@
           onviewimage={(paths, index) => (imageViewer = { paths, index })}
           ondownloaddocument={(documentId, title) =>
             downloadDocument(documentId, title)}
+          onremovedownload={removeDownloadedDocument}
+          ondownloadfile={downloadCloudFile}
           onnewspace={() => (dialog = { kind: "new-space" })}
           onclonespace={(id, name) => (dialog = { kind: "clone-space", id, name })}
           ondeletespace={(id) => (dialog = { kind: "delete-space", id })}
@@ -500,43 +581,32 @@
             class="flex items-center justify-between border-b border-[var(--color-line)] px-3 py-1.5"
           >
             <span
-              class="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]"
+              class="truncate text-[10px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]"
             >
-              Files
+              {selectedFolder ? selectedFolder : "Files"}
             </span>
-            <div class="flex gap-0.5">
-              <button
-                class="rounded p-1 text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
-                onclick={() => (dialog = { kind: "new-file" })}
-                aria-label="New file"
-              >
-                <Icon icon="ph:file-plus" />
-              </button>
-              <button
-                class="rounded p-1 text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
-                onclick={() => (dialog = { kind: "new-subfolder" })}
-                aria-label="New folder"
-              >
-                <Icon icon="ph:folder-plus" />
-              </button>
-              <button
-                class="rounded p-1 text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
-                onclick={importFiles}
-                aria-label="Import files from this computer"
-              >
-                <Icon icon="ph:upload-simple" />
-              </button>
-            </div>
           </div>
 
           <FileTree
             files={app.target?.files ?? []}
             activePath={app.activePath}
             entrypoint={app.target?.entrypoint ?? "main.typ"}
+            selected={selectedEntry}
+            dropTarget={treeDropTarget}
             onopen={openFile}
+            onselect={(path, isDir) => {
+              selectedEntry = path;
+              selectedIsDir = isDir;
+            }}
             onrename={(path) => (dialog = { kind: "rename-file", path })}
             ondelete={(path) => (dialog = { kind: "delete-file", path })}
+            onduplicate={duplicateInTarget}
+            onreveal={revealInTarget}
             onsetentry={setEntrypoint}
+            onmove={moveInTarget}
+            onnewfile={(parent) => (dialog = { kind: "new-file", parent })}
+            onnewfolder={(parent) => (dialog = { kind: "new-subfolder", parent })}
+            onimport={(parent) => importFiles(parent)}
           />
         </div>
       {/if}
@@ -718,21 +788,23 @@
     onclose={close}
   />
 {:else if dialog.kind === "new-file"}
+  {@const target = dialog}
   <PromptModal
-    title="New file"
+    title={target.parent ? `New file in ${target.parent}` : "New file"}
     label="File name"
     icon="ph:file-plus"
     placeholder="chapter-1"
-    onsubmit={createFileInTarget}
+    onsubmit={(name) => createFileInTarget(target.parent, name)}
     onclose={close}
   />
 {:else if dialog.kind === "new-subfolder"}
+  {@const target = dialog}
   <PromptModal
-    title="New folder"
+    title={target.parent ? `New folder in ${target.parent}` : "New folder"}
     label="Folder name"
     icon="ph:folder-plus"
     placeholder="figures"
-    onsubmit={createFolderInTarget}
+    onsubmit={(name) => createFolderInTarget(target.parent, name)}
     onclose={close}
   />
 {:else if dialog.kind === "rename-file"}

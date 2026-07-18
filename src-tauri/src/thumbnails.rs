@@ -27,6 +27,26 @@ fn modified_seconds(path: &Path) -> i64 {
         .unwrap_or(0)
 }
 
+fn newest_change_seconds(dir: &Path) -> i64 {
+    let mut newest = 0;
+    for entry in walkdir::WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
+        if !entry.file_type().is_file() {
+            continue;
+        }
+        let seconds = entry
+            .metadata()
+            .ok()
+            .and_then(|meta| meta.modified().ok())
+            .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
+            .map(|elapsed| elapsed.as_secs() as i64)
+            .unwrap_or(0);
+        if seconds > newest {
+            newest = seconds;
+        }
+    }
+    newest
+}
+
 fn mime_for(name: &str) -> &'static str {
     let lower = name.to_lowercase();
     if lower.ends_with(".png") {
@@ -115,12 +135,17 @@ pub fn thumbnail(app: &AppHandle, store: &Store, path: &str) -> Result<Thumbnail
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_default();
 
+    let is_project = full.is_dir();
     let image = is_image(&name);
-    if !image && !name.to_lowercase().ends_with(".typ") {
+    if !image && !is_project && !name.to_lowercase().ends_with(".typ") {
         return Err("No preview available".to_string());
     }
 
-    let modified = modified_seconds(&full);
+    let modified = if is_project {
+        newest_change_seconds(&full)
+    } else {
+        modified_seconds(&full)
+    };
 
     if let Some((kind, data)) = store.thumbnail(path, modified)? {
         return Ok(Thumbnail { kind, data });
