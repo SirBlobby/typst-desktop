@@ -17,7 +17,6 @@
   import AssetsModal from "$lib/components/AssetsModal.svelte";
   import WindowControls from "$lib/components/WindowControls.svelte";
   import ImageViewer from "$lib/components/ImageViewer.svelte";
-  import InfoModal from "$lib/components/InfoModal.svelte";
   import EditorToolbar from "$lib/components/EditorToolbar.svelte";
   import PageSettingsModal from "$lib/components/PageSettingsModal.svelte";
 
@@ -67,7 +66,6 @@
     | { kind: "delete-file"; path: string }
     | { kind: "login" }
     | { kind: "settings" }
-    | { kind: "info" }
     | { kind: "assets" }
     | { kind: "page-settings" }
     | { kind: "conflicts" };
@@ -514,14 +512,6 @@
       <Icon icon="ph:gear-six" />
     </button>
 
-    <button
-      class="rounded-md p-1.5 text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-ink)]"
-      onclick={() => (dialog = { kind: "info" })}
-      aria-label="About"
-    >
-      <Icon icon="ph:info" />
-    </button>
-
     <div class="ml-1 h-5 w-px bg-[var(--color-line)]"></div>
 
     <WindowControls />
@@ -838,8 +828,6 @@
   />
 {:else if dialog.kind === "settings"}
   <SettingsModal onclose={close} onsignin={() => (dialog = { kind: "login" })} />
-{:else if dialog.kind === "info"}
-  <InfoModal onclose={close} />
 {:else if dialog.kind === "assets"}
   <AssetsModal
     oninsert={app.view === "editor" && editorView
