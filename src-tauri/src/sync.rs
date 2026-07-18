@@ -127,14 +127,11 @@ pub fn delete_space(server_url: &str, token: &str, space_id: &str) -> Result<(),
 #[derive(Deserialize)]
 pub struct ManifestEntry {
     pub path: String,
-    pub kind: String,
     pub hash: String,
 }
 
 #[derive(Deserialize)]
 pub struct SpaceManifest {
-    pub space_id: String,
-    pub name: String,
     pub entrypoint: String,
     pub files: Vec<ManifestEntry>,
 }
@@ -158,7 +155,6 @@ pub fn get_manifest(
 
 #[derive(Deserialize)]
 pub struct FileContent {
-    pub path: String,
     pub kind: String,
     pub hash: String,
     pub encoding: String,

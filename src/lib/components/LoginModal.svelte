@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import Modal from "./Modal.svelte";
   import * as api from "$lib/ts/api";
 
@@ -10,7 +11,7 @@
 
   let { serverUrl, onsuccess, onclose }: Props = $props();
 
-  let url = $state(serverUrl);
+  let url = $state(untrack(() => serverUrl));
   let email = $state("");
   let password = $state("");
   let busy = $state(false);
