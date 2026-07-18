@@ -6,33 +6,58 @@
     files: FileEntry[];
     activePath: string | null;
     entrypoint: string;
+    selected: string | null;
+    dropTarget: string | null;
     onopen: (path: string) => void;
+    onselect: (path: string | null, isDir: boolean) => void;
     onrename: (path: string) => void;
     ondelete: (path: string) => void;
+    onduplicate: (path: string) => void;
+    onreveal: (path: string) => void;
     onsetentry: (path: string) => void;
+    onmove: (path: string, destination: string) => void;
+    onnewfile: (parent: string) => void;
+    onnewfolder: (parent: string) => void;
+    onimport: (parent: string) => void;
   }
 
   let {
     files,
     activePath,
     entrypoint,
+    selected,
+    dropTarget,
     onopen,
+    onselect,
     onrename,
     ondelete,
+    onduplicate,
+    onreveal,
     onsetentry,
+    onmove,
+    onnewfile,
+    onnewfolder,
+    onimport,
   }: Props = $props();
 
   interface TreeNode {
     name: string;
     path: string;
     file: FileEntry | null;
+    isDir: boolean;
     children: TreeNode[];
   }
 
   const tree = $derived(buildTree(files));
 
   function buildTree(entries: FileEntry[]): TreeNode[] {
-    const root: TreeNode = { name: "", path: "", file: null, children: [] };
+    const root: TreeNode = {
+      name: "",
+      path: "",
+      file: null,
+      isDir: true,
+      children: [],
+    };
 
     for (const entry of entries) {
       const segments = entry.path.split("/");
@@ -41,17 +66,22 @@
       segments.forEach((segment, index) => {
         const path = segments.slice(0, index + 1).join("/");
         const isLeaf = index === segments.length - 1;
-        let child = node.children.find((c) => c.name === segment);
+        let child = node.children.find((candidate) => candidate.name === segment);
 
         if (!child) {
           child = {
             name: segment,
             path,
-            file: isLeaf ? entry : null,
+            file: isLeaf && !entry.is_dir ? entry : null,
+            isDir: isLeaf ? entry.is_dir : true,
             children: [],
           };
           node.children.push(child);
+        } else if (isLeaf && !entry.is_dir) {
+          child.file = entry;
+          child.isDir = false;
         }
+
         node = child;
       });
     }
@@ -61,9 +91,7 @@
 
   function sortNodes(nodes: TreeNode[]): TreeNode[] {
     nodes.sort((a, b) => {
-      const aIsFolder = a.file === null;
-      const bIsFolder = b.file === null;
-      if (aIsFolder !== bIsFolder) return aIsFolder ? -1 : 1;
+      if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
       return a.name.localeCompare(b.name);
     });
     for (const node of nodes) sortNodes(node.children);
@@ -71,100 +99,147 @@
   }
 
   function iconFor(node: TreeNode): string {
-    if (!node.file) return "ph:folder";
+    if (node.isDir) return "ph:folder";
     if (node.name.endsWith(".typ")) return "ph:file-text";
     if (node.name.endsWith(".toml")) return "ph:gear-six";
-    if (node.file.is_text) return "ph:file";
+    if (node.file?.is_text) return "ph:file";
     return "ph:image";
   }
 
   let collapsed = $state<Record<string, boolean>>({});
-  let menuPath = $state<string | null>(null);
+  let menu = $state<{ path: string; isDir: boolean; x: number; y: number } | null>(
+    null,
+  );
+  let dragging = $state<string | null>(null);
+
+  function activate(node: TreeNode) {
+    onselect(node.path, node.isDir);
+    if (node.isDir) {
+      collapsed[node.path] = !collapsed[node.path];
+    } else {
+      onopen(node.path);
+    }
+  }
+
+  function openMenu(event: MouseEvent, node: TreeNode) {
+    event.preventDefault();
+    onselect(node.path, node.isDir);
+    menu = { path: node.path, isDir: node.isDir, x: event.clientX, y: event.clientY };
+  }
+
+  function handleKey(event: KeyboardEvent, node: TreeNode) {
+    if (event.key === "F2") {
+      event.preventDefault();
+      onrename(node.path);
+    }
+    if (event.key === "Delete") {
+      event.preventDefault();
+      ondelete(node.path);
+    }
+  }
+
+  function collapseAll() {
+    const next: Record<string, boolean> = {};
+    for (const entry of files) {
+      if (entry.is_dir) next[entry.path] = true;
+    }
+    collapsed = next;
+  }
+
+  export function expandTo(path: string) {
+    const segments = path.split("/");
+    for (let index = 1; index < segments.length; index += 1) {
+      collapsed[segments.slice(0, index).join("/")] = false;
+    }
+  }
+
+  function parentOf(path: string): string {
+    const index = path.lastIndexOf("/");
+    return index === -1 ? "" : path.slice(0, index);
+  }
 </script>
+
+<svelte:window
+  on:click={() => (menu = null)}
+  on:contextmenu={(event) => {
+    if (!(event.target as HTMLElement).closest("[data-tree-row]")) menu = null;
+  }}
+/>
 
 {#snippet branch(nodes: TreeNode[], depth: number)}
   {#each nodes as node (node.path)}
     <div>
       <div
+        data-tree-row
+        data-tree-path={node.path}
+        data-tree-dir={node.isDir ? "true" : "false"}
+        role="treeitem"
+        tabindex="0"
+        aria-selected={node.path === selected}
+        draggable="true"
         class="group flex items-center gap-1.5 rounded px-2 py-1 text-xs transition
           {node.path === activePath
           ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent)]'
-          : 'text-[var(--color-ink)] hover:bg-[var(--color-surface-sunken)]'}"
+          : node.path === selected
+            ? 'bg-[var(--color-surface-sunken)]'
+            : 'text-[var(--color-ink)] hover:bg-[var(--color-surface-sunken)]'}
+          {dropTarget === node.path
+          ? 'ring-1 ring-inset ring-[var(--color-accent)]'
+          : ''}"
         style="padding-left: {depth * 12 + 8}px"
+        onclick={() => activate(node)}
+        oncontextmenu={(event) => openMenu(event, node)}
+        onkeydown={(event) => handleKey(event, node)}
+        ondragstart={(event) => {
+          dragging = node.path;
+          event.dataTransfer?.setData("text/plain", node.path);
+        }}
+        ondragend={() => (dragging = null)}
+        ondragover={(event) => {
+          if (!dragging || !node.isDir) return;
+          event.preventDefault();
+        }}
+        ondrop={(event) => {
+          event.preventDefault();
+          const source = dragging ?? event.dataTransfer?.getData("text/plain");
+          dragging = null;
+          if (!source) return;
+          const destination = node.isDir ? node.path : parentOf(node.path);
+          if (parentOf(source) === destination) return;
+          onmove(source, destination);
+        }}
       >
-        <button
-          class="flex min-w-0 flex-1 items-center gap-1.5 text-left"
-          onclick={() => {
-            if (node.file) {
-              onopen(node.path);
-            } else {
-              collapsed[node.path] = !collapsed[node.path];
-            }
-          }}
-        >
-          {#if !node.file}
-            <Icon
-              icon={collapsed[node.path] ? "ph:caret-right" : "ph:caret-down"}
-              class="shrink-0 text-[10px] text-[var(--color-ink-muted)]"
-            />
-          {/if}
-          <Icon icon={iconFor(node)} class="shrink-0 text-sm" />
-          <span class="truncate">{node.name}</span>
-          {#if node.path === entrypoint}
-            <span
-              class="shrink-0 rounded bg-[var(--color-accent)] px-1 py-px text-[9px] font-medium text-white"
-            >
-              main
-            </span>
-          {/if}
-        </button>
-
-        {#if node.file}
-          <button
-            class="shrink-0 rounded p-0.5 text-[var(--color-ink-muted)] opacity-0 transition group-hover:opacity-100 hover:bg-[var(--color-surface)]"
-            onclick={() => (menuPath = menuPath === node.path ? null : node.path)}
-            aria-label="File actions"
-          >
-            <Icon icon="ph:dots-three-vertical" />
-          </button>
+        {#if node.isDir}
+          <Icon
+            icon={collapsed[node.path] ? "ph:caret-right" : "ph:caret-down"}
+            class="shrink-0 text-[10px] text-[var(--color-ink-muted)]"
+          />
+        {:else}
+          <span class="w-2.5 shrink-0"></span>
         {/if}
-      </div>
 
-      {#if node.file && menuPath === node.path}
-        <div
-          class="ml-6 mb-1 flex flex-col rounded border border-[var(--color-line)] bg-[var(--color-surface)] py-1 text-xs shadow-sm"
+        <Icon icon={iconFor(node)} class="shrink-0 text-sm" />
+        <span class="min-w-0 flex-1 truncate">{node.name}</span>
+
+        {#if node.path === entrypoint}
+          <span
+            class="shrink-0 rounded bg-[var(--color-accent)] px-1 py-px text-[9px] font-medium text-white"
+          >
+            main
+          </span>
+        {/if}
+
+        <button
+          class="shrink-0 rounded p-0.5 text-[var(--color-ink-muted)] opacity-0 transition group-hover:opacity-100 hover:bg-[var(--color-surface)]"
+          onclick={(event) => {
+            event.stopPropagation();
+            openMenu(event, node);
+          }}
+          aria-label="Actions"
         >
-          {#if node.name.endsWith(".typ")}
-            <button
-              class="px-3 py-1.5 text-left hover:bg-[var(--color-surface-sunken)]"
-              onclick={() => {
-                onsetentry(node.path);
-                menuPath = null;
-              }}
-            >
-              Set as entrypoint
-            </button>
-          {/if}
-          <button
-            class="px-3 py-1.5 text-left hover:bg-[var(--color-surface-sunken)]"
-            onclick={() => {
-              onrename(node.path);
-              menuPath = null;
-            }}
-          >
-            Rename
-          </button>
-          <button
-            class="px-3 py-1.5 text-left text-[var(--color-danger)] hover:bg-[var(--color-surface-sunken)]"
-            onclick={() => {
-              ondelete(node.path);
-              menuPath = null;
-            }}
-          >
-            Delete
-          </button>
-        </div>
-      {/if}
+          <Icon icon="ph:dots-three-vertical" />
+        </button>
+      </div>
 
       {#if node.children.length > 0 && !collapsed[node.path]}
         {@render branch(node.children, depth + 1)}
@@ -173,10 +248,140 @@
   {/each}
 {/snippet}
 
-<div class="scroll-thin flex-1 overflow-y-auto py-1">
-  {#if files.length === 0}
-    <p class="px-3 py-4 text-xs text-[var(--color-ink-muted)]">No files yet</p>
-  {:else}
-    {@render branch(tree, 0)}
-  {/if}
+<div class="flex min-h-0 flex-1 flex-col">
+  <div
+    class="flex items-center justify-end gap-0.5 border-b border-[var(--color-line)] px-2 py-1"
+  >
+    <button
+      class="rounded p-1 text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
+      onclick={() => onnewfile(selected ?? "")}
+      title="New file"
+      aria-label="New file"
+    >
+      <Icon icon="ph:file-plus" />
+    </button>
+    <button
+      class="rounded p-1 text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
+      onclick={() => onnewfolder(selected ?? "")}
+      title="New folder"
+      aria-label="New folder"
+    >
+      <Icon icon="ph:folder-plus" />
+    </button>
+    <button
+      class="rounded p-1 text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
+      onclick={() => onimport(selected ?? "")}
+      title="Import files"
+      aria-label="Import files"
+    >
+      <Icon icon="ph:upload-simple" />
+    </button>
+    <button
+      class="rounded p-1 text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
+      onclick={collapseAll}
+      title="Collapse all"
+      aria-label="Collapse all"
+    >
+      <Icon icon="ph:arrows-in-line-vertical" />
+    </button>
+  </div>
+
+  <div
+    class="scroll-thin flex-1 overflow-y-auto py-1"
+    role="tree"
+    tabindex="-1"
+    data-tree-path=""
+    data-tree-dir="true"
+    onclick={(event) => {
+      if (event.target === event.currentTarget) onselect(null, true);
+    }}
+    onkeydown={(event) => {
+      if (event.key === "Escape") onselect(null, true);
+    }}
+    ondragover={(event) => {
+      if (dragging) event.preventDefault();
+    }}
+    ondrop={(event) => {
+      event.preventDefault();
+      const source = dragging ?? event.dataTransfer?.getData("text/plain");
+      dragging = null;
+      if (source && parentOf(source) !== "") onmove(source, "");
+    }}
+  >
+    {#if files.length === 0}
+      <p class="px-3 py-4 text-xs text-[var(--color-ink-muted)]">No files yet</p>
+    {:else}
+      {@render branch(tree, 0)}
+    {/if}
+  </div>
 </div>
+
+{#if menu}
+  {@const target = menu}
+  <div
+    class="fixed z-50 flex w-48 flex-col rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] py-1 text-xs shadow-lg"
+    style="left: {target.x}px; top: {target.y}px"
+  >
+    {#if target.isDir}
+      <button
+        class="px-3 py-1.5 text-left hover:bg-[var(--color-surface-sunken)]"
+        onclick={() => onnewfile(target.path)}
+      >
+        New file
+      </button>
+      <button
+        class="px-3 py-1.5 text-left hover:bg-[var(--color-surface-sunken)]"
+        onclick={() => onnewfolder(target.path)}
+      >
+        New folder
+      </button>
+      <button
+        class="px-3 py-1.5 text-left hover:bg-[var(--color-surface-sunken)]"
+        onclick={() => onimport(target.path)}
+      >
+        Import files here
+      </button>
+      <div class="my-1 h-px bg-[var(--color-line)]"></div>
+    {:else if target.path.endsWith(".typ")}
+      <button
+        class="px-3 py-1.5 text-left hover:bg-[var(--color-surface-sunken)]"
+        onclick={() => onsetentry(target.path)}
+      >
+        Set as entrypoint
+      </button>
+      <div class="my-1 h-px bg-[var(--color-line)]"></div>
+    {/if}
+
+    <button
+      class="px-3 py-1.5 text-left hover:bg-[var(--color-surface-sunken)]"
+      onclick={() => onrename(target.path)}
+    >
+      Rename
+    </button>
+    <button
+      class="px-3 py-1.5 text-left hover:bg-[var(--color-surface-sunken)]"
+      onclick={() => onduplicate(target.path)}
+    >
+      Duplicate
+    </button>
+    <button
+      class="px-3 py-1.5 text-left hover:bg-[var(--color-surface-sunken)]"
+      onclick={() => navigator.clipboard.writeText(target.path)}
+    >
+      Copy path
+    </button>
+    <button
+      class="px-3 py-1.5 text-left hover:bg-[var(--color-surface-sunken)]"
+      onclick={() => onreveal(target.path)}
+    >
+      Reveal in file manager
+    </button>
+    <div class="my-1 h-px bg-[var(--color-line)]"></div>
+    <button
+      class="px-3 py-1.5 text-left text-[var(--color-danger)] hover:bg-[var(--color-surface-sunken)]"
+      onclick={() => ondelete(target.path)}
+    >
+      Delete
+    </button>
+  </div>
+{/if}

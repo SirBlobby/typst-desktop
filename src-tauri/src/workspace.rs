@@ -127,6 +127,62 @@ pub struct BrowseEntry {
     pub space_id: Option<String>,
     pub last_synced_at: Option<String>,
     pub child_count: usize,
+    pub cloud_linked: bool,
+    /// "synced" when nothing changed since the last sync, "pending" when local
+    /// edits are waiting to go up, or None when the entry is not linked.
+    pub sync_state: Option<String>,
+}
+
+fn modified_time(path: &Path) -> Option<chrono::DateTime<chrono::Utc>> {
+    Some(std::fs::metadata(path).ok()?.modified().ok()?.into())
+}
+
+fn newest_change(dir: &Path) -> Option<chrono::DateTime<chrono::Utc>> {
+    let mut newest: Option<chrono::DateTime<chrono::Utc>> = None;
+
+    for entry in WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
+        if !entry.file_type().is_file() {
+            continue;
+        }
+        let Some(relative) = relative_path(dir, entry.path()) else {
+            continue;
+        };
+        if relative.split('/').any(|segment| segment.starts_with('.')) {
+            continue;
+        }
+        if let Some(time) = entry.metadata().ok().and_then(|m| m.modified().ok()) {
+            let time: chrono::DateTime<chrono::Utc> = time.into();
+            if newest.map(|current| time > current).unwrap_or(true) {
+                newest = Some(time);
+            }
+        }
+    }
+
+    newest
+}
+
+/// Compares when the entry last changed on disk against when it was last
+/// synced. Metadata only, so browsing stays cheap.
+pub fn sync_state_of(path: &Path, synced_at: Option<&str>) -> Option<String> {
+    sync_state_for(modified_time(path), synced_at)
+}
+
+pub fn project_sync_state(dir: &Path, synced_at: Option<&str>) -> Option<String> {
+    sync_state_for(newest_change(dir), synced_at)
+}
+
+fn sync_state_for(
+    changed: Option<chrono::DateTime<chrono::Utc>>,
+    synced_at: Option<&str>,
+) -> Option<String> {
+    let synced = chrono::DateTime::parse_from_rfc3339(synced_at?)
+        .ok()
+        .map(|value| value.with_timezone(&chrono::Utc))?;
+
+    match changed {
+        Some(changed) if changed > synced => Some("pending".to_string()),
+        _ => Some("synced".to_string()),
+    }
 }
 
 fn modified_at(path: &Path) -> Option<String> {
@@ -177,18 +233,42 @@ pub fn browse(app: &AppHandle, store: &Store, relative: &str) -> Result<Vec<Brow
                 })
                 .unwrap_or(0);
 
+            let space_id = meta.as_ref().and_then(|m| m.space_id.clone());
+            let last_synced_at = meta.as_ref().and_then(|m| m.last_synced_at.clone());
+            let sync_state = if space_id.is_some() {
+                sync_state_for(newest_change(&full), last_synced_at.as_deref())
+            } else {
+                None
+            };
+
             entries.push(BrowseEntry {
                 name,
                 path,
                 kind: if project { "project" } else { "folder" }.to_string(),
                 size: 0,
                 modified: modified_at(&full),
-                space_id: meta.as_ref().and_then(|m| m.space_id.clone()),
-                last_synced_at: meta.as_ref().and_then(|m| m.last_synced_at.clone()),
+                cloud_linked: space_id.is_some(),
+                space_id,
+                last_synced_at,
+                sync_state,
                 child_count,
             });
         } else {
             let kind = if is_typst_file(&name) { "document" } else { "file" };
+            let link = store.document_link(&path)?;
+
+            // Cloud documents are managed from the Cloud view, so they are not
+            // listed a second time here.
+            if link.is_some() {
+                continue;
+            }
+
+            let sync_state = link
+                .as_ref()
+                .and_then(|link| {
+                    sync_state_for(modified_time(&full), link.synced_at.as_deref())
+                });
+
             entries.push(BrowseEntry {
                 name,
                 path,
@@ -196,8 +276,10 @@ pub fn browse(app: &AppHandle, store: &Store, relative: &str) -> Result<Vec<Brow
                 size: std::fs::metadata(&full).map(|m| m.len()).unwrap_or(0),
                 modified: modified_at(&full),
                 space_id: None,
-                last_synced_at: None,
+                last_synced_at: link.as_ref().and_then(|link| link.synced_at.clone()),
                 child_count: 0,
+                cloud_linked: link.is_some(),
+                sync_state,
             });
         }
     }
@@ -368,27 +450,49 @@ pub fn read_all_files(project_dir: &Path) -> Result<HashMap<String, Vec<u8>>, St
 pub struct FileEntry {
     pub path: String,
     pub name: String,
+    pub is_dir: bool,
     pub is_text: bool,
     pub size: u64,
 }
 
+/// Lists a project's contents for the editor tree. Unlike `collect_files`,
+/// which feeds sync and only cares about file contents, this includes
+/// directories so an empty folder is still visible after it is created.
 pub fn list_files(project_dir: &Path) -> Result<Vec<FileEntry>, String> {
     let mut entries = Vec::new();
-    for relative in collect_files(project_dir)? {
-        let full = project_file_path(project_dir, &relative)?;
-        let size = std::fs::metadata(&full).map(|m| m.len()).unwrap_or(0);
+
+    for entry in WalkDir::new(project_dir).into_iter().filter_map(|e| e.ok()) {
+        let Some(relative) = relative_path(project_dir, entry.path()) else {
+            continue;
+        };
+        if relative.is_empty() || relative == PROJECT_META_FILE {
+            continue;
+        }
+        if relative.split('/').any(|segment| segment.starts_with('.')) {
+            continue;
+        }
+
+        let is_dir = entry.file_type().is_dir();
         let name = relative
             .rsplit('/')
             .next()
             .unwrap_or(&relative)
             .to_string();
+
         entries.push(FileEntry {
-            is_text: is_text_file(&relative),
+            is_dir,
+            is_text: !is_dir && is_text_file(&relative),
+            size: if is_dir {
+                0
+            } else {
+                entry.metadata().map(|m| m.len()).unwrap_or(0)
+            },
             path: relative,
             name,
-            size,
         });
     }
+
+    entries.sort_by(|a, b| a.path.cmp(&b.path));
     Ok(entries)
 }
 

@@ -228,6 +228,98 @@ fn delete_entry(app: AppHandle, store: State<'_, Store>, path: String) -> Result
     }
 }
 
+/// Moves an entry into another folder, keeping its name.
+#[tauri::command]
+fn move_entry(
+    app: AppHandle,
+    store: State<'_, Store>,
+    path: String,
+    destination: String,
+) -> Result<String, String> {
+    let name = path
+        .rsplit('/')
+        .next()
+        .ok_or("Invalid path")?
+        .to_string();
+
+    let target_path = join_path(&destination, &name);
+    if target_path == path {
+        return Ok(path);
+    }
+    if destination == path || destination.starts_with(&format!("{}/", path)) {
+        return Err("A folder cannot be moved into itself".to_string());
+    }
+
+    let from = workspace_path(&app, &store, &path)?;
+    let to = workspace_path(&app, &store, &target_path)?;
+
+    if to.exists() {
+        return Err(format!("'{}' already exists there", name));
+    }
+    if let Some(parent) = to.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+
+    std::fs::rename(&from, &to).map_err(|e| e.to_string())?;
+    store.rename_project(&path, &target_path)?;
+    Ok(target_path)
+}
+
+#[tauri::command]
+fn duplicate_entry(
+    app: AppHandle,
+    store: State<'_, Store>,
+    path: String,
+) -> Result<String, String> {
+    let full = workspace_path(&app, &store, &path)?;
+    let parent = parent_of(&path);
+
+    let name = path.rsplit('/').next().ok_or("Invalid path")?;
+    let (stem, extension) = match name.rsplit_once('.') {
+        Some((stem, ext)) if !stem.is_empty() => (stem.to_string(), format!(".{}", ext)),
+        _ => (name.to_string(), String::new()),
+    };
+
+    let mut candidate = String::new();
+    for index in 1..1000 {
+        let suffix = if index == 1 {
+            " copy".to_string()
+        } else {
+            format!(" copy {}", index)
+        };
+        let attempt = join_path(&parent, &format!("{}{}{}", stem, suffix, extension));
+        if !workspace_path(&app, &store, &attempt)?.exists() {
+            candidate = attempt;
+            break;
+        }
+    }
+
+    if candidate.is_empty() {
+        return Err("Could not find a free name".to_string());
+    }
+
+    let to = workspace_path(&app, &store, &candidate)?;
+    if full.is_dir() {
+        assets::import_paths(&[full.to_string_lossy().to_string()], &to)?;
+    } else {
+        std::fs::copy(&full, &to).map_err(|e| e.to_string())?;
+    }
+
+    Ok(candidate)
+}
+
+/// Absolute path on disk, used to reveal an entry in the system file manager.
+#[tauri::command]
+fn absolute_path(
+    app: AppHandle,
+    store: State<'_, Store>,
+    path: String,
+) -> Result<String, String> {
+    Ok(workspace_path(&app, &store, &path)?
+        .to_string_lossy()
+        .to_string())
+}
+
 #[tauri::command]
 fn upload_entry(
     app: AppHandle,
@@ -282,6 +374,7 @@ fn target_info(app: AppHandle, store: State<'_, Store>, path: String) -> Result<
             files: vec![FileEntry {
                 path: target.entrypoint.clone(),
                 name: target.entrypoint,
+                is_dir: false,
                 is_text: true,
                 size,
             }],
@@ -481,7 +574,7 @@ fn list_resources(
     };
 
     for file in list_files(&target.root)? {
-        if file.path.to_lowercase().ends_with(".typ") {
+        if file.is_dir || file.path.to_lowercase().ends_with(".typ") {
             continue;
         }
 
@@ -659,6 +752,37 @@ fn cloud_list_documents(
 }
 
 #[tauri::command]
+fn cloud_list_files(
+    app: AppHandle,
+    store: State<'_, Store>,
+    folder_id: Option<String>,
+) -> Result<Vec<sync::CloudFile>, String> {
+    let (server_url, token) = cloud_credentials(&app, &store)?;
+    sync::list_account_files(&server_url, &token, folder_id.as_deref())
+}
+
+/// Downloads an account file into the shared asset library, where every
+/// project can reference it by name.
+#[tauri::command]
+fn cloud_download_file(
+    app: AppHandle,
+    store: State<'_, Store>,
+    file_id: String,
+) -> Result<String, String> {
+    let (server_url, token) = cloud_credentials(&app, &store)?;
+    let file = sync::pull_account_file(&server_url, &token, &file_id)?;
+
+    let bytes = BASE64
+        .decode(file.content.as_bytes())
+        .map_err(|e| format!("Invalid file data: {}", e))?;
+
+    let destination = assets::assets_dir(&app, &store)?.join(&file.name);
+    std::fs::write(&destination, bytes).map_err(|e| e.to_string())?;
+
+    Ok(file.name)
+}
+
+#[tauri::command]
 fn cloud_list_shared(
     app: AppHandle,
     store: State<'_, Store>,
@@ -738,6 +862,77 @@ fn cloud_resolve_document(
 #[tauri::command]
 fn cloud_unlink_document(store: State<'_, Store>, path: String) -> Result<(), String> {
     store.forget_document_link(&path)
+}
+
+#[derive(Serialize)]
+pub struct LinkedDocument {
+    pub path: String,
+    pub document_id: String,
+    pub synced_at: Option<String>,
+    pub sync_state: Option<String>,
+}
+
+/// Every cloud document that has been downloaded, so the cloud view can show
+/// which ones live on this device and whether they are up to date.
+#[tauri::command]
+fn cloud_linked_documents(
+    app: AppHandle,
+    store: State<'_, Store>,
+) -> Result<Vec<LinkedDocument>, String> {
+    let mut linked = Vec::new();
+
+    for (path, document_id, synced_at) in store.all_document_links()? {
+        let Ok(full) = workspace_path(&app, &store, &path) else {
+            continue;
+        };
+        if !full.is_file() {
+            continue;
+        }
+
+        linked.push(LinkedDocument {
+            sync_state: workspace::sync_state_of(&full, synced_at.as_deref()),
+            path,
+            document_id,
+            synced_at,
+        });
+    }
+
+    Ok(linked)
+}
+
+#[derive(Serialize)]
+pub struct LinkedSpace {
+    pub path: String,
+    pub space_id: String,
+    pub synced_at: Option<String>,
+    pub sync_state: Option<String>,
+}
+
+/// Cloud spaces that have been downloaded, wherever they sit in the workspace.
+#[tauri::command]
+fn cloud_linked_spaces(
+    app: AppHandle,
+    store: State<'_, Store>,
+) -> Result<Vec<LinkedSpace>, String> {
+    let mut linked = Vec::new();
+
+    for (path, space_id, synced_at) in store.all_space_links()? {
+        let Ok(full) = workspace_path(&app, &store, &path) else {
+            continue;
+        };
+        if !full.is_dir() {
+            continue;
+        }
+
+        linked.push(LinkedSpace {
+            sync_state: workspace::project_sync_state(&full, synced_at.as_deref()),
+            path,
+            space_id,
+            synced_at,
+        });
+    }
+
+    Ok(linked)
 }
 
 #[tauri::command]
@@ -899,6 +1094,9 @@ pub fn run() {
             create_document_entry,
             create_project_entry,
             rename_entry,
+            move_entry,
+            duplicate_entry,
+            absolute_path,
             delete_entry,
             upload_entry,
             target_info,
@@ -928,10 +1126,14 @@ pub fn run() {
             cloud_list_folders,
             cloud_list_documents,
             cloud_list_shared,
+            cloud_list_files,
+            cloud_download_file,
             cloud_download_document,
             cloud_sync_document,
             cloud_resolve_document,
             cloud_document_link,
+            cloud_linked_documents,
+            cloud_linked_spaces,
             cloud_unlink_document,
             cloud_create_space,
             cloud_delete_space,
