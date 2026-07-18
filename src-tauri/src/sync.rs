@@ -566,3 +566,285 @@ pub fn resolve_conflict(
         .insert(path.to_string(), server_hash.to_string());
     store.save_meta(project, meta)
 }
+
+#[derive(Deserialize, Serialize, Clone)]
+pub struct CloudFolder {
+    pub id: String,
+    pub name: String,
+    pub parent_id: Option<String>,
+}
+
+#[derive(Deserialize, Serialize, Clone)]
+pub struct CloudDocument {
+    pub id: String,
+    pub title: String,
+    pub folder_id: Option<String>,
+    pub role: String,
+    pub updated_at: String,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct SharedItems {
+    pub documents: Vec<CloudDocument>,
+    pub spaces: Vec<SpaceSummary>,
+}
+
+pub fn list_folders(server_url: &str, token: &str) -> Result<Vec<CloudFolder>, String> {
+    agent()
+        .get(&endpoint(server_url, "/folders"))
+        .set("Authorization", &format!("Bearer {}", token))
+        .call()
+        .map_err(describe)?
+        .into_json::<Vec<CloudFolder>>()
+        .map_err(|e| e.to_string())
+}
+
+pub fn list_documents(
+    server_url: &str,
+    token: &str,
+    folder_id: Option<&str>,
+) -> Result<Vec<CloudDocument>, String> {
+    let mut request = agent()
+        .get(&endpoint(server_url, "/documents"))
+        .set("Authorization", &format!("Bearer {}", token));
+
+    if let Some(folder) = folder_id {
+        request = request.query("folder_id", folder);
+    }
+
+    request
+        .call()
+        .map_err(describe)?
+        .into_json::<Vec<CloudDocument>>()
+        .map_err(|e| e.to_string())
+}
+
+pub fn list_shared(server_url: &str, token: &str) -> Result<SharedItems, String> {
+    agent()
+        .get(&endpoint(server_url, "/shared"))
+        .set("Authorization", &format!("Bearer {}", token))
+        .call()
+        .map_err(describe)?
+        .into_json::<SharedItems>()
+        .map_err(|e| e.to_string())
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct DocumentContent {
+    pub id: String,
+    pub title: String,
+    pub role: String,
+    pub hash: String,
+    pub content: String,
+}
+
+pub fn pull_document(
+    server_url: &str,
+    token: &str,
+    document_id: &str,
+) -> Result<DocumentContent, String> {
+    agent()
+        .get(&endpoint(server_url, &format!("/documents/{}", document_id)))
+        .set("Authorization", &format!("Bearer {}", token))
+        .call()
+        .map_err(describe)?
+        .into_json::<DocumentContent>()
+        .map_err(|e| e.to_string())
+}
+
+/// Syncs one downloaded cloud document. The merge base is the copy stored when
+/// the document was last exchanged with the server.
+pub fn sync_document(
+    server_url: &str,
+    token: &str,
+    app: &tauri::AppHandle,
+    store: &Store,
+    path: &str,
+) -> Result<SyncReport, String> {
+    let link = store
+        .document_link(path)?
+        .ok_or("This document is not linked to the cloud")?;
+
+    let full = crate::workspace::workspace_path(app, store, path)?;
+    let local = std::fs::read_to_string(&full).map_err(|e| e.to_string())?;
+    let remote = pull_document(server_url, token, &link.document_id)?;
+
+    let mut report = SyncReport::default();
+
+    let local_hash = content_hash(local.as_bytes());
+    let editable = remote.role == "owner" || remote.role == "editor";
+
+    if local_hash == remote.hash {
+        store.save_document_link(path, &link.document_id, &remote.hash, &remote.role, &local)?;
+        return Ok(report);
+    }
+
+    if local_hash == link.base_hash {
+        std::fs::write(&full, &remote.content).map_err(|e| e.to_string())?;
+        store.save_document_link(
+            path,
+            &link.document_id,
+            &remote.hash,
+            &remote.role,
+            &remote.content,
+        )?;
+        report.pulled.push(path.to_string());
+        return Ok(report);
+    }
+
+    if remote.hash == link.base_hash {
+        if !editable {
+            return Err("You only have view access to this document".to_string());
+        }
+        match push_document(
+            server_url,
+            token,
+            &link.document_id,
+            &local,
+            Some(&link.base_hash),
+        )? {
+            PushResult::Applied => {
+                store.save_document_link(
+                    path,
+                    &link.document_id,
+                    &local_hash,
+                    &remote.role,
+                    &local,
+                )?;
+                report.pushed.push(path.to_string());
+            }
+            PushResult::Conflict {
+                server_hash,
+                server_text,
+            } => {
+                report.conflicts.push(Conflict {
+                    path: path.to_string(),
+                    local_text: local,
+                    remote_text: server_text.clone(),
+                    merged_text: server_text,
+                    server_hash,
+                    auto_merged: false,
+                    binary: false,
+                });
+            }
+        }
+        return Ok(report);
+    }
+
+    match diffy::merge(&link.base_content, &local, &remote.content) {
+        Ok(merged) => {
+            std::fs::write(&full, &merged).map_err(|e| e.to_string())?;
+
+            if editable {
+                match push_document(
+                    server_url,
+                    token,
+                    &link.document_id,
+                    &merged,
+                    Some(&remote.hash),
+                )? {
+                    PushResult::Applied => {
+                        store.save_document_link(
+                            path,
+                            &link.document_id,
+                            &content_hash(merged.as_bytes()),
+                            &remote.role,
+                            &merged,
+                        )?;
+                    }
+                    PushResult::Conflict {
+                        server_hash,
+                        server_text,
+                    } => {
+                        report.conflicts.push(Conflict {
+                            path: path.to_string(),
+                            local_text: merged.clone(),
+                            remote_text: server_text.clone(),
+                            merged_text: server_text,
+                            server_hash,
+                            auto_merged: false,
+                            binary: false,
+                        });
+                        return Ok(report);
+                    }
+                }
+            }
+
+            report.merged.push(path.to_string());
+        }
+        Err(conflicted) => {
+            report.conflicts.push(Conflict {
+                path: path.to_string(),
+                local_text: local,
+                remote_text: remote.content,
+                merged_text: conflicted,
+                server_hash: remote.hash,
+                auto_merged: false,
+                binary: false,
+            });
+        }
+    }
+
+    Ok(report)
+}
+
+/// Applies a resolved cloud document and uploads it.
+pub fn resolve_document_conflict(
+    server_url: &str,
+    token: &str,
+    app: &tauri::AppHandle,
+    store: &Store,
+    path: &str,
+    content: &str,
+    server_hash: &str,
+) -> Result<(), String> {
+    let link = store
+        .document_link(path)?
+        .ok_or("This document is not linked to the cloud")?;
+
+    let full = crate::workspace::workspace_path(app, store, path)?;
+    std::fs::write(&full, content).map_err(|e| e.to_string())?;
+
+    match push_document(server_url, token, &link.document_id, content, Some(server_hash))? {
+        PushResult::Applied => store.save_document_link(
+            path,
+            &link.document_id,
+            &content_hash(content.as_bytes()),
+            &link.role,
+            content,
+        ),
+        PushResult::Conflict { .. } => {
+            Err("The document changed again in the cloud. Sync and merge once more.".to_string())
+        }
+    }
+}
+
+pub fn push_document(
+    server_url: &str,
+    token: &str,
+    document_id: &str,
+    content: &str,
+    base_hash: Option<&str>,
+) -> Result<PushResult, String> {
+    let response = agent()
+        .put(&endpoint(server_url, &format!("/documents/{}", document_id)))
+        .set("Authorization", &format!("Bearer {}", token))
+        .send_json(ureq::json!({
+            "content": content,
+            "base_hash": base_hash,
+        }));
+
+    match response {
+        Ok(_) => Ok(PushResult::Applied),
+        Err(ureq::Error::Status(409, body)) => {
+            let conflict = body
+                .into_json::<ConflictBody>()
+                .map_err(|e| format!("Malformed conflict response: {}", e))?;
+            Ok(PushResult::Conflict {
+                server_hash: conflict.server_hash,
+                server_text: conflict.server_content,
+            })
+        }
+        Err(other) => Err(describe(other)),
+    }
+}

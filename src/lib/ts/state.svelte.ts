@@ -2,9 +2,12 @@ import * as api from "./api";
 import type {
   Account,
   BrowseEntry,
+  CloudDocument,
+  CloudFolder,
   CompileResult,
   Conflict,
   Diagnostic,
+  DocumentLink,
   Settings,
   SpaceSummary,
   TargetInfo,
@@ -23,6 +26,11 @@ interface AppState {
   currentDir: string;
   entries: BrowseEntry[];
   spaces: SpaceSummary[];
+  cloudFolder: string | null | "shared";
+  cloudFolders: CloudFolder[];
+  cloudDocuments: CloudDocument[];
+  cloudLoading: boolean;
+  documentLink: DocumentLink | null;
 
   target: TargetInfo | null;
   activePath: string | null;
@@ -49,6 +57,11 @@ export const app = $state<AppState>({
   currentDir: "",
   entries: [],
   spaces: [],
+  cloudFolder: null,
+  cloudFolders: [],
+  cloudDocuments: [],
+  cloudLoading: false,
+  documentLink: null,
 
   target: null,
   activePath: null,
@@ -102,6 +115,7 @@ export async function bootstrap() {
 
   try {
     app.settings = await api.getSettings();
+    restartAutoSync();
     await browseTo("");
     await refreshAccount();
   } catch (error) {
@@ -144,6 +158,53 @@ export async function refreshSpaces() {
   }
 }
 
+export async function refreshCloud() {
+  if (!app.account) return;
+
+  app.cloudLoading = true;
+  try {
+    if (app.cloudFolder === "shared") {
+      const shared = await api.cloudListShared();
+      app.cloudDocuments = shared.documents;
+      app.spaces = shared.spaces;
+      app.cloudFolders = [];
+    } else {
+      const [folders, documents, spaces] = await Promise.all([
+        api.cloudListFolders(),
+        api.cloudListDocuments(app.cloudFolder),
+        api.cloudListSpaces(),
+      ]);
+      app.cloudFolders = folders.filter(
+        (folder) => (folder.parent_id ?? null) === app.cloudFolder,
+      );
+      app.cloudDocuments = documents;
+      app.spaces = spaces;
+    }
+  } catch (error) {
+    setError(error);
+  } finally {
+    app.cloudLoading = false;
+  }
+}
+
+export async function openCloudFolder(id: string | null | "shared") {
+  app.cloudFolder = id;
+  await refreshCloud();
+}
+
+export async function downloadDocument(documentId: string, title: string) {
+  try {
+    const path = await api.cloudDownloadDocument(documentId, "");
+    app.scope = "local";
+    await browseTo("");
+    setStatus(`Downloaded '${title}' to this device`);
+    return path;
+  } catch (error) {
+    setError(error);
+    return null;
+  }
+}
+
 export async function openTarget(path: string) {
   try {
     const target = await api.targetInfo(path);
@@ -156,6 +217,10 @@ export async function openTarget(path: string) {
     app.diagnostics = [];
     app.lspStatus = "off";
     clearMessages();
+
+    app.documentLink = target.standalone
+      ? await api.cloudDocumentLink(path).catch(() => null)
+      : null;
 
     const preferred =
       target.files.find((file) => file.path === target.entrypoint) ??
@@ -170,6 +235,7 @@ export async function openTarget(path: string) {
 
 export async function closeTarget() {
   cancelScheduledCompile();
+  cancelAutosave();
   if (app.dirty) await saveActiveFile();
   app.view = "files";
   app.target = null;
@@ -194,6 +260,7 @@ export async function openFile(file: string) {
   if (!app.target) return;
 
   cancelScheduledCompile();
+  cancelAutosave();
 
   if (app.dirty && app.activePath) await saveActiveFile();
 
@@ -242,7 +309,15 @@ export async function compile() {
   app.compiling = true;
 
   try {
-    const result = await api.compileTarget(app.target.path, liveOverrides());
+    const previewFile =
+      app.activePath && app.activePath.toLowerCase().endsWith(".typ")
+        ? app.activePath
+        : undefined;
+    const result = await api.compileTarget(
+      app.target.path,
+      previewFile,
+      liveOverrides(),
+    );
     app.compiled = result;
     app.diagnostics = result.diagnostics;
   } catch (error) {
@@ -280,8 +355,57 @@ export function cancelScheduledCompile() {
   }
 }
 
+let autosaveTimer: ReturnType<typeof setTimeout> | null = null;
+
+export function scheduleAutosave() {
+  const seconds = app.settings?.autosave_seconds ?? 0;
+  if (autosaveTimer) clearTimeout(autosaveTimer);
+  if (seconds <= 0) return;
+
+  autosaveTimer = setTimeout(() => {
+    autosaveTimer = null;
+    if (app.dirty) saveActiveFile();
+  }, seconds * 1000);
+}
+
+export function cancelAutosave() {
+  if (autosaveTimer) {
+    clearTimeout(autosaveTimer);
+    autosaveTimer = null;
+  }
+}
+
+let syncTimer: ReturnType<typeof setInterval> | null = null;
+
+export function restartAutoSync() {
+  if (syncTimer) {
+    clearInterval(syncTimer);
+    syncTimer = null;
+  }
+
+  const minutes = app.settings?.sync_minutes ?? 0;
+  if (minutes <= 0) return;
+
+  syncTimer = setInterval(() => {
+    autoSync();
+  }, minutes * 60 * 1000);
+}
+
+async function autoSync() {
+  if (!app.account || app.syncing) return;
+  if (app.conflicts.length > 0) return;
+
+  const linked = app.target?.space_id || app.documentLink;
+  const project = linked ? app.target?.path : null;
+  if (!project) return;
+
+  if (app.dirty) await saveActiveFile();
+  await runSync("sync", project, true);
+}
+
 export async function saveAndCompile() {
   cancelScheduledCompile();
+  cancelAutosave();
   await saveActiveFile();
   await compile();
 }
@@ -289,15 +413,17 @@ export async function saveAndCompile() {
 export async function runSync(
   action: "sync" | "push" | "pull",
   project = app.target?.path,
+  quiet = false,
 ) {
   if (!project) return;
 
   app.syncing = true;
-  clearMessages();
+  if (!quiet) clearMessages();
 
   try {
-    const report =
-      action === "push"
+    const report = app.documentLink
+      ? await api.cloudSyncDocument(project)
+      : action === "push"
         ? await api.cloudPush(project)
         : action === "pull"
           ? await api.cloudPull(project)
@@ -307,7 +433,7 @@ export async function runSync(
 
     if (report.conflicts.length > 0) {
       setError(`${report.conflicts.length} file(s) need conflict resolution`);
-    } else {
+    } else if (!quiet) {
       setStatus(summarize(report));
     }
 

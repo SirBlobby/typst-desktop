@@ -3,7 +3,14 @@
   import { open } from "@tauri-apps/plugin-dialog";
   import Modal from "./Modal.svelte";
   import * as api from "$lib/ts/api";
-  import { app, applyTheme, refreshEntries, setError } from "$lib/ts/state.svelte";
+  import { untrack } from "svelte";
+  import {
+    app,
+    applyTheme,
+    refreshEntries,
+    restartAutoSync,
+    setError,
+  } from "$lib/ts/state.svelte";
 
   interface Props {
     onclose: () => void;
@@ -12,9 +19,25 @@
 
   let { onclose, onsignin }: Props = $props();
 
-  let workspaceRoot = $state(app.settings?.workspace_root ?? "");
-  let serverUrl = $state(app.settings?.server_url ?? "");
+  let workspaceRoot = $state(untrack(() => app.settings?.workspace_root ?? ""));
+  let serverUrl = $state(untrack(() => app.settings?.server_url ?? ""));
+  let autosaveSeconds = $state(untrack(() => app.settings?.autosave_seconds ?? 0));
+  let syncMinutes = $state(untrack(() => app.settings?.sync_minutes ?? 0));
   let saving = $state(false);
+
+  const autosaveOptions = [
+    { value: 0, label: "Off" },
+    { value: 5, label: "5 seconds" },
+    { value: 10, label: "10 seconds" },
+    { value: 15, label: "15 seconds" },
+  ];
+
+  const syncOptions = [
+    { value: 0, label: "Off" },
+    { value: 1, label: "1 minute" },
+    { value: 2, label: "2 minutes" },
+    { value: 5, label: "5 minutes" },
+  ];
 
   async function browse() {
     const selected = await open({ directory: true, multiple: false });
@@ -29,7 +52,10 @@
       app.settings = await api.updateSettings({
         workspaceRoot,
         serverUrl,
+        autosaveSeconds,
+        syncMinutes,
       });
+      restartAutoSync();
       await refreshEntries();
       onclose();
     } catch (error) {
@@ -79,6 +105,37 @@
         class="rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2 text-sm focus:border-[var(--color-accent)] focus:outline-none"
         bind:value={serverUrl}
       />
+    </div>
+
+    <div class="flex flex-col gap-1 text-xs">
+      <span class="font-medium text-[var(--color-ink-muted)]">Autosave</span>
+      <select
+        class="rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2 text-sm focus:border-[var(--color-accent)] focus:outline-none"
+        bind:value={autosaveSeconds}
+      >
+        {#each autosaveOptions as option}
+          <option value={option.value}>{option.label}</option>
+        {/each}
+      </select>
+      <span class="text-[var(--color-ink-muted)]">
+        Saves the file being edited after you stop typing.
+      </span>
+    </div>
+
+    <div class="flex flex-col gap-1 text-xs">
+      <span class="font-medium text-[var(--color-ink-muted)]">Automatic sync</span>
+      <select
+        class="rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2 text-sm focus:border-[var(--color-accent)] focus:outline-none"
+        bind:value={syncMinutes}
+      >
+        {#each syncOptions as option}
+          <option value={option.value}>{option.label}</option>
+        {/each}
+      </select>
+      <span class="text-[var(--color-ink-muted)]">
+        Pulls and pushes cloud-linked projects on a timer. Conflicts pause
+        syncing until they are resolved.
+      </span>
     </div>
 
     <div

@@ -6,6 +6,8 @@ export interface Settings {
   device_token: string | null;
   account_email: string | null;
   account_username: string | null;
+  autosave_seconds: number;
+  sync_minutes: number;
 }
 
 export interface FileEntry {
@@ -143,8 +145,9 @@ export const setTargetEntrypoint = (path: string, entrypoint: string) =>
 
 export const compileTarget = (
   path: string,
+  entrypoint?: string,
   overrides?: Record<string, string>,
-) => invoke<CompileResult>("compile_target", { path, overrides });
+) => invoke<CompileResult>("compile_target", { path, entrypoint, overrides });
 
 export const exportTarget = (
   path: string,
@@ -160,6 +163,19 @@ export interface Asset {
 }
 
 export const listAssets = () => invoke<Asset[]>("list_assets");
+
+export interface Resource {
+  name: string;
+  reference: string;
+  path: string;
+  scope: "shared" | "project";
+  kind: "font" | "image" | "file";
+  size: number;
+  font_families: string[];
+}
+
+export const listResources = (path: string) =>
+  invoke<Resource[]>("list_resources", { path });
 
 export interface Thumbnail {
   kind: "svg" | "image";
@@ -204,11 +220,23 @@ export const importIntoTarget = (path: string, sources: string[]) =>
 export const importIntoFolder = (parent: string, sources: string[]) =>
   invoke<string[]>("import_into_folder", { parent, sources });
 
+export interface AppInfo {
+  version: string;
+  typst_version: string;
+  authors: string;
+  license: string;
+  tauri_version: string;
+}
+
+export const appInfo = () => invoke<AppInfo>("app_info");
+
 export const getSettings = () => invoke<Settings>("get_settings");
 
 export const updateSettings = (changes: {
   workspaceRoot?: string;
   serverUrl?: string;
+  autosaveSeconds?: number;
+  syncMinutes?: number;
 }) => invoke<Settings>("update_settings", changes);
 
 export const cloudLogin = (
@@ -223,6 +251,60 @@ export const cloudAccount = () => invoke<Account | null>("cloud_account");
 
 export const cloudListSpaces = () =>
   invoke<SpaceSummary[]>("cloud_list_spaces");
+
+export interface CloudFolder {
+  id: string;
+  name: string;
+  parent_id: string | null;
+}
+
+export interface CloudDocument {
+  id: string;
+  title: string;
+  folder_id: string | null;
+  role: string;
+  updated_at: string;
+}
+
+export interface SharedItems {
+  documents: CloudDocument[];
+  spaces: SpaceSummary[];
+}
+
+export interface DocumentLink {
+  document_id: string;
+  base_hash: string;
+  role: string;
+  base_content: string;
+}
+
+export const cloudListFolders = () =>
+  invoke<CloudFolder[]>("cloud_list_folders");
+
+export const cloudListDocuments = (folderId?: string | null) =>
+  invoke<CloudDocument[]>("cloud_list_documents", {
+    folderId: folderId ?? null,
+  });
+
+export const cloudListShared = () => invoke<SharedItems>("cloud_list_shared");
+
+export const cloudDownloadDocument = (documentId: string, parent: string) =>
+  invoke<string>("cloud_download_document", { documentId, parent });
+
+export const cloudSyncDocument = (path: string) =>
+  invoke<SyncReport>("cloud_sync_document", { path });
+
+export const cloudResolveDocument = (
+  path: string,
+  content: string,
+  serverHash: string,
+) => invoke<void>("cloud_resolve_document", { path, content, serverHash });
+
+export const cloudDocumentLink = (path: string) =>
+  invoke<DocumentLink | null>("cloud_document_link", { path });
+
+export const cloudUnlinkDocument = (path: string) =>
+  invoke<void>("cloud_unlink_document", { path });
 
 export const cloudCreateSpace = (name: string) =>
   invoke<SpaceSummary>("cloud_create_space", { name });

@@ -35,6 +35,10 @@ pub struct Settings {
     pub account_email: Option<String>,
     #[serde(default)]
     pub account_username: Option<String>,
+    #[serde(default)]
+    pub autosave_seconds: u32,
+    #[serde(default)]
+    pub sync_minutes: u32,
 }
 
 impl Settings {
@@ -49,6 +53,8 @@ impl Settings {
             device_token: None,
             account_email: None,
             account_username: None,
+            autosave_seconds: 5,
+            sync_minutes: 0,
         }
     }
 }

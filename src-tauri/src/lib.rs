@@ -57,6 +57,26 @@ fn load_project(
     Ok((dir, store.meta(project)?))
 }
 
+#[derive(Serialize)]
+pub struct AppInfo {
+    pub version: String,
+    pub typst_version: String,
+    pub authors: String,
+    pub license: String,
+    pub tauri_version: String,
+}
+
+#[tauri::command]
+fn app_info() -> AppInfo {
+    AppInfo {
+        version: env!("CARGO_PKG_VERSION").to_string(),
+        typst_version: "0.14.2".to_string(),
+        authors: "SirBlobby".to_string(),
+        license: "Apache-2.0".to_string(),
+        tauri_version: tauri::VERSION.to_string(),
+    }
+}
+
 #[tauri::command]
 fn get_settings(app: AppHandle, store: State<'_, Store>) -> Result<Settings, String> {
     load_settings(&app, &store)
@@ -68,6 +88,8 @@ fn update_settings(
     store: State<'_, Store>,
     workspace_root: Option<String>,
     server_url: Option<String>,
+    autosave_seconds: Option<u32>,
+    sync_minutes: Option<u32>,
 ) -> Result<Settings, String> {
     let mut settings = load_settings(&app, &store)?;
     if let Some(root) = workspace_root {
@@ -78,6 +100,12 @@ fn update_settings(
     }
     if let Some(url) = server_url {
         settings.server_url = url.trim_end_matches('/').to_string();
+    }
+    if let Some(seconds) = autosave_seconds {
+        settings.autosave_seconds = seconds;
+    }
+    if let Some(minutes) = sync_minutes {
+        settings.sync_minutes = minutes;
     }
     save_settings(&store, &settings)?;
     Ok(settings)
@@ -331,6 +359,7 @@ fn compile_target(
     app: AppHandle,
     store: State<'_, Store>,
     path: String,
+    entrypoint: Option<String>,
     overrides: Option<std::collections::HashMap<String, String>>,
 ) -> Result<CompileResult, CompileFailure> {
     let target = resolve_target(&app, &store, &path).map_err(failure)?;
@@ -340,7 +369,12 @@ fn compile_target(
         files.insert(file, content.into_bytes());
     }
 
-    compiler::compile_to_svg(target.entrypoint, files)
+    let entrypoint = match entrypoint {
+        Some(file) if files.contains_key(&file) => file,
+        _ => target.entrypoint,
+    };
+
+    compiler::compile_to_svg(entrypoint, files)
         .map_err(|diagnostics| CompileFailure { diagnostics })
 }
 
@@ -395,6 +429,87 @@ fn clear_thumbnails(store: State<'_, Store>) -> Result<(), String> {
 #[tauri::command]
 fn list_assets(app: AppHandle, store: State<'_, Store>) -> Result<Vec<Asset>, String> {
     assets::list_assets(&app, &store)
+}
+
+#[derive(Serialize)]
+pub struct Resource {
+    pub name: String,
+    pub reference: String,
+    pub path: String,
+    pub scope: String,
+    pub kind: String,
+    pub size: u64,
+    pub font_families: Vec<String>,
+}
+
+fn resource_kind(name: &str) -> String {
+    if assets::is_font(name) {
+        "font"
+    } else if assets::is_image(name) {
+        "image"
+    } else {
+        "file"
+    }
+    .to_string()
+}
+
+#[tauri::command]
+fn list_resources(
+    app: AppHandle,
+    store: State<'_, Store>,
+    path: String,
+) -> Result<Vec<Resource>, String> {
+    let mut resources = Vec::new();
+
+    for asset in assets::list_assets(&app, &store)? {
+        resources.push(Resource {
+            reference: asset.name.clone(),
+            path: format!("{}/{}", assets::ASSETS_DIR, asset.name),
+            scope: "shared".to_string(),
+            kind: asset.kind,
+            size: asset.size,
+            font_families: asset.font_families,
+            name: asset.name,
+        });
+    }
+
+    let target = resolve_target(&app, &store, &path)?;
+    let prefix = if target.standalone {
+        path.rsplit_once('/').map(|(dir, _)| dir).unwrap_or("")
+    } else {
+        path.as_str()
+    };
+
+    for file in list_files(&target.root)? {
+        if file.path.to_lowercase().ends_with(".typ") {
+            continue;
+        }
+
+        let full = target.root.join(&file.path);
+        let font_families = if assets::is_font(&file.name) {
+            std::fs::read(&full)
+                .map(|data| assets::families_in(&data))
+                .unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+
+        resources.push(Resource {
+            name: file.name,
+            reference: file.path.clone(),
+            path: if prefix.is_empty() {
+                file.path.clone()
+            } else {
+                format!("{}/{}", prefix, file.path)
+            },
+            scope: "project".to_string(),
+            kind: resource_kind(&file.path),
+            size: file.size,
+            font_families,
+        });
+    }
+
+    Ok(resources)
 }
 
 #[tauri::command]
@@ -522,6 +637,115 @@ fn cloud_account(app: AppHandle, store: State<'_, Store>) -> Result<Option<Accou
 fn cloud_list_spaces(app: AppHandle, store: State<'_, Store>) -> Result<Vec<SpaceSummary>, String> {
     let (server_url, token) = cloud_credentials(&app, &store)?;
     sync::list_spaces(&server_url, &token)
+}
+
+#[tauri::command]
+fn cloud_list_folders(
+    app: AppHandle,
+    store: State<'_, Store>,
+) -> Result<Vec<sync::CloudFolder>, String> {
+    let (server_url, token) = cloud_credentials(&app, &store)?;
+    sync::list_folders(&server_url, &token)
+}
+
+#[tauri::command]
+fn cloud_list_documents(
+    app: AppHandle,
+    store: State<'_, Store>,
+    folder_id: Option<String>,
+) -> Result<Vec<sync::CloudDocument>, String> {
+    let (server_url, token) = cloud_credentials(&app, &store)?;
+    sync::list_documents(&server_url, &token, folder_id.as_deref())
+}
+
+#[tauri::command]
+fn cloud_list_shared(
+    app: AppHandle,
+    store: State<'_, Store>,
+) -> Result<sync::SharedItems, String> {
+    let (server_url, token) = cloud_credentials(&app, &store)?;
+    sync::list_shared(&server_url, &token)
+}
+
+/// Downloads a cloud document into the workspace and remembers where it came
+/// from so it can be synced back.
+#[tauri::command]
+fn cloud_download_document(
+    app: AppHandle,
+    store: State<'_, Store>,
+    document_id: String,
+    parent: String,
+) -> Result<String, String> {
+    let (server_url, token) = cloud_credentials(&app, &store)?;
+    let document = sync::pull_document(&server_url, &token, &document_id)?;
+
+    let mut name = document.title.replace('/', "-").trim().to_string();
+    if name.is_empty() {
+        name = "document".to_string();
+    }
+    if !name.to_lowercase().ends_with(".typ") {
+        name.push_str(".typ");
+    }
+
+    let path = join_path(&parent, &name);
+    let full = workspace_path(&app, &store, &path)?;
+    if let Some(dir) = full.parent() {
+        std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    }
+    std::fs::write(&full, &document.content).map_err(|e| e.to_string())?;
+
+    store.save_document_link(
+        &path,
+        &document_id,
+        &document.hash,
+        &document.role,
+        &document.content,
+    )?;
+
+    Ok(path)
+}
+
+#[tauri::command]
+fn cloud_sync_document(
+    app: AppHandle,
+    store: State<'_, Store>,
+    path: String,
+) -> Result<SyncReport, String> {
+    let (server_url, token) = cloud_credentials(&app, &store)?;
+    sync::sync_document(&server_url, &token, &app, &store, &path)
+}
+
+#[tauri::command]
+fn cloud_resolve_document(
+    app: AppHandle,
+    store: State<'_, Store>,
+    path: String,
+    content: String,
+    server_hash: String,
+) -> Result<(), String> {
+    let (server_url, token) = cloud_credentials(&app, &store)?;
+    sync::resolve_document_conflict(
+        &server_url,
+        &token,
+        &app,
+        &store,
+        &path,
+        &content,
+        &server_hash,
+    )
+}
+
+#[tauri::command]
+fn cloud_unlink_document(store: State<'_, Store>, path: String) -> Result<(), String> {
+    store.forget_document_link(&path)
+}
+
+#[tauri::command]
+fn cloud_document_link(
+    store: State<'_, Store>,
+    path: String,
+) -> Result<Option<db::DocumentLink>, String> {
+    store.document_link(&path)
 }
 
 #[tauri::command]
@@ -667,6 +891,7 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            app_info,
             get_settings,
             update_settings,
             browse_workspace,
@@ -686,6 +911,7 @@ pub fn run() {
             read_image,
             clear_thumbnails,
             list_assets,
+            list_resources,
             list_font_families,
             import_assets,
             delete_asset,
@@ -699,6 +925,14 @@ pub fn run() {
             cloud_logout,
             cloud_account,
             cloud_list_spaces,
+            cloud_list_folders,
+            cloud_list_documents,
+            cloud_list_shared,
+            cloud_download_document,
+            cloud_sync_document,
+            cloud_resolve_document,
+            cloud_document_link,
+            cloud_unlink_document,
             cloud_create_space,
             cloud_delete_space,
             cloud_clone_space,

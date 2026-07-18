@@ -34,7 +34,7 @@ pub fn assets_dir(app: &AppHandle, store: &Store) -> Result<PathBuf, String> {
     Ok(dir)
 }
 
-fn families_in(data: &[u8]) -> Vec<String> {
+pub fn families_in(data: &[u8]) -> Vec<String> {
     let mut families = BTreeSet::new();
     for font in typst::text::Font::iter(typst::foundations::Bytes::new(data.to_vec())) {
         families.insert(font.info().family.clone());

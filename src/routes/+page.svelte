@@ -16,6 +16,7 @@
   import AssetsModal from "$lib/components/AssetsModal.svelte";
   import WindowControls from "$lib/components/WindowControls.svelte";
   import ImageViewer from "$lib/components/ImageViewer.svelte";
+  import InfoModal from "$lib/components/InfoModal.svelte";
   import EditorToolbar from "$lib/components/EditorToolbar.svelte";
   import PageSettingsModal from "$lib/components/PageSettingsModal.svelte";
 
@@ -31,6 +32,7 @@
     clearMessages,
     closeTarget,
     compile,
+    downloadDocument,
     openFile,
     openTarget,
     refreshAccount,
@@ -39,6 +41,7 @@
     refreshTarget,
     runSync,
     saveAndCompile,
+    scheduleAutosave,
     scheduleCompile,
     setError,
     setStatus,
@@ -61,6 +64,7 @@
     | { kind: "delete-file"; path: string }
     | { kind: "login" }
     | { kind: "settings" }
+    | { kind: "info" }
     | { kind: "assets" }
     | { kind: "page-settings" }
     | { kind: "conflicts" };
@@ -231,6 +235,20 @@
     }
   }
 
+  const resolveDocumentConflicts = (resolutions: api.Resolution[]) =>
+    guard(async () => {
+      for (const resolution of resolutions) {
+        await api.cloudResolveDocument(
+          app.target!.path,
+          resolution.content,
+          resolution.server_hash,
+        );
+      }
+      app.conflicts = [];
+      if (app.activePath) await openFile(app.activePath);
+      setStatus("Conflicts resolved and uploaded");
+    });
+
   const resolveConflicts = (resolutions: api.Resolution[]) =>
     guard(async () => {
       const report = await api.cloudResolveConflicts(
@@ -367,14 +385,6 @@
 
       <button
         class="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-ink)]"
-        onclick={() => (dialog = { kind: "assets" })}
-      >
-        <Icon icon="ph:images" />
-        Assets
-      </button>
-
-      <button
-        class="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-ink)]"
         onclick={saveAndCompile}
       >
         <Icon icon="ph:floppy-disk" />
@@ -402,7 +412,7 @@
         </div>
       </div>
 
-      {#if app.target?.space_id}
+      {#if app.target?.space_id || app.documentLink}
         <button
           class="flex items-center gap-1.5 rounded-md bg-[var(--color-accent)] px-2.5 py-1.5 text-xs font-medium text-white transition hover:opacity-90 disabled:opacity-50"
           disabled={app.syncing}
@@ -423,6 +433,14 @@
       aria-label="Settings"
     >
       <Icon icon="ph:gear-six" />
+    </button>
+
+    <button
+      class="rounded-md p-1.5 text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-ink)]"
+      onclick={() => (dialog = { kind: "info" })}
+      aria-label="About"
+    >
+      <Icon icon="ph:info" />
     </button>
 
     <div class="ml-1 h-5 w-px bg-[var(--color-line)]"></div>
@@ -461,11 +479,12 @@
           onnewfolder={() => (dialog = { kind: "new-folder" })}
           onnewdocument={() => (dialog = { kind: "new-document" })}
           onupload={importFiles}
-          onassets={() => (dialog = { kind: "assets" })}
           onrename={(entry) => (dialog = { kind: "rename-entry", entry })}
           ondelete={(entry) => (dialog = { kind: "delete-entry", entry })}
           onlink={(entry) => (dialog = { kind: "link-entry", entry })}
           onviewimage={(paths, index) => (imageViewer = { paths, index })}
+          ondownloaddocument={(documentId, title) =>
+            downloadDocument(documentId, title)}
           onnewspace={() => (dialog = { kind: "new-space" })}
           onclonespace={(id, name) => (dialog = { kind: "clone-space", id, name })}
           ondeletespace={(id) => (dialog = { kind: "delete-space", id })}
@@ -553,6 +572,7 @@
                     app.editorContent = value;
                     app.dirty = true;
                     scheduleCompile();
+                    scheduleAutosave();
                   }}
                   onsave={saveAndCompile}
                   onlspstatus={(status) => (app.lspStatus = status)}
@@ -746,6 +766,8 @@
   />
 {:else if dialog.kind === "settings"}
   <SettingsModal onclose={close} onsignin={() => (dialog = { kind: "login" })} />
+{:else if dialog.kind === "info"}
+  <InfoModal onclose={close} />
 {:else if dialog.kind === "assets"}
   <AssetsModal
     oninsert={app.view === "editor" && editorView
@@ -762,7 +784,7 @@
 {:else if dialog.kind === "conflicts"}
   <ConflictModal
     conflicts={app.conflicts}
-    onresolve={resolveConflicts}
+    onresolve={app.documentLink ? resolveDocumentConflicts : resolveConflicts}
     onclose={close}
   />
 {/if}

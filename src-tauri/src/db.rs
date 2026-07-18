@@ -1,4 +1,5 @@
 use rusqlite::{params, Connection, OptionalExtension};
+use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::Mutex;
 use tauri::{AppHandle, Manager};
@@ -9,7 +10,15 @@ pub struct Store {
     connection: Mutex<Connection>,
 }
 
-const SCHEMA: [&str; 4] = [
+#[derive(Serialize, Clone)]
+pub struct DocumentLink {
+    pub document_id: String,
+    pub base_hash: String,
+    pub role: String,
+    pub base_content: String,
+}
+
+const SCHEMA: [&str; 5] = [
     "CREATE TABLE IF NOT EXISTS settings (
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL
@@ -26,6 +35,13 @@ const SCHEMA: [&str; 4] = [
         hash TEXT NOT NULL,
         content BLOB,
         PRIMARY KEY (project_path, file_path)
+    )",
+    "CREATE TABLE IF NOT EXISTS document_links (
+        path TEXT PRIMARY KEY,
+        document_id TEXT NOT NULL,
+        base_hash TEXT NOT NULL,
+        role TEXT NOT NULL,
+        base_content TEXT
     )",
     "CREATE TABLE IF NOT EXISTS thumbnails (
         path TEXT PRIMARY KEY,
@@ -253,6 +269,56 @@ impl Store {
                    content = excluded.content",
                 params![project, file, hash, content],
             )?;
+            Ok(())
+        })
+    }
+
+    pub fn save_document_link(
+        &self,
+        path: &str,
+        document_id: &str,
+        base_hash: &str,
+        role: &str,
+        base_content: &str,
+    ) -> Result<(), String> {
+        self.with(|connection| {
+            connection.execute(
+                "INSERT INTO document_links (path, document_id, base_hash, role, base_content)
+                 VALUES (?1, ?2, ?3, ?4, ?5)
+                 ON CONFLICT(path) DO UPDATE SET
+                   document_id = excluded.document_id,
+                   base_hash = excluded.base_hash,
+                   role = excluded.role,
+                   base_content = excluded.base_content",
+                params![path, document_id, base_hash, role, base_content],
+            )?;
+            Ok(())
+        })
+    }
+
+    pub fn document_link(&self, path: &str) -> Result<Option<DocumentLink>, String> {
+        self.with(|connection| {
+            connection
+                .query_row(
+                    "SELECT document_id, base_hash, role, base_content
+                     FROM document_links WHERE path = ?1",
+                    params![path],
+                    |row| {
+                        Ok(DocumentLink {
+                            document_id: row.get(0)?,
+                            base_hash: row.get(1)?,
+                            role: row.get(2)?,
+                            base_content: row.get::<_, Option<String>>(3)?.unwrap_or_default(),
+                        })
+                    },
+                )
+                .optional()
+        })
+    }
+
+    pub fn forget_document_link(&self, path: &str) -> Result<(), String> {
+        self.with(|connection| {
+            connection.execute("DELETE FROM document_links WHERE path = ?1", params![path])?;
             Ok(())
         })
     }

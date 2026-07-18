@@ -6,7 +6,9 @@
     app,
     breadcrumbs,
     browseTo,
+    openCloudFolder,
     openTarget,
+    refreshCloud,
   } from "$lib/ts/state.svelte";
 
   interface Props {
@@ -14,11 +16,11 @@
     onnewproject: () => void;
     onnewdocument: () => void;
     onupload: () => void;
-    onassets: () => void;
     onrename: (entry: BrowseEntry) => void;
     ondelete: (entry: BrowseEntry) => void;
     onlink: (entry: BrowseEntry) => void;
     onviewimage: (paths: string[], index: number) => void;
+    ondownloaddocument: (documentId: string, title: string) => void;
     onclonespace: (spaceId: string, name: string) => void;
     ondeletespace: (spaceId: string) => void;
     onnewspace: () => void;
@@ -30,11 +32,11 @@
     onnewproject,
     onnewdocument,
     onupload,
-    onassets,
     onrename,
     ondelete,
     onlink,
     onviewimage,
+    ondownloaddocument,
     onclonespace,
     ondeletespace,
     onnewspace,
@@ -44,6 +46,12 @@
   let menuFor = $state<string | null>(null);
 
   const trail = $derived(breadcrumbs());
+
+  $effect(() => {
+    if (app.scope === "cloud" && app.account) {
+      refreshCloud();
+    }
+  });
 
   const containers = $derived(
     app.entries.filter(
@@ -221,13 +229,6 @@
     <div class="flex-1"></div>
 
     {#if app.scope === "local"}
-      <button
-        class="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-ink)]"
-        onclick={onassets}
-      >
-        <Icon icon="ph:images" />
-        Assets
-      </button>
       <button
         class="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-ink)]"
         onclick={onupload}
@@ -454,14 +455,105 @@
             Sign in
           </button>
         </div>
-      {:else if app.spaces.length === 0}
-        <div
-          class="flex h-full flex-col items-center justify-center gap-3 text-[var(--color-ink-muted)]"
-        >
-          <Icon icon="ph:cloud" class="text-5xl" />
-          <p class="text-sm">No cloud spaces yet.</p>
-        </div>
       {:else}
+        <div class="mb-3 flex items-center gap-1 text-xs">
+          <button
+            class="flex items-center gap-1.5 rounded px-2 py-1 transition hover:bg-[var(--color-surface)]
+              {app.cloudFolder === null ? 'font-medium' : 'text-[var(--color-ink-muted)]'}"
+            onclick={() => openCloudFolder(null)}
+          >
+            <Icon icon="ph:cloud" />
+            My Drive
+          </button>
+          <button
+            class="flex items-center gap-1.5 rounded px-2 py-1 transition hover:bg-[var(--color-surface)]
+              {app.cloudFolder === 'shared'
+              ? 'font-medium'
+              : 'text-[var(--color-ink-muted)]'}"
+            onclick={() => openCloudFolder("shared")}
+          >
+            <Icon icon="ph:users-three" />
+            Shared with me
+          </button>
+
+          {#if app.cloudLoading}
+            <Icon
+              icon="ph:circle-notch"
+              class="animate-spin text-[var(--color-accent)]"
+            />
+          {/if}
+        </div>
+
+        {#if app.cloudFolders.length > 0}
+          <div
+            class="mb-4 grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-2"
+          >
+            {#each app.cloudFolders as folder (folder.id)}
+              <button
+                class="flex items-center gap-2.5 rounded-lg border border-[var(--color-line)] bg-[var(--color-surface-sunken)] px-3 py-2.5 text-left transition hover:border-[var(--color-accent)] hover:bg-[var(--color-surface)]"
+                onclick={() => openCloudFolder(folder.id)}
+              >
+                <Icon
+                  icon="ph:folder-fill"
+                  class="shrink-0 text-2xl text-[var(--color-ink-muted)]"
+                />
+                <span class="truncate text-xs font-medium">{folder.name}</span>
+              </button>
+            {/each}
+          </div>
+        {/if}
+
+        {#if app.cloudDocuments.length > 0}
+          <h2
+            class="mb-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]"
+          >
+            Documents
+          </h2>
+          <div
+            class="mb-4 grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3"
+          >
+            {#each app.cloudDocuments as document (document.id)}
+              <div
+                class="flex flex-col gap-2 rounded-lg border border-[var(--color-line)] bg-[var(--color-surface)] p-3 transition hover:border-[var(--color-accent)]"
+              >
+                <Icon
+                  icon="ph:file-text"
+                  class="text-xl text-[var(--color-accent)]"
+                />
+                <span class="truncate text-xs font-medium" title={document.title}>
+                  {document.title}
+                </span>
+                <span class="text-[10px] text-[var(--color-ink-muted)]">
+                  {document.role} · {formatDate(document.updated_at)}
+                </span>
+                <button
+                  class="mt-1 flex items-center justify-center gap-1 rounded border border-[var(--color-line)] px-2 py-1 text-[10px] hover:bg-[var(--color-surface-muted)]"
+                  onclick={() => ondownloaddocument(document.id, document.title)}
+                >
+                  <Icon icon="ph:download-simple" />
+                  Download
+                </button>
+              </div>
+            {/each}
+          </div>
+        {/if}
+
+        {#if app.spaces.length === 0 && app.cloudDocuments.length === 0 && app.cloudFolders.length === 0}
+          <div
+            class="flex flex-col items-center justify-center gap-3 py-16 text-[var(--color-ink-muted)]"
+          >
+            <Icon icon="ph:cloud" class="text-5xl" />
+            <p class="text-sm">Nothing here yet.</p>
+          </div>
+        {/if}
+
+        {#if app.spaces.length > 0}
+          <h2
+            class="mb-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]"
+          >
+            Spaces
+          </h2>
+        {/if}
         <div class="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3">
           {#each app.spaces as space (space.id)}
             <div
