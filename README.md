@@ -1,5 +1,6 @@
 # Typst Desktop
 
+[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/sirblobby/typst-desktop)
 [![Typst Version](https://img.shields.io/badge/Typst-0.14.2-239dad?logo=typst&logoColor=white)](https://typst.app/)
 [![Rust](https://img.shields.io/badge/Rust-1.82+-orange?logo=rust&logoColor=white)](https://www.rust-lang.org/)
 [![Tauri](https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white)](https://tauri.app/)
@@ -106,16 +107,3 @@ To build a release bundle:
 ```bash
 bun run tauri build
 ```
-
-### Layout
-
-| Path | Contents |
-|---|---|
-| `src/` | SvelteKit frontend. |
-| `src/lib/components/` | Views, editor, modals. |
-| `src/lib/ts/` | Tauri command bindings and app state. |
-| `src-tauri/src/` | Rust backend. |
-| `src-tauri/src/workspace.rs` | Workspace browsing and file access. |
-| `src-tauri/src/compiler.rs` | Typst compilation and export. |
-| `src-tauri/src/sync.rs` | TypstDrive sync and merging. |
-| `src-tauri/src/db.rs` | Local SQLite storage. |

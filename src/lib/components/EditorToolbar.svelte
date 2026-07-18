@@ -31,8 +31,6 @@
       .then((families) => (fonts = families))
       .catch(() => (fonts = []));
   });
-
-  const stats = $derived(app.compiled?.stats ?? null);
 </script>
 
 {#snippet action(
@@ -130,12 +128,4 @@
   </button>
 
   <div class="flex-1"></div>
-
-  {#if stats}
-    <span
-      class="shrink-0 whitespace-nowrap pr-1 text-[10px] text-[var(--color-ink-muted)]"
-    >
-      {stats.pages} pages · {stats.words} words · {stats.characters} chars
-    </span>
-  {/if}
 </div>
