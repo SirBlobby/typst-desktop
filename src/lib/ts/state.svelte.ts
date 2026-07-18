@@ -31,6 +31,7 @@ interface AppState {
   spaces: SpaceSummary[];
   cloudFolder: string | null | "shared";
   cloudFolders: CloudFolder[];
+  cloudFolderTree: CloudFolder[];
   cloudDocuments: CloudDocument[];
   cloudFiles: CloudFile[];
   cloudLoading: boolean;
@@ -65,6 +66,7 @@ export const app = $state<AppState>({
   spaces: [],
   cloudFolder: null,
   cloudFolders: [],
+  cloudFolderTree: [],
   cloudDocuments: [],
   cloudFiles: [],
   cloudLoading: false,
@@ -188,6 +190,7 @@ export async function refreshCloud() {
         api.cloudListSpaces(),
         api.cloudListFiles(app.cloudFolder),
       ]);
+      app.cloudFolderTree = folders;
       app.cloudFolders = folders.filter(
         (folder) => (folder.parent_id ?? null) === app.cloudFolder,
       );
@@ -200,6 +203,22 @@ export async function refreshCloud() {
   } finally {
     app.cloudLoading = false;
   }
+}
+
+/** Trail from the drive root down to the folder being viewed. */
+export function cloudBreadcrumbs(): CloudFolder[] {
+  if (app.cloudFolder === "shared" || app.cloudFolder === null) return [];
+
+  const byId = new Map(app.cloudFolderTree.map((folder) => [folder.id, folder]));
+  const trail: CloudFolder[] = [];
+
+  let current = byId.get(app.cloudFolder);
+  while (current) {
+    trail.unshift(current);
+    current = current.parent_id ? byId.get(current.parent_id) : undefined;
+  }
+
+  return trail;
 }
 
 export async function openCloudFolder(id: string | null | "shared") {

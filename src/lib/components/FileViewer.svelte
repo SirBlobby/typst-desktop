@@ -6,6 +6,7 @@
     app,
     breadcrumbs,
     browseTo,
+    cloudBreadcrumbs,
     linkedDocument,
     linkedSpace,
     openCloudFolder,
@@ -53,6 +54,7 @@
   let menuAt = $state({ x: 0, y: 0 });
 
   const trail = $derived(breadcrumbs());
+  const cloudTrail = $derived(cloudBreadcrumbs());
 
   $effect(() => {
     if (app.scope === "cloud" && app.account) {
@@ -200,10 +202,10 @@
   <div
     class="group flex flex-col overflow-hidden rounded-lg border border-[var(--color-line)] bg-[var(--color-surface)] transition hover:border-[var(--color-accent)] hover:shadow-sm"
   >
-    {#if link && cloudThumbs[link.path]}
-      <div
-        class="flex h-24 items-center justify-center overflow-hidden border-b border-[var(--color-line)] bg-[var(--color-surface-muted)]"
-      >
+    <div
+      class="flex h-24 items-center justify-center overflow-hidden border-b border-[var(--color-line)] bg-[var(--color-surface-muted)]"
+    >
+      {#if link && cloudThumbs[link.path]}
         {#if cloudThumbs[link.path].kind === "svg"}
           <span
             class="flex w-full items-start justify-center bg-white p-1 [&_svg]:h-auto [&_svg]:w-full"
@@ -217,12 +219,18 @@
             class="h-full w-full object-contain"
           />
         {/if}
-      </div>
-    {/if}
+      {:else}
+        <Icon
+          {icon}
+          class="text-3xl {link
+            ? 'text-[var(--color-accent)]'
+            : 'text-[var(--color-ink-muted)]'}"
+        />
+      {/if}
+    </div>
 
     <div class="flex flex-col gap-2.5 p-3">
     <div class="flex items-start gap-2">
-      <Icon {icon} class="shrink-0 text-xl text-[var(--color-accent)]" />
       <div class="min-w-0 flex-1">
         <p class="truncate text-xs font-medium" {title}>{title}</p>
         <p class="truncate text-[10px] text-[var(--color-ink-muted)]">{meta}</p>
@@ -675,6 +683,33 @@
             />
           {/if}
         </div>
+
+        {#if cloudTrail.length > 0}
+          <div class="mb-3 flex flex-wrap items-center gap-1 text-xs">
+            <button
+              class="rounded px-2 py-1 text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface)] hover:text-[var(--color-ink)]"
+              onclick={() => openCloudFolder(null)}
+            >
+              My Drive
+            </button>
+
+            {#each cloudTrail as folder, index}
+              <Icon
+                icon="ph:caret-right"
+                class="text-[10px] text-[var(--color-ink-muted)]"
+              />
+              <button
+                class="rounded px-2 py-1 transition hover:bg-[var(--color-surface)]
+                  {index === cloudTrail.length - 1
+                  ? 'font-medium'
+                  : 'text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]'}"
+                onclick={() => openCloudFolder(folder.id)}
+              >
+                {folder.name}
+              </button>
+            {/each}
+          </div>
+        {/if}
 
         {#if app.cloudFolders.length > 0}
           <div
