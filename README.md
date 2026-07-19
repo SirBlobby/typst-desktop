@@ -140,13 +140,21 @@ bun run tauri build
 
 ## Distribution
 
-Installers are built by the `Build and Release` workflow, which runs on every `v*` tag and can also be started manually. It produces a draft GitHub release with an installer for each platform.
+Workflows live in `.github/workflows` for GitHub Actions and `.gitea/workflows` for Gitea Actions.
+
+| Workflow | Where | Trigger | Output |
+|---|---|---|---|
+| `ci.yml` | both | push, pull requests | Type check, frontend build, backend check. |
+| `release.yml` | GitHub | `v*` tags, manual | A draft release with installers for every platform. |
+| `build.yml` | Gitea | `v*` tags, manual | Linux packages as workflow artifacts. |
 
 | Platform | Artifacts |
 |---|---|
 | Linux | `.deb`, `.rpm`, `.AppImage` |
 | Windows | `.msi`, `-setup.exe` (NSIS) |
 | macOS | `.dmg` for Apple Silicon and Intel, built separately |
+
+Windows and macOS installers come from GitHub Actions because those runners are not available on a self-hosted Gitea instance. The Gitea workflows cover checks and Linux packages.
 
 To cut a release:
 
