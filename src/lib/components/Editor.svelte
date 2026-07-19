@@ -6,7 +6,7 @@
     lineNumbers,
     highlightActiveLine,
   } from "@codemirror/view";
-  import { EditorState, Compartment } from "@codemirror/state";
+  import { EditorState, Compartment, StateField } from "@codemirror/state";
   import {
     defaultKeymap,
     history,
@@ -16,6 +16,7 @@
   import {
     bracketMatching,
     indentOnInput,
+    language,
     Language,
     StreamLanguage,
   } from "@codemirror/language";
@@ -70,6 +71,38 @@
 
   const isToml = $derived(filePath.toLowerCase().endsWith(".toml"));
 
+  function resilientSync(parser: any) {
+    return StateField.define<null>({
+      create: () => null,
+      update(_value, transaction) {
+        if (
+          transaction.startState.facet(language) !==
+          transaction.state.facet(language)
+        ) {
+          parser.clearParser();
+          return null;
+        }
+
+        if (!transaction.docChanged) return null;
+
+        try {
+          transaction.changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => {
+            const edits = parser.parser?.edit(fromA, toA, inserted.toString());
+            if (!edits || edits.full_update) {
+              parser.clearTree();
+              return;
+            }
+            for (const edit of edits.edits) parser.applyTreeEdit(edit);
+          });
+        } catch {
+          parser.clearParser();
+        }
+
+        return null;
+      },
+    });
+  }
+
   async function loadTypstLanguage() {
     const { typst, TypstParser, typstHighlight } = await import(
       "codemirror-lang-typst"
@@ -79,7 +112,7 @@
     return new Language(
       support.language.data,
       parser,
-      [parser.updateListener()],
+      [resilientSync(parser)],
       "typst",
     );
   }
