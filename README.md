@@ -188,6 +188,8 @@ To build a release bundle for your own platform:
 bun run tauri build
 ```
 
+On Linux, use `bun run build:linux` instead. It is the same command with `NO_STRIP=1` set, which the AppImage bundler needs on a rolling-release distribution. See [Platform notes](#platform-notes).
+
 ## Distribution
 
 Workflows live in `.gitea/workflows` and run on Gitea Actions.
@@ -241,11 +243,13 @@ Linux builds also need the WebKit and GTK development packages:
 sudo apt-get install libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev patchelf
 ```
 
-On rolling-release distributions such as Arch, the AppImage step fails while stripping system libraries, because the `strip` bundled inside `linuxdeploy` predates the `.relr.dyn` relocation section that a current toolchain emits. Skip stripping:
+On rolling-release distributions such as Arch, the AppImage step fails with `failed to run linuxdeploy`. The `strip` bundled inside `linuxdeploy` predates the `.relr.dyn` relocation section that a current toolchain emits, so it rejects every system library it is asked to strip. Setting `NO_STRIP=1` skips that pass, which is what `build:linux` does:
 
 ```bash
-NO_STRIP=1 bun run tauri build
+bun run build:linux
 ```
+
+The `.deb` and `.rpm` targets are unaffected, so a build that produces those two and then fails is almost always this.
 
 ## License
 
