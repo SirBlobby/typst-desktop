@@ -16,13 +16,16 @@ The Typst compiler is built into the app — there is nothing extra to install t
 ## Features
 
 - **Local first**: Every document is an ordinary file in a folder you choose. Nothing is locked in a database, and any other editor can open the same files.
-- **Two views**: A file viewer for browsing folders, projects, and documents, and an editor view for writing.
+- **Two views**: A file viewer for browsing local and cloud files, and an editor view for writing.
 - **Single files or projects**: Open a lone `.typ` file, or a project folder with its own `typst.toml`, chapters, bibliography, and assets.
-- **Live preview**: The preview recompiles as you type. Saving is not required to see changes.
-- **Editor**: Typst syntax highlighting, snippet autocompletion, a formatting toolbar, inline diagnostics, and optional `tinymist` language server support.
-- **Cloud sync**: Link a project to a TypstDrive Space to push and pull changes, with three-way merge and a conflict resolver for files edited in both places.
-- **Images and fonts**: Import files from anywhere on disk, or drag and drop them in. A shared asset library makes images and fonts available to every project.
-- **Thumbnails**: Documents show their first compiled page; images show a preview.
+- **Live preview**: The preview recompiles as you type, and follows whichever file you are editing rather than only the entrypoint. Saving is not required to see changes.
+- **Editor**: Typst syntax highlighting, snippet autocompletion, a formatting toolbar, page settings, inline diagnostics, and optional `tinymist` language server support.
+- **File explorer**: Folder selection, a right-click menu, drag and drop, rename, duplicate, move, and reveal in your file manager.
+- **Cloud workspace**: Browse your TypstDrive folders, documents, spaces, and everything shared with you. Download what you want on this device and open it straight from the cloud view.
+- **Sync**: Three-way merge with a conflict resolver, plus optional automatic sync on a timer.
+- **Autosave**: Off by default, or every 5, 10, or 15 seconds.
+- **Images and fonts**: Import from anywhere on disk, drag and drop, or pull from your TypstDrive assets. A searchable asset browser with previews sits in the editor toolbar.
+- **Thumbnails**: Documents and projects show their first compiled page; images show a preview.
 - **Image viewer**: Open images full screen with zoom and folder navigation.
 
 ## Storage
@@ -37,6 +40,17 @@ Inside the workspace:
 | `<workspace>/.assets/` | Shared images and fonts available to every project. |
 
 Application data — settings, sync state, and the thumbnail cache — is kept in a SQLite database in the platform's app-data directory. Documents themselves are never stored there.
+
+## Settings
+
+Settings are grouped into four sections.
+
+| Section | Contents |
+|---|---|
+| Files | Workspace folder and autosave delay. |
+| Appearance | Light or dark theme. |
+| Account | TypstDrive server, sign in and out, automatic sync interval. |
+| About | Version, Typst version, license, and links to the official Typst site. |
 
 ## Fonts and Images
 
@@ -62,19 +76,34 @@ Reference an image by its file name:
 
 Images in the shared asset library are available to every project. Images inside a project folder are available to that project and override an asset of the same name.
 
-## Cloud Sync
+## Cloud Workspace
 
-Sync is optional. Without it the app is entirely local.
+Cloud features are optional. Without an account the app is entirely local.
 
-1. Open **Settings**, enter your TypstDrive server URL, and sign in.
-2. In the file viewer, choose **Upload to cloud** on a project to create a Space from it.
-3. Use **Sync** in the editor to pull remote changes and push local ones.
+1. Open **Settings**, go to **Account**, enter your TypstDrive server URL, and sign in.
+2. Switch the file viewer to **Cloud**.
 
-A project already in the cloud can be brought to another device from the **Cloud** tab in the file viewer.
+The cloud view has two places to look. **My Drive** shows your folders, documents, spaces, and uploaded images and fonts. **Shared with me** shows everything other people have shared with you, along with the role you were given.
+
+| Item | Action |
+|---|---|
+| Document | Download to this device, then Open to edit it. |
+| Space | Download as a local project, then Open. |
+| Image or font | Download into your shared asset library. |
+
+Cards show whether an item is on this device and whether it has local changes waiting to go up. Downloaded documents are managed from the cloud view rather than appearing a second time under Local.
+
+To publish a local project, choose **Upload to cloud** on it in the Local view. That creates a Space from its contents.
+
+### Sync
+
+Sync pulls before it pushes. Use **Sync** in the editor, or turn on automatic sync in **Settings** to run it on a timer.
+
+Viewer access is read-only: a document shared with the viewer role can be downloaded and read, but pushing changes back is refused.
 
 ### Conflicts
 
-Sync pulls before it pushes. When a file changed both locally and in the cloud, a three-way merge is attempted against the version last synced. If the merge cannot be resolved automatically, a conflict resolver opens where you can keep either version or edit the merged result. Binary files cannot be merged and keep the cloud version.
+When a file changed both locally and in the cloud, a three-way merge is attempted against the version last synced. If the merge cannot be resolved automatically, a conflict resolver opens where you can keep either version or edit the merged result. Binary files cannot be merged and keep the cloud version. Automatic sync pauses while conflicts are unresolved.
 
 ## Language Server
 
@@ -108,6 +137,21 @@ To build a release bundle:
 ```bash
 bun run tauri build
 ```
+
+### Layout
+
+| Path | Contents |
+|---|---|
+| `src/lib/components/` | Views, editor, modals. |
+| `src/lib/ts/` | Tauri command bindings and app state. |
+| `src-tauri/src/workspace.rs` | Workspace browsing and file access. |
+| `src-tauri/src/compiler.rs` | Typst compilation and export. |
+| `src-tauri/src/world.rs` | Font and file resolution for the compiler. |
+| `src-tauri/src/sync.rs` | TypstDrive sync and merging. |
+| `src-tauri/src/assets.rs` | Shared image and font library. |
+| `src-tauri/src/thumbnails.rs` | Preview rendering and cache. |
+| `src-tauri/src/lsp.rs` | Language server bridge. |
+| `src-tauri/src/db.rs` | Local SQLite storage. |
 
 ## License
 
