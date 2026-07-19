@@ -140,21 +140,24 @@ bun run tauri build
 
 ## Distribution
 
-Workflows live in `.github/workflows` for GitHub Actions and `.gitea/workflows` for Gitea Actions.
+Workflows live in `.gitea/workflows` and run on Gitea Actions.
 
-| Workflow | Where | Trigger | Output |
-|---|---|---|---|
-| `ci.yml` | both | push, pull requests | Type check, frontend build, backend check. |
-| `release.yml` | GitHub | `v*` tags, manual | A draft release with installers for every platform. |
-| `build.yml` | Gitea | `v*` tags, manual | Linux packages as workflow artifacts. |
+| Workflow | Trigger | Output |
+|---|---|---|
+| `ci.yml` | push, pull requests | Type check, frontend build, backend check. |
+| `build.yml` | `v*` tags, manual | Linux packages as workflow artifacts, and on a tag, a draft GitHub release. |
 
 | Platform | Artifacts |
 |---|---|
 | Linux | `.deb`, `.rpm`, `.AppImage` |
-| Windows | `.msi`, `-setup.exe` (NSIS) |
-| macOS | `.dmg` for Apple Silicon and Intel, built separately |
 
-Windows and macOS installers come from GitHub Actions because those runners are not available on a self-hosted Gitea instance. The Gitea workflows cover checks and Linux packages.
+Builds run on a Linux runner, so Linux packages are the only artifacts produced. Windows and macOS installers have to be built on their own platforms and attached to the release by hand.
+
+Publishing to GitHub needs one repository secret:
+
+| Secret | Value |
+|---|---|
+| `GITHUB_RELEASE_TOKEN` | A classic GitHub personal access token with the `repo` scope. |
 
 To cut a release:
 
@@ -163,11 +166,11 @@ git tag v1.0.0
 git push origin v1.0.0
 ```
 
-The workflow drafts the release so you can review the artifacts before publishing.
+The release is drafted rather than published, so you can add other platforms and review the artifacts before making it public.
 
 ### Platform notes
 
-Each runner builds natively, so no cross-compilation is involved. `.msi` packages can only be built on Windows because the WiX Toolset is Windows-only, which is why the Windows job runs on a Windows runner rather than cross-compiling with `cargo-xwin`.
+`.msi` packages can only be built on Windows, because the WiX Toolset is Windows-only. Building on the target platform is the supported path for both Windows and macOS.
 
 The Windows installers download the WebView2 bootstrapper when the runtime is missing. Windows 10 (April 2018 or later) and Windows 11 already ship it, so this only affects older systems. The NSIS installer asks whether to install for the current user or the whole machine.
 

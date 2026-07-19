@@ -40,7 +40,8 @@ jobs:
             build-essential \
             file \
             curl \
-            wget
+            wget \
+            jq
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
@@ -82,3 +83,44 @@ jobs:
           name: typst-desktop-linux-x86_64
           path: packages/*
           if-no-files-found: error
+
+      - name: Publish to GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          TOKEN: ${{ secrets.GITHUB_RELEASE_TOKEN }}
+          REPOSITORY: sirblobby/typst-desktop
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          api="https://api.github.com/repos/$REPOSITORY"
+          auth="Authorization: Bearer $TOKEN"
+          json="Content-Type: application/json"
+
+          existing=$(curl -sS -H "$auth" "$api/releases/tags/$TAG" | jq -r '.id // empty')
+
+          if [ -n "$existing" ]; then
+            release_id=$existing
+          else
+            release_id=$(curl -sS -X POST -H "$auth" -H "$json" "$api/releases" \
+              -d "$(jq -n --arg tag "$TAG" \
+                '{tag_name: $tag, name: ("Typst Desktop " + $tag), body: "Download the package for your distribution below.", draft: true, prerelease: false}')" \
+              | jq -r '.id')
+          fi
+
+          if [ -z "$release_id" ] || [ "$release_id" = "null" ]; then
+            echo "Could not create or find the release"
+            exit 1
+          fi
+
+          for package in packages/*; do
+            name=$(basename "$package")
+            echo "Uploading $name"
+            curl -sS --fail -X POST -H "$auth" \
+              -H "Content-Type: application/octet-stream" \
+              --data-binary "@$package" \
+              "https://uploads.github.com/repos/$REPOSITORY/releases/$release_id/assets?name=$name" \
+              > /dev/null
+          done
+
+          echo "Uploaded to the draft release for $TAG"
