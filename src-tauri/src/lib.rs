@@ -70,7 +70,7 @@ pub struct AppInfo {
 fn app_info() -> AppInfo {
     AppInfo {
         version: env!("CARGO_PKG_VERSION").to_string(),
-        typst_version: "0.14.2".to_string(),
+        typst_version: "0.15.1".to_string(),
         authors: "SirBlobby".to_string(),
         license: "Apache-2.0".to_string(),
         tauri_version: tauri::VERSION.to_string(),

@@ -2,8 +2,9 @@ use serde::Serialize;
 use std::collections::HashMap;
 use typst::diag::Warned;
 use typst::layout::{Frame, FrameItem};
+use typst::utils::Scalar;
 use typst::WorldExt;
-use typst_html::HtmlDocument;
+use typst_html::{HtmlDocument, HtmlOptions};
 use typst_layout::PagedDocument;
 use typst_pdf::{pdf, PdfOptions};
 use typst_render::{render, RenderOptions};
@@ -174,7 +175,7 @@ pub fn export_png(
             warnings: _,
         } => {
             let options = RenderOptions {
-                pixel_per_pt: 2.0,
+                pixel_per_pt: Scalar::new(2.0),
                 ..RenderOptions::default()
             };
             match document.pages().first() {
@@ -207,7 +208,7 @@ pub fn export_html(
         } => return Err(collect_diagnostics(&world, &source_text, errors)),
     };
 
-    typst_html::html(&document)
+    typst_html::html(&document, &HtmlOptions::default())
         .map(|html| html.into_bytes())
         .map_err(|errors| collect_diagnostics(&world, &source_text, errors))
 }
