@@ -13,6 +13,56 @@ A desktop editor for Typst. Your documents stay as plain files on your own drive
 
 The Typst compiler is built into the app — there is nothing extra to install to write and export documents.
 
+## Install
+
+Packages are attached to each [release](https://github.com/sirblobby/typst-desktop/releases). Set the version you want first:
+
+```bash
+VERSION=1.0.0
+BASE=https://github.com/sirblobby/typst-desktop/releases/download/v$VERSION
+```
+
+### Debian and Ubuntu
+
+```bash
+wget "$BASE/typst-desktop_${VERSION}_amd64.deb"
+sudo apt install "./typst-desktop_${VERSION}_amd64.deb"
+```
+
+Installing with `apt` rather than `dpkg -i` pulls in `libwebkit2gtk-4.1-0` and `libgtk-3-0` for you. Debian 12 or Ubuntu 22.04 and newer carry a new enough WebKit.
+
+Remove it with `sudo apt remove typst-desktop`.
+
+### Fedora
+
+```bash
+wget "$BASE/typst-desktop-${VERSION}-1.x86_64.rpm"
+sudo dnf install "./typst-desktop-${VERSION}-1.x86_64.rpm"
+```
+
+Remove it with `sudo dnf remove typst-desktop`.
+
+### Arch
+
+There is no package in the AUR. Use the AppImage, which needs FUSE:
+
+```bash
+sudo pacman -S fuse2
+wget "$BASE/typst-desktop_${VERSION}_amd64.AppImage"
+chmod +x "typst-desktop_${VERSION}_amd64.AppImage"
+./typst-desktop_${VERSION}_amd64.AppImage
+```
+
+To keep it on your `PATH`:
+
+```bash
+sudo install -Dm755 "typst-desktop_${VERSION}_amd64.AppImage" /usr/local/bin/typst-desktop
+```
+
+Remove it with `sudo rm /usr/local/bin/typst-desktop`.
+
+The AppImage runs on any distribution, so it also works as a fallback on Debian or Fedora. Building from source is covered under [Development](#development).
+
 ## Features
 
 - **Local first**: Every document is an ordinary file in a folder you choose. Nothing is locked in a database, and any other editor can open the same files.
