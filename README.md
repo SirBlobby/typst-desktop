@@ -157,7 +157,7 @@ Publishing to GitHub needs one repository secret:
 
 | Secret | Value |
 |---|---|
-| `GITHUB_RELEASE_TOKEN` | A classic GitHub personal access token with the `repo` scope. |
+| `RELEASE_TOKEN` | A classic GitHub personal access token with the `repo` scope. |
 
 To cut a release:
 
