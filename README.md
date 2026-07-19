@@ -188,6 +188,12 @@ Linux builds also need the WebKit and GTK development packages:
 sudo apt-get install libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev patchelf
 ```
 
+On rolling-release distributions such as Arch, the AppImage step fails while stripping system libraries, because the `strip` bundled inside `linuxdeploy` predates the `.relr.dyn` relocation section that a current toolchain emits. Skip stripping:
+
+```bash
+NO_STRIP=1 bun run tauri build
+```
+
 ## License
 
 Apache License 2.0. See [LICENSE](LICENSE).

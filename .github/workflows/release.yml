@@ -13,6 +13,7 @@ on:
 env:
   TYPST_COMMIT: 44b3f78ed37fedea75e911dde2269ef86c45316f
   APPIMAGE_EXTRACT_AND_RUN: 1
+  NO_STRIP: 1
 
 jobs:
   build:
