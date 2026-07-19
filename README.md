@@ -190,36 +190,6 @@ bun run tauri build
 
 On Linux, use `bun run build:linux` instead. It is the same command with `NO_STRIP=1` set, which the AppImage bundler needs on a rolling-release distribution. See [Platform notes](#platform-notes).
 
-## Distribution
-
-Workflows live in `.gitea/workflows` and run on Gitea Actions.
-
-| Workflow | Trigger | Output |
-|---|---|---|
-| `ci.yml` | push, pull requests | Type check, frontend build, backend check. |
-| `build.yml` | `v*` tags, manual | Linux packages as workflow artifacts, and on a tag, a draft GitHub release. |
-
-| Platform | Artifacts |
-|---|---|
-| Linux | `.deb`, `.rpm`, `.AppImage` |
-
-Builds run on a Linux runner, so Linux packages are the only artifacts produced. Windows and macOS installers have to be built on their own platforms and attached to the release by hand.
-
-Publishing to GitHub needs one repository secret:
-
-| Secret | Value |
-|---|---|
-| `RELEASE_TOKEN` | A classic GitHub personal access token with the `repo` scope. |
-
-To cut a release:
-
-```bash
-git tag v1.0.0
-git push origin v1.0.0
-```
-
-The release is drafted rather than published, so you can add other platforms and review the artifacts before making it public.
-
 ### Platform notes
 
 `.msi` packages can only be built on Windows, because the WiX Toolset is Windows-only. Building on the target platform is the supported path for both Windows and macOS.
@@ -243,13 +213,9 @@ Linux builds also need the WebKit and GTK development packages:
 sudo apt-get install libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev patchelf
 ```
 
-On rolling-release distributions such as Arch, the AppImage step fails with `failed to run linuxdeploy`. The `strip` bundled inside `linuxdeploy` predates the `.relr.dyn` relocation section that a current toolchain emits, so it rejects every system library it is asked to strip. Setting `NO_STRIP=1` skips that pass, which is what `build:linux` does:
-
 ```bash
 bun run build:linux
 ```
-
-The `.deb` and `.rpm` targets are unaffected, so a build that produces those two and then fails is almost always this.
 
 ## License
 
