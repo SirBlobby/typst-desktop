@@ -4,6 +4,7 @@
   import { save } from "@tauri-apps/plugin-dialog";
   import { revealItemInDir } from "@tauri-apps/plugin-opener";
   import { getCurrentWebview } from "@tauri-apps/api/webview";
+  import { listen } from "@tauri-apps/api/event";
 
   import FileViewer from "$lib/components/FileViewer.svelte";
   import FileTree from "$lib/components/FileTree.svelte";
@@ -47,7 +48,9 @@
     scheduleCompile,
     setError,
     setStatus,
+    trackDownload,
   } from "$lib/ts/state.svelte";
+  import type { DownloadProgress } from "$lib/ts/state.svelte";
 
   type Dialog =
     | { kind: "none" }
@@ -77,7 +80,6 @@
   let selectedIsDir = $state(false);
   let treeDropTarget = $state<string | null>(null);
 
-  /** Folder that new files, folders, and imports go into. */
   const selectedFolder = $derived(
     !selectedEntry
       ? ""
@@ -337,7 +339,6 @@
     return null;
   }
 
-  /** Folder row under the pointer, so an OS drop lands where it is aimed. */
   function folderUnderPointer(x: number, y: number): string | null {
     const element = document
       .elementFromPoint(x, y)
@@ -373,6 +374,10 @@
   }
 
   onMount(() => {
+    const downloads = listen<DownloadProgress>("download://progress", (event) =>
+      trackDownload(event.payload),
+    );
+
     const pending = getCurrentWebview().onDragDropEvent((event) => {
       if (event.payload.type === "over") {
         dropActive = dropDestination() !== null;
@@ -396,6 +401,7 @@
 
     return () => {
       pending.then((unlisten) => unlisten());
+      downloads.then((unlisten) => unlisten());
     };
   });
 
@@ -516,6 +522,47 @@
 
     <WindowControls />
   </header>
+
+  {#if app.download}
+    {@const progress = app.download}
+    <div
+      class="flex shrink-0 items-center gap-3 border-b border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2"
+    >
+      <Icon
+        icon={progress.done ? "ph:check-circle" : "ph:cloud-arrow-down"}
+        class="shrink-0 text-base {progress.done
+          ? 'text-[var(--color-success)]'
+          : 'text-[var(--color-accent)]'}"
+      />
+
+      <span class="shrink-0 text-xs">
+        {progress.done ? "Downloaded" : "Downloading"}
+        <span class="font-medium">{progress.label}</span>
+      </span>
+
+      <div
+        class="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-[var(--color-surface-sunken)]"
+      >
+        <div
+          class="h-full rounded-full transition-all duration-200
+            {progress.done
+            ? 'bg-[var(--color-success)]'
+            : 'bg-[var(--color-accent)]'}"
+          style="width: {progress.total > 0
+            ? Math.round((progress.current / progress.total) * 100)
+            : 0}%"
+        ></div>
+      </div>
+
+      {#if progress.total > 1}
+        <span
+          class="shrink-0 tabular-nums text-[10px] text-[var(--color-ink-muted)]"
+        >
+          {progress.current} of {progress.total} files
+        </span>
+      {/if}
+    </div>
+  {/if}
 
   {#if app.status || app.error}
     <div

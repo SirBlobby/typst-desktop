@@ -493,9 +493,39 @@ pub fn push_project(
     Ok(report)
 }
 
+#[derive(Serialize, Clone)]
+pub struct DownloadProgress {
+    pub label: String,
+    pub current: usize,
+    pub total: usize,
+    pub done: bool,
+}
+
+pub const PROGRESS_EVENT: &str = "download://progress";
+
+pub fn report_progress(
+    app: &tauri::AppHandle,
+    label: &str,
+    current: usize,
+    total: usize,
+    done: bool,
+) {
+    use tauri::Emitter;
+    let _ = app.emit(
+        PROGRESS_EVENT,
+        DownloadProgress {
+            label: label.to_string(),
+            current,
+            total,
+            done,
+        },
+    );
+}
+
 pub fn clone_space(
     server_url: &str,
     token: &str,
+    app: &tauri::AppHandle,
     store: &Store,
     project: &str,
     project_dir: &Path,
@@ -509,13 +539,18 @@ pub fn clone_space(
     meta.entrypoint = manifest.entrypoint.clone();
 
     let mut report = SyncReport::default();
+    let total = manifest.files.len();
 
-    for entry in &manifest.files {
+    for (index, entry) in manifest.files.iter().enumerate() {
+        report_progress(app, project, index, total, false);
+
         let remote = pull_file(server_url, token, space_id, &entry.path)?;
         write_local(project_dir, &entry.path, &remote.bytes()?)?;
         meta.base_hashes.insert(entry.path.clone(), remote.hash);
         report.pulled.push(entry.path.clone());
     }
+
+    report_progress(app, project, total, total, true);
 
     meta.last_synced_at = Some(chrono::Utc::now().to_rfc3339());
     store.save_meta(project, &meta)?;
@@ -652,8 +687,6 @@ pub fn pull_document(
         .map_err(|e| e.to_string())
 }
 
-/// Syncs one downloaded cloud document. The merge base is the copy stored when
-/// the document was last exchanged with the server.
 pub fn sync_document(
     server_url: &str,
     token: &str,
@@ -788,7 +821,6 @@ pub fn sync_document(
     Ok(report)
 }
 
-/// Applies a resolved cloud document and uploads it.
 pub fn resolve_document_conflict(
     server_url: &str,
     token: &str,

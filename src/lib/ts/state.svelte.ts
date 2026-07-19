@@ -48,6 +48,7 @@ interface AppState {
   compiling: boolean;
   lspStatus: LspStatus;
 
+  download: DownloadProgress | null;
   syncing: boolean;
   conflicts: Conflict[];
   status: string;
@@ -83,12 +84,38 @@ export const app = $state<AppState>({
   compiling: false,
   lspStatus: "off",
 
+  download: null,
   syncing: false,
   conflicts: [],
   status: "",
   error: "",
   theme: "light",
 });
+
+export interface DownloadProgress {
+  label: string;
+  current: number;
+  total: number;
+  done: boolean;
+}
+
+let downloadClearTimer: ReturnType<typeof setTimeout> | null = null;
+
+export function trackDownload(progress: DownloadProgress) {
+  if (downloadClearTimer) {
+    clearTimeout(downloadClearTimer);
+    downloadClearTimer = null;
+  }
+
+  app.download = progress;
+
+  if (progress.done) {
+    downloadClearTimer = setTimeout(() => {
+      app.download = null;
+      downloadClearTimer = null;
+    }, 1200);
+  }
+}
 
 export function setError(error: unknown) {
   app.error = api.errorMessage(error);
@@ -205,7 +232,6 @@ export async function refreshCloud() {
   }
 }
 
-/** Trail from the drive root down to the folder being viewed. */
 export function cloudBreadcrumbs(): CloudFolder[] {
   if (app.cloudFolder === "shared" || app.cloudFolder === null) return [];
 

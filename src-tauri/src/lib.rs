@@ -228,7 +228,6 @@ fn delete_entry(app: AppHandle, store: State<'_, Store>, path: String) -> Result
     }
 }
 
-/// Moves an entry into another folder, keeping its name.
 #[tauri::command]
 fn move_entry(
     app: AppHandle,
@@ -308,7 +307,6 @@ fn duplicate_entry(
     Ok(candidate)
 }
 
-/// Absolute path on disk, used to reveal an entry in the system file manager.
 #[tauri::command]
 fn absolute_path(
     app: AppHandle,
@@ -761,8 +759,6 @@ fn cloud_list_files(
     sync::list_account_files(&server_url, &token, folder_id.as_deref())
 }
 
-/// Downloads an account file into the shared asset library, where every
-/// project can reference it by name.
 #[tauri::command]
 fn cloud_download_file(
     app: AppHandle,
@@ -770,7 +766,10 @@ fn cloud_download_file(
     file_id: String,
 ) -> Result<String, String> {
     let (server_url, token) = cloud_credentials(&app, &store)?;
+
+    sync::report_progress(&app, "file", 0, 1, false);
     let file = sync::pull_account_file(&server_url, &token, &file_id)?;
+    sync::report_progress(&app, &file.name, 1, 1, true);
 
     let bytes = BASE64
         .decode(file.content.as_bytes())
@@ -791,8 +790,6 @@ fn cloud_list_shared(
     sync::list_shared(&server_url, &token)
 }
 
-/// Downloads a cloud document into the workspace and remembers where it came
-/// from so it can be synced back.
 #[tauri::command]
 fn cloud_download_document(
     app: AppHandle,
@@ -801,7 +798,10 @@ fn cloud_download_document(
     parent: String,
 ) -> Result<String, String> {
     let (server_url, token) = cloud_credentials(&app, &store)?;
+
+    sync::report_progress(&app, "document", 0, 1, false);
     let document = sync::pull_document(&server_url, &token, &document_id)?;
+    sync::report_progress(&app, &document.title, 1, 1, true);
 
     let mut name = document.title.replace('/', "-").trim().to_string();
     if name.is_empty() {
@@ -872,8 +872,6 @@ pub struct LinkedDocument {
     pub sync_state: Option<String>,
 }
 
-/// Every cloud document that has been downloaded, so the cloud view can show
-/// which ones live on this device and whether they are up to date.
 #[tauri::command]
 fn cloud_linked_documents(
     app: AppHandle,
@@ -908,7 +906,6 @@ pub struct LinkedSpace {
     pub sync_state: Option<String>,
 }
 
-/// Cloud spaces that have been downloaded, wherever they sit in the workspace.
 #[tauri::command]
 fn cloud_linked_spaces(
     app: AppHandle,
@@ -968,7 +965,7 @@ fn cloud_clone_space(
     if dir.exists() {
         return Err(format!("A project named '{}' already exists", project_name));
     }
-    sync::clone_space(&server_url, &token, &store, &project, &dir, &space_id)
+    sync::clone_space(&server_url, &token, &app, &store, &project, &dir, &space_id)
 }
 
 #[tauri::command]
