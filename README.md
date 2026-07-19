@@ -138,21 +138,6 @@ To build a release bundle:
 bun run tauri build
 ```
 
-### Layout
-
-| Path | Contents |
-|---|---|
-| `src/lib/components/` | Views, editor, modals. |
-| `src/lib/ts/` | Tauri command bindings and app state. |
-| `src-tauri/src/workspace.rs` | Workspace browsing and file access. |
-| `src-tauri/src/compiler.rs` | Typst compilation and export. |
-| `src-tauri/src/world.rs` | Font and file resolution for the compiler. |
-| `src-tauri/src/sync.rs` | TypstDrive sync and merging. |
-| `src-tauri/src/assets.rs` | Shared image and font library. |
-| `src-tauri/src/thumbnails.rs` | Preview rendering and cache. |
-| `src-tauri/src/lsp.rs` | Language server bridge. |
-| `src-tauri/src/db.rs` | Local SQLite storage. |
-
 ## License
 
 Apache License 2.0. See [LICENSE](LICENSE).
