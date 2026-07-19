@@ -163,7 +163,7 @@ Each runner builds natively, so no cross-compilation is involved. `.msi` package
 
 The Windows installers download the WebView2 bootstrapper when the runtime is missing. Windows 10 (April 2018 or later) and Windows 11 already ship it, so this only affects older systems. The NSIS installer asks whether to install for the current user or the whole machine.
 
-macOS builds are unsigned. Gatekeeper will refuse to open the app until you either sign it with an Apple Developer ID or right-click the app and choose **Open** once. Signing and notarization need `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`, `APPLE_ID`, `APPLE_PASSWORD`, and `APPLE_TEAM_ID` as repository secrets; the workflow picks them up automatically once they exist.
+macOS builds are unsigned. Gatekeeper blocks unsigned apps on first launch, so open the app once with right-click then **Open**, or run `xattr -dr com.apple.quarantine "/Applications/Typst Desktop.app"` after installing.
 
 ### Building locally for another platform
 
