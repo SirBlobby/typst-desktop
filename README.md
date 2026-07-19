@@ -132,10 +132,52 @@ bun install
 bun run tauri dev
 ```
 
-To build a release bundle:
+To build a release bundle for your own platform:
 
 ```bash
 bun run tauri build
+```
+
+## Distribution
+
+Installers are built by the `Build and Release` workflow, which runs on every `v*` tag and can also be started manually. It produces a draft GitHub release with an installer for each platform.
+
+| Platform | Artifacts |
+|---|---|
+| Linux | `.deb`, `.rpm`, `.AppImage` |
+| Windows | `.msi`, `-setup.exe` (NSIS) |
+| macOS | `.dmg` for Apple Silicon and Intel, built separately |
+
+To cut a release:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+The workflow drafts the release so you can review the artifacts before publishing.
+
+### Platform notes
+
+Each runner builds natively, so no cross-compilation is involved. `.msi` packages can only be built on Windows because the WiX Toolset is Windows-only, which is why the Windows job runs on a Windows runner rather than cross-compiling with `cargo-xwin`.
+
+The Windows installers download the WebView2 bootstrapper when the runtime is missing. Windows 10 (April 2018 or later) and Windows 11 already ship it, so this only affects older systems. The NSIS installer asks whether to install for the current user or the whole machine.
+
+macOS builds are unsigned. Gatekeeper will refuse to open the app until you either sign it with an Apple Developer ID or right-click the app and choose **Open** once. Signing and notarization need `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`, `APPLE_ID`, `APPLE_PASSWORD`, and `APPLE_TEAM_ID` as repository secrets; the workflow picks them up automatically once they exist.
+
+### Building locally for another platform
+
+Building on the target platform is the supported path. The Typst compiler is a path dependency, so any machine or runner needs it checked out beside this repository:
+
+```bash
+git clone https://github.com/typst/typst.git ../typstdrive/typst
+git -C ../typstdrive/typst checkout 44b3f78ed37fedea75e911dde2269ef86c45316f
+```
+
+Linux builds also need the WebKit and GTK development packages:
+
+```bash
+sudo apt-get install libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev patchelf
 ```
 
 ## License

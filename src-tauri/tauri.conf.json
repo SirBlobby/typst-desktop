@@ -27,12 +27,40 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": false,
+    "publisher": "SirBlobby",
+    "copyright": "Copyright (c) 2026 SirBlobby",
+    "category": "Productivity",
+    "shortDescription": "A desktop editor for Typst",
+    "longDescription": "A desktop editor for Typst documents with a built-in compiler, live preview, and optional sync to a TypstDrive server.",
+    "homepage": "https://github.com/sirblobby/typst-desktop",
+    "licenseFile": "../LICENSE",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "linux": {
+      "deb": {
+        "depends": [
+          "libwebkit2gtk-4.1-0",
+          "libgtk-3-0"
+        ]
+      }
+    },
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper"
+      },
+      "nsis": {
+        "installMode": "both",
+        "displayLanguageSelector": false
+      }
+    },
+    "macOS": {
+      "minimumSystemVersion": "10.15"
+    }
   }
 }
