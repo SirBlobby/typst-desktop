@@ -245,7 +245,7 @@ pub fn asset_files(app: &AppHandle, store: &Store) -> HashMap<String, Vec<u8>> {
         if name.starts_with('.') {
             continue;
         }
-        if let Ok(data) = std::fs::read(entry.path()) {
+        if let Some(data) = crate::workspace::read_file_cached(&entry.path()) {
             files.insert(name, data);
         }
     }

@@ -1,5 +1,6 @@
 use chrono::Datelike;
 use std::collections::HashMap;
+use std::sync::{Mutex, OnceLock};
 
 use typst::diag::{FileError, FileResult};
 use typst::foundations::{Bytes, Datetime, Duration};
@@ -23,6 +24,37 @@ fn normalize_path(path: &str) -> String {
     path.trim_start_matches('/').replace('\\', "/")
 }
 
+fn bundled_fonts() -> &'static Vec<Font> {
+    static FONTS: OnceLock<Vec<Font>> = OnceLock::new();
+    FONTS.get_or_init(|| {
+        let mut fonts = Vec::new();
+        for data in typst_assets::fonts() {
+            fonts.extend(Font::iter(Bytes::new(data)));
+        }
+        fonts
+    })
+}
+
+fn custom_fonts(name: &str, data: &[u8]) -> Vec<Font> {
+    static CACHE: OnceLock<Mutex<HashMap<(String, usize), Vec<Font>>>> = OnceLock::new();
+    let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+    let key = (name.to_string(), data.len());
+
+    if let Ok(map) = cache.lock() {
+        if let Some(fonts) = map.get(&key) {
+            return fonts.clone();
+        }
+    }
+
+    let fonts: Vec<Font> = Font::iter(Bytes::new(data.to_vec())).collect();
+
+    if let Ok(mut map) = cache.lock() {
+        map.insert(key, fonts.clone());
+    }
+
+    fonts
+}
+
 impl ProjectWorld {
     pub fn new(entrypoint: String, files: HashMap<String, Vec<u8>>, enable_html: bool) -> Self {
         let main = FileId::new(RootedPath::new(
@@ -33,16 +65,7 @@ impl ProjectWorld {
         let downloader = SystemDownloader::new("TypstDesktop (typst-kit)");
         let packages = SystemPackages::new(downloader);
 
-        let mut book = FontBook::new();
-        let mut fonts = Vec::new();
-
-        for data in typst_assets::fonts() {
-            let buffer = Bytes::new(data);
-            for font in Font::iter(buffer) {
-                book.push(font.info().clone());
-                fonts.push(font);
-            }
-        }
+        let mut fonts = bundled_fonts().clone();
 
         for (name, data) in &files {
             let lower = name.to_lowercase();
@@ -50,11 +73,13 @@ impl ProjectWorld {
                 .iter()
                 .any(|ext| lower.ends_with(ext))
             {
-                for font in Font::iter(Bytes::new(data.clone())) {
-                    book.push(font.info().clone());
-                    fonts.push(font);
-                }
+                fonts.extend(custom_fonts(name, data));
             }
+        }
+
+        let mut book = FontBook::new();
+        for font in &fonts {
+            book.push(font.info().clone());
         }
 
         let library = if enable_html {

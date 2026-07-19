@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex, OnceLock};
+use std::time::SystemTime;
 use tauri::{AppHandle, Manager};
 
 use crate::db::Store;
@@ -23,6 +25,34 @@ pub fn is_text_file(path: &str) -> bool {
 
 pub fn content_hash(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
+}
+
+pub fn read_file_cached(path: &Path) -> Option<Vec<u8>> {
+    type Cache = Mutex<HashMap<PathBuf, (SystemTime, u64, Arc<Vec<u8>>)>>;
+    static CACHE: OnceLock<Cache> = OnceLock::new();
+
+    let metadata = std::fs::metadata(path).ok()?;
+    let modified = metadata.modified().ok()?;
+    let size = metadata.len();
+    let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+
+    if let Ok(map) = cache.lock() {
+        if let Some((stamp, cached_size, bytes)) = map.get(path) {
+            if *stamp == modified && *cached_size == size {
+                return Some(bytes.as_ref().clone());
+            }
+        }
+    }
+
+    let bytes = std::fs::read(path).ok()?;
+    if let Ok(mut map) = cache.lock() {
+        map.insert(
+            path.to_path_buf(),
+            (modified, size, Arc::new(bytes.clone())),
+        );
+    }
+
+    Some(bytes)
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -128,8 +158,6 @@ pub struct BrowseEntry {
     pub last_synced_at: Option<String>,
     pub child_count: usize,
     pub cloud_linked: bool,
-    /// "synced" when nothing changed since the last sync, "pending" when local
-    /// edits are waiting to go up, or None when the entry is not linked.
     pub sync_state: Option<String>,
 }
 
@@ -161,8 +189,6 @@ fn newest_change(dir: &Path) -> Option<chrono::DateTime<chrono::Utc>> {
     newest
 }
 
-/// Compares when the entry last changed on disk against when it was last
-/// synced. Metadata only, so browsing stays cheap.
 pub fn sync_state_of(path: &Path, synced_at: Option<&str>) -> Option<String> {
     sync_state_for(modified_time(path), synced_at)
 }
@@ -257,8 +283,6 @@ pub fn browse(app: &AppHandle, store: &Store, relative: &str) -> Result<Vec<Brow
             let kind = if is_typst_file(&name) { "document" } else { "file" };
             let link = store.document_link(&path)?;
 
-            // Cloud documents are managed from the Cloud view, so they are not
-            // listed a second time here.
             if link.is_some() {
                 continue;
             }
@@ -379,7 +403,7 @@ fn collect_loose_files(
                 continue;
             }
             collect_loose_files(&path, &key, map)?;
-        } else if let Ok(bytes) = std::fs::read(&path) {
+        } else if let Some(bytes) = read_file_cached(&path) {
             map.insert(key, bytes);
         }
     }
@@ -440,8 +464,9 @@ pub fn read_all_files(project_dir: &Path) -> Result<HashMap<String, Vec<u8>>, St
     let mut map = HashMap::new();
     for relative in collect_files(project_dir)? {
         let full = project_file_path(project_dir, &relative)?;
-        let bytes = std::fs::read(&full).map_err(|e| e.to_string())?;
-        map.insert(relative, bytes);
+        if let Some(bytes) = read_file_cached(&full) {
+            map.insert(relative, bytes);
+        }
     }
     Ok(map)
 }
@@ -455,9 +480,6 @@ pub struct FileEntry {
     pub size: u64,
 }
 
-/// Lists a project's contents for the editor tree. Unlike `collect_files`,
-/// which feeds sync and only cares about file contents, this includes
-/// directories so an empty folder is still visible after it is created.
 pub fn list_files(project_dir: &Path) -> Result<Vec<FileEntry>, String> {
     let mut entries = Vec::new();
 
