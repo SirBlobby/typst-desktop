@@ -676,6 +676,12 @@ fn lsp_running(state: State<'_, LspState>) -> bool {
 }
 
 #[tauri::command]
+fn cloud_check_compatibility(server_url: String) -> sync::CompatibilityStatus {
+    let server_url = server_url.trim_end_matches('/').to_string();
+    sync::check_compatibility(&server_url)
+}
+
+#[tauri::command]
 fn cloud_login(
     app: AppHandle,
     store: State<'_, Store>,
@@ -779,6 +785,30 @@ fn cloud_download_file(
     std::fs::write(&destination, bytes).map_err(|e| e.to_string())?;
 
     Ok(file.name)
+}
+
+#[tauri::command]
+fn cloud_delete_file(app: AppHandle, store: State<'_, Store>, file_id: String) -> Result<(), String> {
+    let (server_url, token) = cloud_credentials(&app, &store)?;
+    sync::delete_account_file(&server_url, &token, &file_id)
+}
+
+#[tauri::command]
+fn cloud_delete_document(
+    app: AppHandle,
+    store: State<'_, Store>,
+    document_id: String,
+) -> Result<(), String> {
+    let (server_url, token) = cloud_credentials(&app, &store)?;
+    sync::delete_document(&server_url, &token, &document_id)?;
+
+    if let Ok(links) = store.all_document_links() {
+        if let Some((path, _, _)) = links.into_iter().find(|(_, id, _)| id == &document_id) {
+            let _ = store.forget_document_link(&path);
+        }
+    }
+
+    Ok(())
 }
 
 #[tauri::command]
@@ -971,6 +1001,18 @@ fn cloud_create_project(app: AppHandle, store: State<'_, Store>, name: String) -
 }
 
 #[tauri::command]
+fn cloud_new_document(app: AppHandle, store: State<'_, Store>, title: String) -> Result<sync::DocumentContent, String> {
+    let title = title.trim();
+    if title.is_empty() {
+        return Err("Document name cannot be empty".to_string());
+    }
+
+    let (server_url, token) = cloud_credentials(&app, &store)?;
+    let content = format!("= {}\n\nStart writing here.\n", title);
+    sync::create_document(&server_url, &token, title, &content)
+}
+
+#[tauri::command]
 fn cloud_delete_project(app: AppHandle, store: State<'_, Store>, cloud_project_id: String) -> Result<(), String> {
     let (server_url, token) = cloud_credentials(&app, &store)?;
     sync::delete_cloud_project(&server_url, &token, &cloud_project_id)
@@ -1101,7 +1143,6 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_drag::init())
         .setup(|app| {
             let store = Store::open(&app.handle())?;
             app.manage(store);
@@ -1149,6 +1190,7 @@ pub fn run() {
             lsp_send,
             lsp_stop,
             lsp_running,
+            cloud_check_compatibility,
             cloud_login,
             cloud_logout,
             cloud_account,
@@ -1158,7 +1200,9 @@ pub fn run() {
             cloud_list_shared,
             cloud_list_files,
             cloud_download_file,
+            cloud_delete_file,
             cloud_download_document,
+            cloud_delete_document,
             cloud_sync_document,
             cloud_resolve_document,
             cloud_document_link,
@@ -1167,6 +1211,7 @@ pub fn run() {
             cloud_unlink_document,
             cloud_create_document,
             cloud_create_project,
+            cloud_new_document,
             cloud_delete_project,
             cloud_clone_project,
             cloud_link_project,

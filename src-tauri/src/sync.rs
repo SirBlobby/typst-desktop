@@ -34,6 +34,88 @@ fn describe(error: ureq::Error) -> String {
     }
 }
 
+pub const MIN_SERVER_VERSION: &str = "1.5.0";
+
+fn parse_version(version: &str) -> (u32, u32, u32) {
+    let mut parts = version.trim().split('.').map(|part| part.parse::<u32>().unwrap_or(0));
+    (
+        parts.next().unwrap_or(0),
+        parts.next().unwrap_or(0),
+        parts.next().unwrap_or(0),
+    )
+}
+
+fn version_at_least(actual: &str, required: &str) -> bool {
+    parse_version(actual) >= parse_version(required)
+}
+
+#[derive(Deserialize)]
+struct ServerVersionInfo {
+    server_version: String,
+    min_desktop_version: String,
+}
+
+#[derive(Serialize, Clone)]
+pub struct CompatibilityStatus {
+    pub compatible: bool,
+    pub server_version: String,
+    pub desktop_version: String,
+    pub min_server_version: String,
+    pub min_desktop_version: String,
+    pub message: Option<String>,
+}
+
+pub fn check_compatibility(server_url: &str) -> CompatibilityStatus {
+    let desktop_version = env!("CARGO_PKG_VERSION").to_string();
+
+    let info = agent()
+        .get(&endpoint(server_url, "/version"))
+        .call()
+        .map_err(describe)
+        .and_then(|response| response.into_json::<ServerVersionInfo>().map_err(|e| e.to_string()));
+
+    match info {
+        Ok(info) => {
+            let server_too_old = !version_at_least(&info.server_version, MIN_SERVER_VERSION);
+            let desktop_too_old = !version_at_least(&desktop_version, &info.min_desktop_version);
+
+            let message = if server_too_old {
+                Some(format!(
+                    "This app requires a TypstDrive server v{} or newer (server is running v{}). Ask the administrator to update it.",
+                    MIN_SERVER_VERSION, info.server_version
+                ))
+            } else if desktop_too_old {
+                Some(format!(
+                    "This TypstDrive server requires typst-desktop v{} or newer (you have v{}). Please update the app.",
+                    info.min_desktop_version, desktop_version
+                ))
+            } else {
+                None
+            };
+
+            CompatibilityStatus {
+                compatible: !server_too_old && !desktop_too_old,
+                server_version: info.server_version,
+                desktop_version,
+                min_server_version: MIN_SERVER_VERSION.to_string(),
+                min_desktop_version: info.min_desktop_version,
+                message,
+            }
+        }
+        Err(_) => CompatibilityStatus {
+            compatible: false,
+            server_version: "unknown".to_string(),
+            desktop_version,
+            min_server_version: MIN_SERVER_VERSION.to_string(),
+            min_desktop_version: "unknown".to_string(),
+            message: Some(format!(
+                "Could not determine the server's version. It may be unreachable, or older than v{} which doesn't support version checks. Please update the server.",
+                MIN_SERVER_VERSION
+            )),
+        },
+    }
+}
+
 #[derive(Deserialize, Serialize, Clone)]
 pub struct Account {
     pub user_id: String,
@@ -55,12 +137,20 @@ pub fn login(
     password: &str,
     device_name: &str,
 ) -> Result<LoginResponse, String> {
+    let status = check_compatibility(server_url);
+    if !status.compatible {
+        return Err(status
+            .message
+            .unwrap_or_else(|| "This server is not compatible with this app.".to_string()));
+    }
+
     agent()
         .post(&endpoint(server_url, "/auth/login"))
         .send_json(ureq::json!({
             "email": email,
             "password": password,
             "device_name": device_name,
+            "client_version": env!("CARGO_PKG_VERSION"),
         }))
         .map_err(describe)?
         .into_json::<LoginResponse>()
@@ -926,6 +1016,15 @@ pub fn push_document(
     }
 }
 
+pub fn delete_document(server_url: &str, token: &str, document_id: &str) -> Result<(), String> {
+    agent()
+        .delete(&endpoint(server_url, &format!("/documents/{}", document_id)))
+        .set("Authorization", &format!("Bearer {}", token))
+        .call()
+        .map_err(describe)?;
+    Ok(())
+}
+
 #[derive(Deserialize, Serialize, Clone)]
 pub struct CloudFile {
     pub id: String,
@@ -973,4 +1072,13 @@ pub fn pull_account_file(
         .map_err(describe)?
         .into_json::<CloudFileContent>()
         .map_err(|e| e.to_string())
+}
+
+pub fn delete_account_file(server_url: &str, token: &str, file_id: &str) -> Result<(), String> {
+    agent()
+        .delete(&endpoint(server_url, &format!("/files/{}", file_id)))
+        .set("Authorization", &format!("Bearer {}", token))
+        .call()
+        .map_err(describe)?;
+    Ok(())
 }

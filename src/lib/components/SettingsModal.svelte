@@ -5,7 +5,7 @@
   import { openUrl } from "@tauri-apps/plugin-opener";
   import Modal from "./Modal.svelte";
   import * as api from "$lib/ts/api";
-  import type { AppInfo } from "$lib/ts/api";
+  import type { AppInfo, CompatibilityStatus } from "$lib/ts/api";
   import {
     app,
     applyTheme,
@@ -62,6 +62,28 @@
 
   let workspaceRoot = $state(untrack(() => app.settings?.workspace_root ?? ""));
   let serverUrl = $state(untrack(() => app.settings?.server_url ?? ""));
+  let compatibility = $state<CompatibilityStatus | null>(null);
+  let checkingCompatibility = $state(false);
+  let compatibilityTimer: ReturnType<typeof setTimeout> | undefined;
+
+  $effect(() => {
+    const url = serverUrl.trim();
+    clearTimeout(compatibilityTimer);
+    if (!url) {
+      compatibility = null;
+      return;
+    }
+    compatibilityTimer = setTimeout(async () => {
+      checkingCompatibility = true;
+      try {
+        compatibility = await api.cloudCheckCompatibility(url);
+      } catch {
+        compatibility = null;
+      } finally {
+        checkingCompatibility = false;
+      }
+    }, 600);
+  });
   let autosaveSeconds = $state(untrack(() => app.settings?.autosave_seconds ?? 0));
   let syncMinutes = $state(untrack(() => app.settings?.sync_minutes ?? 0));
   let saving = $state(false);
@@ -100,6 +122,16 @@
       label: "Typst Universe",
       url: "https://typst.app/universe/",
       icon: "ph:planet",
+    },
+    {
+      label: "GitHub Repository",
+      url: "https://github.com/SirBlobby/typst-desktop",
+      icon: "ph:github-logo",
+    },
+    {
+      label: "Report an Issue",
+      url: "https://github.com/SirBlobby/typst-desktop/issues",
+      icon: "ph:bug",
     },
   ];
 
@@ -366,6 +398,22 @@
               TypstDrive server
             </span>
             <input class={fieldClass} bind:value={serverUrl} />
+            {#if checkingCompatibility}
+              <span class="flex items-center gap-1 text-[var(--color-ink-muted)]">
+                <Icon icon="ph:circle-notch" class="animate-spin" />
+                Checking server version...
+              </span>
+            {:else if compatibility && !compatibility.compatible}
+              <span class="flex items-center gap-1 text-[var(--color-danger)]">
+                <Icon icon="ph:warning-circle" />
+                {compatibility.message}
+              </span>
+            {:else if compatibility && compatibility.compatible}
+              <span class="flex items-center gap-1 text-[var(--color-success)]">
+                <Icon icon="ph:check-circle" />
+                Compatible (server v{compatibility.server_version})
+              </span>
+            {/if}
           </div>
 
           <div class="flex flex-col gap-1 text-xs">

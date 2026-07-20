@@ -2,6 +2,7 @@
   import Icon from "@iconify/svelte";
   import * as api from "$lib/ts/api";
   import type { BrowseEntry, EntryKind } from "$lib/ts/api";
+  import { clampMenu } from "$lib/ts/menu-position";
   import {
     app,
     breadcrumbs,
@@ -12,6 +13,8 @@
     openCloudFolder,
     openTarget,
     refreshCloud,
+    refreshEntries,
+    setError,
   } from "$lib/ts/state.svelte";
 
   interface Props {
@@ -27,9 +30,12 @@
     ondownloaddocument: (documentId: string, title: string) => void;
     onremovedownload: (path: string) => void;
     ondownloadfile: (fileId: string, name: string) => void;
+    ondeletefile: (fileId: string) => void;
     oncloneproject: (cloudProjectId: string, name: string) => void;
     ondeleteproject: (cloudProjectId: string) => void;
+    ondeletedocument: (documentId: string) => void;
     onnewcloudproject: () => void;
+    onnewclouddocument: () => void;
     onsignin: () => void;
   }
 
@@ -46,14 +52,34 @@
     ondownloaddocument,
     onremovedownload,
     ondownloadfile,
+    ondeletefile,
     oncloneproject,
     ondeleteproject,
+    ondeletedocument,
     onnewcloudproject,
+    onnewclouddocument,
     onsignin,
   }: Props = $props();
 
   let menuFor = $state<string | null>(null);
   let menuAt = $state({ x: 0, y: 0 });
+
+  function openContextMenu(event: MouseEvent, path: string) {
+    event.preventDefault();
+    event.stopPropagation();
+    menuAt = { x: event.clientX, y: event.clientY };
+    menuFor = path;
+  }
+
+  let cloudMenuFor = $state<string | null>(null);
+  let cloudMenuAt = $state({ x: 0, y: 0 });
+
+  function openCloudContextMenu(event: MouseEvent, id: string) {
+    event.preventDefault();
+    event.stopPropagation();
+    cloudMenuAt = { x: event.clientX, y: event.clientY };
+    cloudMenuFor = id;
+  }
 
   const trail = $derived(breadcrumbs());
   const cloudTrail = $derived(cloudBreadcrumbs());
@@ -169,6 +195,45 @@
       .map((entry) => entry.path),
   );
 
+  let dragging = $state<string | null>(null);
+  let dropTarget = $state<string | null>(null);
+
+  async function moveTo(source: string, destination: string) {
+    if (source === destination) return;
+    const parent = source.includes("/") ? source.slice(0, source.lastIndexOf("/")) : "";
+    if (parent === destination) return;
+    try {
+      await api.moveEntry(source, destination);
+      await refreshEntries();
+    } catch (error) {
+      setError(error);
+    }
+  }
+
+  function startDrag(event: DragEvent, path: string) {
+    dragging = path;
+    event.dataTransfer?.setData("text/plain", path);
+  }
+
+  function endDrag() {
+    dragging = null;
+    dropTarget = null;
+  }
+
+  function allowDrop(event: DragEvent, path: string) {
+    if (!dragging) return;
+    event.preventDefault();
+    dropTarget = path;
+  }
+
+  function handleDrop(event: DragEvent, destination: string) {
+    event.preventDefault();
+    const source = dragging ?? event.dataTransfer?.getData("text/plain");
+    dragging = null;
+    dropTarget = null;
+    if (source) moveTo(source, destination);
+  }
+
   function activate(entry: BrowseEntry) {
     if (entry.kind === "folder") {
       browseTo(entry.path);
@@ -192,7 +257,68 @@
   }
 </script>
 
+{#snippet cloudMenu(
+  id: string,
+  onopen: (() => void) | null,
+  ondownload: () => void,
+  onremove: (() => void) | null,
+  ondelete: (() => void) | null,
+)}
+  {#if cloudMenuFor === id}
+    <div
+      use:clampMenu
+      class="fixed z-50 flex w-44 flex-col rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] py-1 text-xs shadow-lg"
+      style="left: {cloudMenuAt.x}px; top: {cloudMenuAt.y}px"
+    >
+      {#if onopen}
+        <button
+          class="px-3 py-1.5 text-left hover:bg-[var(--color-surface-sunken)]"
+          onclick={() => {
+            onopen();
+            cloudMenuFor = null;
+          }}
+        >
+          Open
+        </button>
+      {:else}
+        <button
+          class="px-3 py-1.5 text-left hover:bg-[var(--color-surface-sunken)]"
+          onclick={() => {
+            ondownload();
+            cloudMenuFor = null;
+          }}
+        >
+          Download
+        </button>
+      {/if}
+      {#if onremove}
+        <button
+          class="px-3 py-1.5 text-left hover:bg-[var(--color-surface-sunken)]"
+          onclick={() => {
+            onremove();
+            cloudMenuFor = null;
+          }}
+        >
+          Remove from this device
+        </button>
+      {/if}
+      {#if ondelete}
+        <button
+          class="px-3 py-1.5 text-left text-[var(--color-danger)] hover:bg-[var(--color-surface-sunken)]"
+          onclick={() => {
+            ondelete();
+            cloudMenuFor = null;
+          }}
+        >
+          Delete from cloud
+        </button>
+      {/if}
+    </div>
+  {/if}
+{/snippet}
+
 {#snippet cloudCard(
+  id: string,
   icon: string,
   title: string,
   meta: string,
@@ -200,10 +326,13 @@
   onopen: (() => void) | null,
   ondownload: () => void,
   onremove: (() => void) | null,
+  ondelete: (() => void) | null,
 )}
   <div
     class="group flex flex-col overflow-hidden rounded-lg border border-[var(--color-line)] bg-[var(--color-surface)] transition hover:border-[var(--color-accent)] hover:shadow-sm"
+    oncontextmenu={(event) => openCloudContextMenu(event, id)}
   >
+    {@render cloudMenu(id, onopen, ondownload, onremove, ondelete)}
     <div
       class="flex h-24 items-center justify-center overflow-hidden border-b border-[var(--color-line)] bg-[var(--color-surface-muted)]"
     >
@@ -278,11 +407,11 @@
         </button>
       {/if}
 
-      {#if onremove}
+      {#if onremove || ondelete}
         <button
           class="rounded-md border border-[var(--color-line)] px-2 py-1.5 text-[10px] text-[var(--color-ink-muted)] transition hover:border-[var(--color-danger)] hover:text-[var(--color-danger)]"
-          onclick={onremove}
-          aria-label="Remove"
+          onclick={onremove ?? ondelete}
+          aria-label={onremove ? "Remove" : "Delete"}
         >
           <Icon icon="ph:trash" />
         </button>
@@ -331,7 +460,8 @@
 
   {#if menuFor === entry.path}
     <div
-      class="fixed z-50 flex w-40 -translate-x-full flex-col rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] py-1 text-xs shadow-lg"
+      use:clampMenu
+      class="fixed z-50 flex w-40 flex-col rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] py-1 text-xs shadow-lg"
       style="left: {menuAt.x}px; top: {menuAt.y}px"
     >
       {#if entry.kind === "project" || entry.kind === "document"}
@@ -404,10 +534,14 @@
     if (!(event.target as HTMLElement).closest("[data-card-menu]")) {
       menuFor = null;
     }
+    cloudMenuFor = null;
   }}
 />
 
-<div class="flex h-full flex-col bg-[var(--color-surface-muted)]">
+<div
+  class="flex h-full flex-col bg-[var(--color-surface-muted)]"
+  oncontextmenu={(event) => event.preventDefault()}
+>
   <div
     class="flex items-center gap-2 border-b border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-2.5"
   >
@@ -459,11 +593,18 @@
       </button>
     {:else if app.account}
       <button
-        class="flex items-center gap-1.5 rounded-md bg-[var(--color-accent)] px-2.5 py-1.5 text-xs font-medium text-white transition hover:opacity-90"
+        class="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-ink)]"
         onclick={onnewcloudproject}
       >
+        <Icon icon="ph:folder-star" />
+        Project
+      </button>
+      <button
+        class="flex items-center gap-1.5 rounded-md bg-[var(--color-accent)] px-2.5 py-1.5 text-xs font-medium text-white transition hover:opacity-90"
+        onclick={onnewclouddocument}
+      >
         <Icon icon="ph:plus" />
-        New cloud project
+        New document
       </button>
     {/if}
   </div>
@@ -474,8 +615,14 @@
     >
       <button
         class="flex items-center gap-1.5 rounded px-2 py-1 transition hover:bg-[var(--color-surface-muted)]
-          {app.currentDir === '' ? 'font-medium' : 'text-[var(--color-ink-muted)]'}"
+          {app.currentDir === '' ? 'font-medium' : 'text-[var(--color-ink-muted)]'}
+          {dropTarget === '' ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent)]' : ''}"
         onclick={() => browseTo("")}
+        ondragover={(event) => allowDrop(event, "")}
+        ondragleave={() => {
+          if (dropTarget === "") dropTarget = null;
+        }}
+        ondrop={(event) => handleDrop(event, "")}
       >
         <Icon icon="ph:house" />
         Workspace
@@ -485,8 +632,14 @@
         <Icon icon="ph:caret-right" class="text-[10px] text-[var(--color-ink-muted)]" />
         <button
           class="rounded px-2 py-1 transition hover:bg-[var(--color-surface-muted)]
-            {index === trail.length - 1 ? 'font-medium' : 'text-[var(--color-ink-muted)]'}"
+            {index === trail.length - 1 ? 'font-medium' : 'text-[var(--color-ink-muted)]'}
+            {dropTarget === crumb.path ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent)]' : ''}"
           onclick={() => browseTo(crumb.path)}
+          ondragover={(event) => allowDrop(event, crumb.path)}
+          ondragleave={() => {
+            if (dropTarget === crumb.path) dropTarget = null;
+          }}
+          ondrop={(event) => handleDrop(event, crumb.path)}
         >
           {crumb.name}
         </button>
@@ -527,7 +680,19 @@
               <div class="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-2">
                 {#each containers as entry (entry.path)}
                   <div
-                    class="group relative flex items-center gap-2.5 rounded-lg border border-[var(--color-line)] bg-[var(--color-surface-sunken)] px-3 py-2.5 transition hover:border-[var(--color-accent)] hover:bg-[var(--color-surface)]"
+                    class="group relative flex items-center gap-2.5 rounded-lg border px-3 py-2.5 transition hover:border-[var(--color-accent)] hover:bg-[var(--color-surface)]
+                      {dropTarget === entry.path
+                      ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)]'
+                      : 'border-[var(--color-line)] bg-[var(--color-surface-sunken)]'}"
+                    draggable="true"
+                    ondragstart={(event) => startDrag(event, entry.path)}
+                    ondragend={endDrag}
+                    ondragover={(event) => allowDrop(event, entry.path)}
+                    ondragleave={() => {
+                      if (dropTarget === entry.path) dropTarget = null;
+                    }}
+                    ondrop={(event) => handleDrop(event, entry.path)}
+                    oncontextmenu={(event) => openContextMenu(event, entry.path)}
                   >
                     <button
                       class="flex min-w-0 flex-1 items-center gap-2.5 text-left"
@@ -579,6 +744,10 @@
                 {#each documents as entry (entry.path)}
                   <div
                     class="group relative flex flex-col overflow-hidden rounded-lg border border-[var(--color-line)] bg-[var(--color-surface)] transition hover:border-[var(--color-accent)] hover:shadow-md"
+                    draggable="true"
+                    ondragstart={(event) => startDrag(event, entry.path)}
+                    ondragend={endDrag}
+                    oncontextmenu={(event) => openContextMenu(event, entry.path)}
                   >
                     <button
                       class="flex flex-col text-left"
@@ -729,16 +898,27 @@
             class="mb-4 grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-2"
           >
             {#each app.cloudFolders as folder (folder.id)}
-              <button
-                class="flex items-center gap-2.5 rounded-lg border border-[var(--color-line)] bg-[var(--color-surface-sunken)] px-3 py-2.5 text-left transition hover:border-[var(--color-accent)] hover:bg-[var(--color-surface)]"
-                onclick={() => openCloudFolder(folder.id)}
-              >
-                <Icon
-                  icon="ph:folder-fill"
-                  class="shrink-0 text-2xl text-[var(--color-ink-muted)]"
-                />
-                <span class="truncate text-xs font-medium">{folder.name}</span>
-              </button>
+              <div class="relative">
+                <button
+                  class="flex w-full items-center gap-2.5 rounded-lg border border-[var(--color-line)] bg-[var(--color-surface-sunken)] px-3 py-2.5 text-left transition hover:border-[var(--color-accent)] hover:bg-[var(--color-surface)]"
+                  onclick={() => openCloudFolder(folder.id)}
+                  oncontextmenu={(event) =>
+                    openCloudContextMenu(event, `folder:${folder.id}`)}
+                >
+                  <Icon
+                    icon="ph:folder-fill"
+                    class="shrink-0 text-2xl text-[var(--color-ink-muted)]"
+                  />
+                  <span class="truncate text-xs font-medium">{folder.name}</span>
+                </button>
+                {@render cloudMenu(
+                  `folder:${folder.id}`,
+                  () => openCloudFolder(folder.id),
+                  () => {},
+                  null,
+                  null,
+                )}
+              </div>
             {/each}
           </div>
         {/if}
@@ -755,6 +935,7 @@
             {#each app.cloudDocuments as entry (entry.id)}
               {@const linked = linkedDocument(entry.id)}
               {@render cloudCard(
+                `document:${entry.id}`,
                 "ph:file-text",
                 entry.title,
                 linked
@@ -764,6 +945,7 @@
                 linked ? () => openTarget(linked.path) : null,
                 () => ondownloaddocument(entry.id, entry.title),
                 linked ? () => onremovedownload(linked.path) : null,
+                () => ondeletedocument(entry.id),
               )}
             {/each}
           </div>
@@ -781,7 +963,16 @@
             {#each app.cloudFiles as file (file.id)}
               <div
                 class="flex items-center gap-2.5 rounded-lg border border-[var(--color-line)] bg-[var(--color-surface)] p-3 transition hover:border-[var(--color-accent)]"
+                oncontextmenu={(event) =>
+                  openCloudContextMenu(event, `file:${file.id}`)}
               >
+                {@render cloudMenu(
+                  `file:${file.id}`,
+                  null,
+                  () => ondownloadfile(file.id, file.name),
+                  null,
+                  () => ondeletefile(file.id),
+                )}
                 <Icon
                   icon={api.isImagePath(file.name)
                     ? "ph:image"
@@ -817,6 +1008,22 @@
           >
             <Icon icon="ph:cloud" class="text-5xl" />
             <p class="text-sm">Nothing here yet.</p>
+            {#if app.cloudFolder !== "shared"}
+              <div class="flex gap-2">
+                <button
+                  class="rounded-md bg-[var(--color-accent)] px-3 py-1.5 text-xs font-medium text-white hover:opacity-90"
+                  onclick={onnewclouddocument}
+                >
+                  New document
+                </button>
+                <button
+                  class="rounded-md border border-[var(--color-line)] px-3 py-1.5 text-xs hover:bg-[var(--color-surface)]"
+                  onclick={onnewcloudproject}
+                >
+                  New project
+                </button>
+              </div>
+            {/if}
           </div>
         {/if}
 
@@ -831,6 +1038,7 @@
           {#each app.cloudProjects as project (project.id)}
             {@const linked = linkedProject(project.id)}
             {@render cloudCard(
+              `project:${project.id}`,
               "ph:folder-star",
               project.name,
               linked
@@ -839,6 +1047,7 @@
               linked,
               linked ? () => openTarget(linked.path) : null,
               () => oncloneproject(project.id, project.name),
+              null,
               project.role === "owner" ? () => ondeleteproject(project.id) : null,
             )}
           {/each}

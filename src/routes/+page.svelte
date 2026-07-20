@@ -38,6 +38,7 @@
     openFile,
     openTarget,
     refreshAccount,
+    refreshCloud,
     refreshCloudProjects,
     refreshEntries,
     refreshTarget,
@@ -62,7 +63,10 @@
     | { kind: "link-entry"; entry: BrowseEntry }
     | { kind: "save-document-to-cloud"; entry: BrowseEntry }
     | { kind: "new-cloud-project" }
+    | { kind: "new-cloud-document" }
     | { kind: "delete-cloud-project"; id: string }
+    | { kind: "delete-cloud-document"; id: string }
+    | { kind: "delete-cloud-file"; id: string }
     | { kind: "clone-cloud-project"; id: string; name: string }
     | { kind: "new-file"; parent: string }
     | { kind: "new-subfolder"; parent: string }
@@ -171,10 +175,28 @@
       await refreshCloudProjects();
     });
 
+  const createCloudDocument = (title: string) =>
+    guard(async () => {
+      await api.cloudNewDocument(title);
+      await refreshCloud();
+    });
+
   const deleteCloudProject = (id: string) =>
     guard(async () => {
       await api.cloudDeleteProject(id);
       await refreshCloudProjects();
+    });
+
+  const deleteCloudDocument = (id: string) =>
+    guard(async () => {
+      await api.cloudDeleteDocument(id);
+      await refreshCloud();
+    });
+
+  const deleteCloudFile = (id: string) =>
+    guard(async () => {
+      await api.cloudDeleteFile(id);
+      await refreshCloud();
     });
 
   const cloneCloudProject = (id: string, name: string) =>
@@ -618,10 +640,13 @@
             downloadDocument(documentId, title)}
           onremovedownload={removeDownloadedDocument}
           ondownloadfile={downloadCloudFile}
+          ondeletefile={(id) => (dialog = { kind: "delete-cloud-file", id })}
           onnewcloudproject={() => (dialog = { kind: "new-cloud-project" })}
+          onnewclouddocument={() => (dialog = { kind: "new-cloud-document" })}
           oncloneproject={(id, name) =>
             (dialog = { kind: "clone-cloud-project", id, name })}
           ondeleteproject={(id) => (dialog = { kind: "delete-cloud-project", id })}
+          ondeletedocument={(id) => (dialog = { kind: "delete-cloud-document", id })}
           onsignin={() => (dialog = { kind: "login" })}
         />
       </div>
@@ -644,7 +669,6 @@
             files={app.target?.files ?? []}
             activePath={app.activePath}
             entrypoint={app.target?.entrypoint ?? "main.typ"}
-            targetPath={app.target?.path ?? ""}
             selected={selectedEntries}
             dropTarget={treeDropTarget}
             onopen={openFile}
@@ -834,12 +858,36 @@
     onsubmit={createCloudProject}
     onclose={close}
   />
+{:else if dialog.kind === "new-cloud-document"}
+  <PromptModal
+    title="New cloud document"
+    label="Document title"
+    icon="ph:cloud-plus"
+    onsubmit={createCloudDocument}
+    onclose={close}
+  />
 {:else if dialog.kind === "delete-cloud-project"}
   {@const target = dialog}
   <ConfirmModal
     title="Delete cloud project"
     message="This permanently deletes the project and its files from TypstDrive. Local copies are kept."
     onconfirm={() => deleteCloudProject(target.id)}
+    onclose={close}
+  />
+{:else if dialog.kind === "delete-cloud-document"}
+  {@const target = dialog}
+  <ConfirmModal
+    title="Delete cloud document"
+    message="This permanently deletes the document from TypstDrive. A local copy, if downloaded, is kept."
+    onconfirm={() => deleteCloudDocument(target.id)}
+    onclose={close}
+  />
+{:else if dialog.kind === "delete-cloud-file"}
+  {@const target = dialog}
+  <ConfirmModal
+    title="Delete cloud file"
+    message="This permanently deletes the file from TypstDrive."
+    onconfirm={() => deleteCloudFile(target.id)}
     onclose={close}
   />
 {:else if dialog.kind === "clone-cloud-project"}

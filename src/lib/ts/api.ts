@@ -251,6 +251,18 @@ export const updateSettings = (changes: {
   syncMinutes?: number;
 }) => invoke<Settings>("update_settings", changes);
 
+export interface CompatibilityStatus {
+  compatible: boolean;
+  server_version: string;
+  desktop_version: string;
+  min_server_version: string;
+  min_desktop_version: string;
+  message: string | null;
+}
+
+export const cloudCheckCompatibility = (serverUrl: string) =>
+  invoke<CompatibilityStatus>("cloud_check_compatibility", { serverUrl });
+
 export const cloudLogin = (
   serverUrl: string,
   email: string,
@@ -314,11 +326,28 @@ export const cloudListFiles = (folderId?: string | null) =>
 export const cloudDownloadFile = (fileId: string) =>
   invoke<string>("cloud_download_file", { fileId });
 
+export const cloudDeleteFile = (fileId: string) =>
+  invoke<void>("cloud_delete_file", { fileId });
+
 export const cloudDownloadDocument = (documentId: string, parent: string) =>
   invoke<string>("cloud_download_document", { documentId, parent });
 
+export const cloudDeleteDocument = (documentId: string) =>
+  invoke<void>("cloud_delete_document", { documentId });
+
 export const cloudCreateDocument = (path: string, title: string) =>
   invoke<string>("cloud_create_document", { path, title });
+
+export interface DocumentContent {
+  id: string;
+  title: string;
+  role: string;
+  hash: string;
+  content: string;
+}
+
+export const cloudNewDocument = (title: string) =>
+  invoke<DocumentContent>("cloud_new_document", { title });
 
 export const cloudSyncDocument = (path: string) =>
   invoke<SyncReport>("cloud_sync_document", { path });

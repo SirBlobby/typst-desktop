@@ -1,14 +1,12 @@
 <script lang="ts">
   import Icon from "@iconify/svelte";
-  import { resolveResource } from "@tauri-apps/api/path";
-  import { startDrag } from "@crabnebula/tauri-plugin-drag";
-  import { absolutePath, type FileEntry } from "$lib/ts/api";
+  import type { FileEntry } from "$lib/ts/api";
+  import { clampMenu } from "$lib/ts/menu-position";
 
   interface Props {
     files: FileEntry[];
     activePath: string | null;
     entrypoint: string;
-    targetPath: string;
     selected: Set<string>;
     dropTarget: string | null;
     onopen: (path: string) => void;
@@ -28,7 +26,6 @@
     files,
     activePath,
     entrypoint,
-    targetPath,
     selected,
     dropTarget,
     onopen,
@@ -115,10 +112,7 @@
     null,
   );
   let dragging = $state<string | null>(null);
-  let dragPaths = $state<string[]>([]);
   let anchorPath = $state<string | null>(null);
-  let nativeDragSent = false;
-  let iconPathPromise: Promise<string> | null = null;
 
   function flattenVisible(nodes: TreeNode[]): TreeNode[] {
     const result: TreeNode[] = [];
@@ -217,40 +211,6 @@
     return index === -1 ? "" : path.slice(0, index);
   }
 
-  function joinTargetPath(path: string): string {
-    return targetPath ? `${targetPath}/${path}` : path;
-  }
-
-  function resolveAbsolutePaths(paths: string[]): Promise<string[]> {
-    return Promise.all(paths.map((path) => absolutePath(joinTargetPath(path))));
-  }
-
-  function dragIcon(): Promise<string> {
-    if (!iconPathPromise) iconPathPromise = resolveResource("icons/32x32.png");
-    return iconPathPromise;
-  }
-
-  async function exportViaOsDrag(paths: string[]) {
-    if (nativeDragSent || paths.length === 0) return;
-    nativeDragSent = true;
-    try {
-      const [absolutePaths, icon] = await Promise.all([
-        resolveAbsolutePaths(paths),
-        dragIcon(),
-      ]);
-      await startDrag({ item: absolutePaths, icon });
-    } catch (error) {
-      console.error("Failed to start native drag", error);
-    }
-  }
-
-  function handleWindowDragLeave(event: DragEvent) {
-    if (!dragging || nativeDragSent) return;
-    // relatedTarget is null only when the pointer leaves the whole window,
-    // as opposed to moving between elements inside it.
-    if (event.relatedTarget !== null) return;
-    exportViaOsDrag(dragPaths);
-  }
 </script>
 
 <svelte:window
@@ -258,7 +218,6 @@
   on:contextmenu={(event) => {
     if (!(event.target as HTMLElement).closest("[data-tree-row]")) menu = null;
   }}
-  on:dragleave={handleWindowDragLeave}
 />
 
 {#snippet branch(nodes: TreeNode[], depth: number)}
@@ -287,17 +246,10 @@
         onkeydown={(event) => handleKey(event, node)}
         ondragstart={(event) => {
           dragging = node.path;
-          dragPaths =
-            selected.has(node.path) && selected.size > 1
-              ? [...selected]
-              : [node.path];
-          nativeDragSent = false;
           event.dataTransfer?.setData("text/plain", node.path);
         }}
         ondragend={() => {
           dragging = null;
-          dragPaths = [];
-          nativeDragSent = false;
         }}
         ondragover={(event) => {
           if (!dragging || !node.isDir) return;
@@ -432,6 +384,7 @@
     selected.has(target.path) && selected.size > 1 ? [...selected] : [target.path]}
   {@const single = menuPaths.length === 1}
   <div
+    use:clampMenu
     class="fixed z-50 flex w-48 flex-col rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] py-1 text-xs shadow-lg"
     style="left: {target.x}px; top: {target.y}px"
   >

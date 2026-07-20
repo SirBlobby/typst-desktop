@@ -24,7 +24,6 @@
     "@codemirror/view": "^6.43.6",
     "@iconify/svelte": "^5.2.2",
     "@lezer/highlight": "^1.2.3",
-    "@crabnebula/tauri-plugin-drag": "^2.1.0",
     "@tauri-apps/api": "^2.11.1",
     "@tauri-apps/plugin-dialog": "^2.7.2",
     "@tauri-apps/plugin-opener": "^2.5.4",
