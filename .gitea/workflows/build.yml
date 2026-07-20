@@ -41,7 +41,8 @@ jobs:
             file \
             curl \
             wget \
-            jq
+            jq \
+            xdg-utils
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
