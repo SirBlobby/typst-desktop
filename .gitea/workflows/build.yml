@@ -7,13 +7,13 @@ on:
   workflow_dispatch:
 
 env:
-  TYPST_COMMIT: 44b3f78ed37fedea75e911dde2269ef86c45316f
+  TYPST_COMMIT: 9dfd3a08500b7896045f907433cf7b4b02434fad
   APPIMAGE_EXTRACT_AND_RUN: 1
   NO_STRIP: 1
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Checkout repository

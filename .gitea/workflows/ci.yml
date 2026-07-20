@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 env:
-  TYPST_COMMIT: 44b3f78ed37fedea75e911dde2269ef86c45316f
+  TYPST_COMMIT: 9dfd3a08500b7896045f907433cf7b4b02434fad
 
 jobs:
   frontend:
