@@ -8,7 +8,7 @@
     browseTo,
     cloudBreadcrumbs,
     linkedDocument,
-    linkedSpace,
+    linkedProject,
     openCloudFolder,
     openTarget,
     refreshCloud,
@@ -22,13 +22,14 @@
     onrename: (entry: BrowseEntry) => void;
     ondelete: (entry: BrowseEntry) => void;
     onlink: (entry: BrowseEntry) => void;
+    onsavetocloud: (entry: BrowseEntry) => void;
     onviewimage: (paths: string[], index: number) => void;
     ondownloaddocument: (documentId: string, title: string) => void;
     onremovedownload: (path: string) => void;
     ondownloadfile: (fileId: string, name: string) => void;
-    onclonespace: (spaceId: string, name: string) => void;
-    ondeletespace: (spaceId: string) => void;
-    onnewspace: () => void;
+    oncloneproject: (cloudProjectId: string, name: string) => void;
+    ondeleteproject: (cloudProjectId: string) => void;
+    onnewcloudproject: () => void;
     onsignin: () => void;
   }
 
@@ -40,13 +41,14 @@
     onrename,
     ondelete,
     onlink,
+    onsavetocloud,
     onviewimage,
     ondownloaddocument,
     onremovedownload,
     ondownloadfile,
-    onclonespace,
-    ondeletespace,
-    onnewspace,
+    oncloneproject,
+    ondeleteproject,
+    onnewcloudproject,
     onsignin,
   }: Props = $props();
 
@@ -82,7 +84,7 @@
 
     const pending = [
       ...app.linkedDocuments.map((linked) => linked.path),
-      ...app.linkedSpaces.map((linked) => linked.path),
+      ...app.linkedProjects.map((linked) => linked.path),
     ];
     let cancelled = false;
 
@@ -353,7 +355,7 @@
           Open image
         </button>
       {/if}
-      {#if entry.kind === "project" && !entry.space_id && app.account}
+      {#if entry.kind === "project" && !entry.cloud_project_id && app.account}
         <button
           class="px-3 py-1.5 text-left hover:bg-[var(--color-surface-sunken)]"
           onclick={() => {
@@ -362,6 +364,17 @@
           }}
         >
           Upload to cloud
+        </button>
+      {/if}
+      {#if entry.kind === "document" && !entry.cloud_linked && app.account}
+        <button
+          class="px-3 py-1.5 text-left hover:bg-[var(--color-surface-sunken)]"
+          onclick={() => {
+            onsavetocloud(entry);
+            menuFor = null;
+          }}
+        >
+          Save to cloud
         </button>
       {/if}
       <button
@@ -432,25 +445,25 @@
       </button>
       <button
         class="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-ink)]"
-        onclick={onnewdocument}
+        onclick={onnewproject}
       >
-        <Icon icon="ph:file-plus" />
-        Document
+        <Icon icon="ph:folder-star" />
+        Project
       </button>
       <button
         class="flex items-center gap-1.5 rounded-md bg-[var(--color-accent)] px-2.5 py-1.5 text-xs font-medium text-white transition hover:opacity-90"
-        onclick={onnewproject}
+        onclick={onnewdocument}
       >
         <Icon icon="ph:plus" />
-        New project
+        New document
       </button>
     {:else if app.account}
       <button
         class="flex items-center gap-1.5 rounded-md bg-[var(--color-accent)] px-2.5 py-1.5 text-xs font-medium text-white transition hover:opacity-90"
-        onclick={onnewspace}
+        onclick={onnewcloudproject}
       >
         <Icon icon="ph:plus" />
-        New space
+        New cloud project
       </button>
     {/if}
   </div>
@@ -490,15 +503,15 @@
           <div class="flex gap-2">
             <button
               class="rounded-md bg-[var(--color-accent)] px-3 py-1.5 text-xs font-medium text-white hover:opacity-90"
-              onclick={onnewproject}
-            >
-              New project
-            </button>
-            <button
-              class="rounded-md border border-[var(--color-line)] px-3 py-1.5 text-xs hover:bg-[var(--color-surface)]"
               onclick={onnewdocument}
             >
               New document
+            </button>
+            <button
+              class="rounded-md border border-[var(--color-line)] px-3 py-1.5 text-xs hover:bg-[var(--color-surface)]"
+              onclick={onnewproject}
+            >
+              New project
             </button>
           </div>
         </div>
@@ -798,7 +811,7 @@
           </div>
         {/if}
 
-        {#if app.spaces.length === 0 && app.cloudDocuments.length === 0 && app.cloudFolders.length === 0 && app.cloudFiles.length === 0}
+        {#if app.cloudProjects.length === 0 && app.cloudDocuments.length === 0 && app.cloudFolders.length === 0 && app.cloudFiles.length === 0}
           <div
             class="flex flex-col items-center justify-center gap-3 py-16 text-[var(--color-ink-muted)]"
           >
@@ -807,26 +820,26 @@
           </div>
         {/if}
 
-        {#if app.spaces.length > 0}
+        {#if app.cloudProjects.length > 0}
           <h2
             class="mb-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]"
           >
-            Spaces
+            Cloud projects
           </h2>
         {/if}
         <div class="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3">
-          {#each app.spaces as space (space.id)}
-            {@const linked = linkedSpace(space.id)}
+          {#each app.cloudProjects as project (project.id)}
+            {@const linked = linkedProject(project.id)}
             {@render cloudCard(
               "ph:folder-star",
-              space.name,
+              project.name,
               linked
-                ? `Project · ${space.role}`
-                : `${space.role} · ${formatDate(space.updated_at)}`,
+                ? `Project · ${project.role}`
+                : `${project.role} · ${formatDate(project.updated_at)}`,
               linked,
               linked ? () => openTarget(linked.path) : null,
-              () => onclonespace(space.id, space.name),
-              space.role === "owner" ? () => ondeletespace(space.id) : null,
+              () => oncloneproject(project.id, project.name),
+              project.role === "owner" ? () => ondeleteproject(project.id) : null,
             )}
           {/each}
         </div>

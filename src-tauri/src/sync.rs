@@ -87,7 +87,7 @@ pub fn me(server_url: &str, token: &str) -> Result<Account, String> {
 }
 
 #[derive(Deserialize, Serialize, Clone)]
-pub struct SpaceSummary {
+pub struct ProjectSummary {
     pub id: String,
     pub name: String,
     pub entrypoint: String,
@@ -95,29 +95,37 @@ pub struct SpaceSummary {
     pub updated_at: String,
 }
 
-pub fn list_spaces(server_url: &str, token: &str) -> Result<Vec<SpaceSummary>, String> {
+pub fn list_cloud_projects(server_url: &str, token: &str) -> Result<Vec<ProjectSummary>, String> {
     agent()
-        .get(&endpoint(server_url, "/spaces"))
+        .get(&endpoint(server_url, "/projects"))
         .set("Authorization", &format!("Bearer {}", token))
         .call()
         .map_err(describe)?
-        .into_json::<Vec<SpaceSummary>>()
+        .into_json::<Vec<ProjectSummary>>()
         .map_err(|e| e.to_string())
 }
 
-pub fn create_space(server_url: &str, token: &str, name: &str) -> Result<SpaceSummary, String> {
+pub fn create_cloud_project(
+    server_url: &str,
+    token: &str,
+    name: &str,
+) -> Result<ProjectSummary, String> {
     agent()
-        .post(&endpoint(server_url, "/spaces"))
+        .post(&endpoint(server_url, "/projects"))
         .set("Authorization", &format!("Bearer {}", token))
         .send_json(ureq::json!({ "name": name }))
         .map_err(describe)?
-        .into_json::<SpaceSummary>()
+        .into_json::<ProjectSummary>()
         .map_err(|e| e.to_string())
 }
 
-pub fn delete_space(server_url: &str, token: &str, space_id: &str) -> Result<(), String> {
+pub fn delete_cloud_project(
+    server_url: &str,
+    token: &str,
+    cloud_project_id: &str,
+) -> Result<(), String> {
     agent()
-        .delete(&endpoint(server_url, &format!("/spaces/{}", space_id)))
+        .delete(&endpoint(server_url, &format!("/projects/{}", cloud_project_id)))
         .set("Authorization", &format!("Bearer {}", token))
         .call()
         .map_err(describe)?;
@@ -131,7 +139,9 @@ pub struct ManifestEntry {
 }
 
 #[derive(Deserialize)]
-pub struct SpaceManifest {
+pub struct ProjectManifest {
+    pub project_id: String,
+    pub name: String,
     pub entrypoint: String,
     pub files: Vec<ManifestEntry>,
 }
@@ -139,17 +149,17 @@ pub struct SpaceManifest {
 pub fn get_manifest(
     server_url: &str,
     token: &str,
-    space_id: &str,
-) -> Result<SpaceManifest, String> {
+    cloud_project_id: &str,
+) -> Result<ProjectManifest, String> {
     agent()
         .get(&endpoint(
             server_url,
-            &format!("/spaces/{}/manifest", space_id),
+            &format!("/projects/{}/manifest", cloud_project_id),
         ))
         .set("Authorization", &format!("Bearer {}", token))
         .call()
         .map_err(describe)?
-        .into_json::<SpaceManifest>()
+        .into_json::<ProjectManifest>()
         .map_err(|e| e.to_string())
 }
 
@@ -176,11 +186,14 @@ impl FileContent {
 pub fn pull_file(
     server_url: &str,
     token: &str,
-    space_id: &str,
+    cloud_project_id: &str,
     path: &str,
 ) -> Result<FileContent, String> {
     agent()
-        .get(&endpoint(server_url, &format!("/spaces/{}/file", space_id)))
+        .get(&endpoint(
+            server_url,
+            &format!("/projects/{}/file", cloud_project_id),
+        ))
         .query("path", path)
         .set("Authorization", &format!("Bearer {}", token))
         .call()
@@ -204,7 +217,7 @@ pub enum PushResult {
 pub fn push_file(
     server_url: &str,
     token: &str,
-    space_id: &str,
+    cloud_project_id: &str,
     path: &str,
     bytes: &[u8],
     base_hash: Option<&str>,
@@ -216,7 +229,10 @@ pub fn push_file(
     };
 
     let response = agent()
-        .put(&endpoint(server_url, &format!("/spaces/{}/file", space_id)))
+        .put(&endpoint(
+            server_url,
+            &format!("/projects/{}/file", cloud_project_id),
+        ))
         .set("Authorization", &format!("Bearer {}", token))
         .send_json(ureq::json!({
             "path": path,
@@ -248,11 +264,14 @@ pub fn push_file(
 pub fn delete_remote_file(
     server_url: &str,
     token: &str,
-    space_id: &str,
+    cloud_project_id: &str,
     path: &str,
 ) -> Result<(), String> {
     let response = agent()
-        .delete(&endpoint(server_url, &format!("/spaces/{}/file", space_id)))
+        .delete(&endpoint(
+            server_url,
+            &format!("/projects/{}/file", cloud_project_id),
+        ))
         .query("path", path)
         .set("Authorization", &format!("Bearer {}", token))
         .call();
@@ -306,12 +325,12 @@ pub fn pull_project(
     project_dir: &Path,
     meta: &mut ProjectMeta,
 ) -> Result<SyncReport, String> {
-    let space_id = meta
-        .space_id
+    let cloud_project_id = meta
+        .cloud_project_id
         .clone()
-        .ok_or("Project is not linked to a cloud space")?;
+        .ok_or("Project is not linked to a cloud project")?;
 
-    let manifest = get_manifest(server_url, token, &space_id)?;
+    let manifest = get_manifest(server_url, token, &cloud_project_id)?;
     let mut report = SyncReport::default();
 
     let local_files: HashSet<String> = collect_files(project_dir)?.into_iter().collect();
@@ -327,7 +346,7 @@ pub fn pull_project(
             if base.is_some() {
                 continue;
             }
-            let remote = pull_file(server_url, token, &space_id, &entry.path)?;
+            let remote = pull_file(server_url, token, &cloud_project_id, &entry.path)?;
             write_local(project_dir, &entry.path, &remote.bytes()?)?;
             meta.base_hashes.insert(entry.path.clone(), remote.hash);
             report.pulled.push(entry.path.clone());
@@ -346,7 +365,7 @@ pub fn pull_project(
             continue;
         }
 
-        let remote = pull_file(server_url, token, &space_id, &entry.path)?;
+        let remote = pull_file(server_url, token, &cloud_project_id, &entry.path)?;
         let remote_bytes = remote.bytes()?;
 
         if base.as_deref() == Some(local_hash.as_str()) {
@@ -428,10 +447,10 @@ pub fn push_project(
     project_dir: &Path,
     meta: &mut ProjectMeta,
 ) -> Result<SyncReport, String> {
-    let space_id = meta
-        .space_id
+    let cloud_project_id = meta
+        .cloud_project_id
         .clone()
-        .ok_or("Project is not linked to a cloud space")?;
+        .ok_or("Project is not linked to a cloud project")?;
 
     let mut report = SyncReport::default();
     let local_files = collect_files(project_dir)?;
@@ -446,7 +465,14 @@ pub fn push_project(
             continue;
         }
 
-        match push_file(server_url, token, &space_id, path, &bytes, base.as_deref())? {
+        match push_file(
+            server_url,
+            token,
+            &cloud_project_id,
+            path,
+            &bytes,
+            base.as_deref(),
+        )? {
             PushResult::Applied => {
                 meta.base_hashes.insert(path.clone(), hash);
                 report.pushed.push(path.clone());
@@ -481,7 +507,7 @@ pub fn push_project(
         .collect();
 
     for path in removed {
-        delete_remote_file(server_url, token, &space_id, &path)?;
+        delete_remote_file(server_url, token, &cloud_project_id, &path)?;
         meta.base_hashes.remove(&path);
         report.deleted_remote.push(path);
     }
@@ -522,20 +548,20 @@ pub fn report_progress(
     );
 }
 
-pub fn clone_space(
+pub fn clone_cloud_project(
     server_url: &str,
     token: &str,
     app: &tauri::AppHandle,
     store: &Store,
     project: &str,
     project_dir: &Path,
-    space_id: &str,
+    cloud_project_id: &str,
 ) -> Result<SyncReport, String> {
     std::fs::create_dir_all(project_dir).map_err(|e| e.to_string())?;
 
-    let manifest = get_manifest(server_url, token, space_id)?;
+    let manifest = get_manifest(server_url, token, cloud_project_id)?;
     let mut meta = store.meta(project)?;
-    meta.space_id = Some(space_id.to_string());
+    meta.cloud_project_id = Some(cloud_project_id.to_string());
     meta.entrypoint = manifest.entrypoint.clone();
 
     let mut report = SyncReport::default();
@@ -544,7 +570,7 @@ pub fn clone_space(
     for (index, entry) in manifest.files.iter().enumerate() {
         report_progress(app, project, index, total, false);
 
-        let remote = pull_file(server_url, token, space_id, &entry.path)?;
+        let remote = pull_file(server_url, token, cloud_project_id, &entry.path)?;
         write_local(project_dir, &entry.path, &remote.bytes()?)?;
         meta.base_hashes.insert(entry.path.clone(), remote.hash);
         report.pulled.push(entry.path.clone());
@@ -621,7 +647,7 @@ pub struct CloudDocument {
 #[derive(Deserialize, Serialize)]
 pub struct SharedItems {
     pub documents: Vec<CloudDocument>,
-    pub spaces: Vec<SpaceSummary>,
+    pub projects: Vec<ProjectSummary>,
 }
 
 pub fn list_folders(server_url: &str, token: &str) -> Result<Vec<CloudFolder>, String> {
@@ -682,6 +708,25 @@ pub fn pull_document(
         .get(&endpoint(server_url, &format!("/documents/{}", document_id)))
         .set("Authorization", &format!("Bearer {}", token))
         .call()
+        .map_err(describe)?
+        .into_json::<DocumentContent>()
+        .map_err(|e| e.to_string())
+}
+
+pub fn create_document(
+    server_url: &str,
+    token: &str,
+    title: &str,
+    content: &str,
+) -> Result<DocumentContent, String> {
+    agent()
+        .post(&endpoint(server_url, "/documents"))
+        .set("Authorization", &format!("Bearer {}", token))
+        .send_json(ureq::json!({
+            "title": title,
+            "content": content,
+            "folder_id": null,
+        }))
         .map_err(describe)?
         .into_json::<DocumentContent>()
         .map_err(|e| e.to_string())

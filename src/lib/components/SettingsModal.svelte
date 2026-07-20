@@ -9,9 +9,15 @@
   import {
     app,
     applyTheme,
+    applyAccent,
+    applyTextScale,
+    applyReduceMotion,
+    applyContrast,
     refreshEntries,
     restartAutoSync,
     setError,
+    type ThemePreference,
+    type TextScale,
   } from "$lib/ts/state.svelte";
 
   interface Props {
@@ -21,13 +27,35 @@
 
   let { onclose, onsignin }: Props = $props();
 
-  type Section = "files" | "appearance" | "account" | "about";
+  type Section =
+    | "files"
+    | "appearance"
+    | "accessibility"
+    | "account"
+    | "about";
 
   const sections: { id: Section; label: string; icon: string }[] = [
     { id: "files", label: "Files", icon: "ph:folder" },
     { id: "appearance", label: "Appearance", icon: "ph:palette" },
+    { id: "accessibility", label: "Accessibility", icon: "ph:wheelchair" },
     { id: "account", label: "Account", icon: "ph:user-circle" },
     { id: "about", label: "About", icon: "ph:info" },
+  ];
+
+  const accentPresets = [
+    "#3b6cf6",
+    "#7c5cfc",
+    "#22b573",
+    "#f2994a",
+    "#ec4899",
+    "#14b8a6",
+  ];
+
+  const textScaleOptions: { value: TextScale; label: string }[] = [
+    { value: "small", label: "Small" },
+    { value: "default", label: "Default" },
+    { value: "large", label: "Large" },
+    { value: "xlarge", label: "Extra large" },
   ];
 
   let section = $state<Section>("files");
@@ -105,7 +133,7 @@
     try {
       await api.cloudLogout();
       app.account = null;
-      app.spaces = [];
+      app.cloudProjects = [];
       app.settings = await api.getSettings();
     } catch (error) {
       setError(error);
@@ -172,13 +200,13 @@
           <div class="flex flex-col gap-2 text-xs">
             <span class="font-medium text-[var(--color-ink-muted)]">Theme</span>
             <div class="flex gap-2">
-              {#each [["light", "Light", "ph:sun"], ["dark", "Dark", "ph:moon"]] as [value, label, icon]}
+              {#each [["light", "Light", "ph:sun"], ["dark", "Dark", "ph:moon"], ["system", "System", "ph:desktop"]] as [value, label, icon]}
                 <button
                   class="flex flex-1 items-center justify-center gap-1.5 rounded-md border px-3 py-2.5 transition
-                    {app.theme === value
+                    {app.themePreference === value
                     ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-[var(--color-accent)]'
                     : 'border-[var(--color-line)] text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-muted)]'}"
-                  onclick={() => applyTheme(value as "light" | "dark")}
+                  onclick={() => applyTheme(value as ThemePreference)}
                 >
                   <Icon {icon} class="text-base" />
                   {label}
@@ -186,7 +214,111 @@
               {/each}
             </div>
             <span class="text-[var(--color-ink-muted)]">
-              Applies immediately to the editor and preview.
+              System follows your OS setting and updates live.
+            </span>
+          </div>
+
+          <div class="flex flex-col gap-2 text-xs">
+            <span class="font-medium text-[var(--color-ink-muted)]">
+              Accent color
+            </span>
+            <div class="flex items-center gap-2">
+              <button
+                class="flex h-7 w-7 items-center justify-center rounded-full border transition
+                  {app.accent === null
+                  ? 'border-[var(--color-accent)] text-[var(--color-accent)]'
+                  : 'border-[var(--color-line)] text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-muted)]'}"
+                title="Default"
+                onclick={() => applyAccent(null)}
+              >
+                <Icon icon="ph:arrow-counter-clockwise" class="text-sm" />
+              </button>
+              {#each accentPresets as preset}
+                <button
+                  class="h-7 w-7 rounded-full border-2 transition
+                    {app.accent === preset
+                    ? 'border-[var(--color-ink)]'
+                    : 'border-transparent hover:opacity-80'}"
+                  style="background-color: {preset}"
+                  title={preset}
+                  onclick={() => applyAccent(preset)}
+                ></button>
+              {/each}
+              <input
+                type="color"
+                class="h-7 w-7 cursor-pointer rounded-full border border-[var(--color-line)] bg-transparent p-0"
+                value={app.accent ?? "#3b6cf6"}
+                title="Custom color"
+                oninput={(event) =>
+                  applyAccent((event.target as HTMLInputElement).value)}
+              />
+            </div>
+            <span class="text-[var(--color-ink-muted)]">
+              Overrides the accent color used across the app.
+            </span>
+          </div>
+        </div>
+      {:else if section === "accessibility"}
+        <div class="flex flex-col gap-5">
+          <div class="flex flex-col gap-2 text-xs">
+            <span class="font-medium text-[var(--color-ink-muted)]">
+              UI text scale
+            </span>
+            <div class="flex gap-2">
+              {#each textScaleOptions as option}
+                <button
+                  class="flex flex-1 items-center justify-center rounded-md border px-3 py-2.5 transition
+                    {app.textScale === option.value
+                    ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-[var(--color-accent)]'
+                    : 'border-[var(--color-line)] text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-muted)]'}"
+                  onclick={() => applyTextScale(option.value)}
+                >
+                  {option.label}
+                </button>
+              {/each}
+            </div>
+            <span class="text-[var(--color-ink-muted)]">
+              Scales text and controls throughout the app.
+            </span>
+          </div>
+
+          <div class="flex flex-col gap-2 text-xs">
+            <label class="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={app.reduceMotion}
+                onchange={(event) =>
+                  applyReduceMotion(
+                    (event.target as HTMLInputElement).checked,
+                  )}
+              />
+              <span class="font-medium text-[var(--color-ink-muted)]">
+                Reduce motion
+              </span>
+            </label>
+            <span class="text-[var(--color-ink-muted)]">
+              Shortens transitions and animations across the app.
+            </span>
+          </div>
+
+          <div class="flex flex-col gap-2 text-xs">
+            <label class="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={app.contrast === "high"}
+                onchange={(event) =>
+                  applyContrast(
+                    (event.target as HTMLInputElement).checked
+                      ? "high"
+                      : "normal",
+                  )}
+              />
+              <span class="font-medium text-[var(--color-ink-muted)]">
+                High contrast
+              </span>
+            </label>
+            <span class="text-[var(--color-ink-muted)]">
+              Increases contrast for borders, muted text, and focus outlines.
             </span>
           </div>
         </div>
@@ -305,13 +437,17 @@
   </div>
 
   {#snippet footer()}
+    {@const draftless =
+      section === "about" ||
+      section === "appearance" ||
+      section === "accessibility"}
     <button
       class="rounded-md px-3 py-1.5 text-xs text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)]"
       onclick={onclose}
     >
-      {section === "about" || section === "appearance" ? "Close" : "Cancel"}
+      {draftless ? "Close" : "Cancel"}
     </button>
-    {#if section !== "about" && section !== "appearance"}
+    {#if !draftless}
       <button
         class="rounded-md bg-[var(--color-accent)] px-3 py-1.5 text-xs font-medium text-white transition hover:opacity-90 disabled:opacity-50"
         disabled={saving}

@@ -1,17 +1,20 @@
 <script lang="ts">
   import Icon from "@iconify/svelte";
-  import type { FileEntry } from "$lib/ts/api";
+  import { resolveResource } from "@tauri-apps/api/path";
+  import { startDrag } from "@crabnebula/tauri-plugin-drag";
+  import { absolutePath, type FileEntry } from "$lib/ts/api";
 
   interface Props {
     files: FileEntry[];
     activePath: string | null;
     entrypoint: string;
-    selected: string | null;
+    targetPath: string;
+    selected: Set<string>;
     dropTarget: string | null;
     onopen: (path: string) => void;
-    onselect: (path: string | null, isDir: boolean) => void;
+    onselect: (paths: string[], primary: string | null, isDir: boolean) => void;
     onrename: (path: string) => void;
-    ondelete: (path: string) => void;
+    ondelete: (paths: string[]) => void;
     onduplicate: (path: string) => void;
     onreveal: (path: string) => void;
     onsetentry: (path: string) => void;
@@ -25,6 +28,7 @@
     files,
     activePath,
     entrypoint,
+    targetPath,
     selected,
     dropTarget,
     onopen,
@@ -111,9 +115,59 @@
     null,
   );
   let dragging = $state<string | null>(null);
+  let dragPaths = $state<string[]>([]);
+  let anchorPath = $state<string | null>(null);
+  let nativeDragSent = false;
+  let iconPathPromise: Promise<string> | null = null;
 
-  function activate(node: TreeNode) {
-    onselect(node.path, node.isDir);
+  function flattenVisible(nodes: TreeNode[]): TreeNode[] {
+    const result: TreeNode[] = [];
+    for (const node of nodes) {
+      result.push(node);
+      if (node.isDir && node.children.length > 0 && !collapsed[node.path]) {
+        result.push(...flattenVisible(node.children));
+      }
+    }
+    return result;
+  }
+
+  function selectRange(from: string, to: TreeNode) {
+    const flat = flattenVisible(tree);
+    const fromIndex = flat.findIndex((node) => node.path === from);
+    const toIndex = flat.findIndex((node) => node.path === to.path);
+
+    if (fromIndex === -1 || toIndex === -1) {
+      onselect([to.path], to.path, to.isDir);
+      return;
+    }
+
+    const [start, end] =
+      fromIndex < toIndex ? [fromIndex, toIndex] : [toIndex, fromIndex];
+    const paths = flat.slice(start, end + 1).map((node) => node.path);
+    onselect(paths, to.path, to.isDir);
+  }
+
+  function handleRowClick(event: MouseEvent, node: TreeNode) {
+    if (event.shiftKey && anchorPath) {
+      selectRange(anchorPath, node);
+      return;
+    }
+
+    if (event.ctrlKey || event.metaKey) {
+      const next = new Set(selected);
+      if (next.has(node.path)) {
+        next.delete(node.path);
+      } else {
+        next.add(node.path);
+      }
+      anchorPath = node.path;
+      onselect([...next], node.path, node.isDir);
+      return;
+    }
+
+    anchorPath = node.path;
+    onselect([node.path], node.path, node.isDir);
+
     if (node.isDir) {
       collapsed[node.path] = !collapsed[node.path];
     } else {
@@ -123,7 +177,10 @@
 
   function openMenu(event: MouseEvent, node: TreeNode) {
     event.preventDefault();
-    onselect(node.path, node.isDir);
+    if (!selected.has(node.path)) {
+      anchorPath = node.path;
+      onselect([node.path], node.path, node.isDir);
+    }
     menu = { path: node.path, isDir: node.isDir, x: event.clientX, y: event.clientY };
   }
 
@@ -134,7 +191,9 @@
     }
     if (event.key === "Delete") {
       event.preventDefault();
-      ondelete(node.path);
+      const paths =
+        selected.has(node.path) && selected.size > 1 ? [...selected] : [node.path];
+      ondelete(paths);
     }
   }
 
@@ -157,6 +216,41 @@
     const index = path.lastIndexOf("/");
     return index === -1 ? "" : path.slice(0, index);
   }
+
+  function joinTargetPath(path: string): string {
+    return targetPath ? `${targetPath}/${path}` : path;
+  }
+
+  function resolveAbsolutePaths(paths: string[]): Promise<string[]> {
+    return Promise.all(paths.map((path) => absolutePath(joinTargetPath(path))));
+  }
+
+  function dragIcon(): Promise<string> {
+    if (!iconPathPromise) iconPathPromise = resolveResource("icons/32x32.png");
+    return iconPathPromise;
+  }
+
+  async function exportViaOsDrag(paths: string[]) {
+    if (nativeDragSent || paths.length === 0) return;
+    nativeDragSent = true;
+    try {
+      const [absolutePaths, icon] = await Promise.all([
+        resolveAbsolutePaths(paths),
+        dragIcon(),
+      ]);
+      await startDrag({ item: absolutePaths, icon });
+    } catch (error) {
+      console.error("Failed to start native drag", error);
+    }
+  }
+
+  function handleWindowDragLeave(event: DragEvent) {
+    if (!dragging || nativeDragSent) return;
+    // relatedTarget is null only when the pointer leaves the whole window,
+    // as opposed to moving between elements inside it.
+    if (event.relatedTarget !== null) return;
+    exportViaOsDrag(dragPaths);
+  }
 </script>
 
 <svelte:window
@@ -164,6 +258,7 @@
   on:contextmenu={(event) => {
     if (!(event.target as HTMLElement).closest("[data-tree-row]")) menu = null;
   }}
+  on:dragleave={handleWindowDragLeave}
 />
 
 {#snippet branch(nodes: TreeNode[], depth: number)}
@@ -175,26 +270,35 @@
         data-tree-dir={node.isDir ? "true" : "false"}
         role="treeitem"
         tabindex="0"
-        aria-selected={node.path === selected}
+        aria-selected={selected.has(node.path)}
         draggable="true"
         class="group flex items-center gap-1.5 rounded px-2 py-1 text-xs transition
           {node.path === activePath
           ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent)]'
-          : node.path === selected
+          : selected.has(node.path)
             ? 'bg-[var(--color-surface-sunken)]'
             : 'text-[var(--color-ink)] hover:bg-[var(--color-surface-sunken)]'}
           {dropTarget === node.path
           ? 'ring-1 ring-inset ring-[var(--color-accent)]'
           : ''}"
         style="padding-left: {depth * 12 + 8}px"
-        onclick={() => activate(node)}
+        onclick={(event) => handleRowClick(event, node)}
         oncontextmenu={(event) => openMenu(event, node)}
         onkeydown={(event) => handleKey(event, node)}
         ondragstart={(event) => {
           dragging = node.path;
+          dragPaths =
+            selected.has(node.path) && selected.size > 1
+              ? [...selected]
+              : [node.path];
+          nativeDragSent = false;
           event.dataTransfer?.setData("text/plain", node.path);
         }}
-        ondragend={() => (dragging = null)}
+        ondragend={() => {
+          dragging = null;
+          dragPaths = [];
+          nativeDragSent = false;
+        }}
         ondragover={(event) => {
           if (!dragging || !node.isDir) return;
           event.preventDefault();
@@ -254,7 +358,7 @@
   >
     <button
       class="rounded p-1 text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
-      onclick={() => onnewfile(selected ?? "")}
+      onclick={() => onnewfile(anchorPath ?? "")}
       title="New file"
       aria-label="New file"
     >
@@ -262,7 +366,7 @@
     </button>
     <button
       class="rounded p-1 text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
-      onclick={() => onnewfolder(selected ?? "")}
+      onclick={() => onnewfolder(anchorPath ?? "")}
       title="New folder"
       aria-label="New folder"
     >
@@ -270,7 +374,7 @@
     </button>
     <button
       class="rounded p-1 text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
-      onclick={() => onimport(selected ?? "")}
+      onclick={() => onimport(anchorPath ?? "")}
       title="Import files"
       aria-label="Import files"
     >
@@ -293,10 +397,16 @@
     data-tree-path=""
     data-tree-dir="true"
     onclick={(event) => {
-      if (event.target === event.currentTarget) onselect(null, true);
+      if (event.target === event.currentTarget) {
+        anchorPath = null;
+        onselect([], null, true);
+      }
     }}
     onkeydown={(event) => {
-      if (event.key === "Escape") onselect(null, true);
+      if (event.key === "Escape") {
+        anchorPath = null;
+        onselect([], null, true);
+      }
     }}
     ondragover={(event) => {
       if (dragging) event.preventDefault();
@@ -318,11 +428,14 @@
 
 {#if menu}
   {@const target = menu}
+  {@const menuPaths =
+    selected.has(target.path) && selected.size > 1 ? [...selected] : [target.path]}
+  {@const single = menuPaths.length === 1}
   <div
     class="fixed z-50 flex w-48 flex-col rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] py-1 text-xs shadow-lg"
     style="left: {target.x}px; top: {target.y}px"
   >
-    {#if target.isDir}
+    {#if single && target.isDir}
       <button
         class="px-3 py-1.5 text-left hover:bg-[var(--color-surface-sunken)]"
         onclick={() => onnewfile(target.path)}
@@ -342,7 +455,7 @@
         Import files here
       </button>
       <div class="my-1 h-px bg-[var(--color-line)]"></div>
-    {:else if target.path.endsWith(".typ")}
+    {:else if single && target.path.endsWith(".typ")}
       <button
         class="px-3 py-1.5 text-left hover:bg-[var(--color-surface-sunken)]"
         onclick={() => onsetentry(target.path)}
@@ -352,36 +465,39 @@
       <div class="my-1 h-px bg-[var(--color-line)]"></div>
     {/if}
 
-    <button
-      class="px-3 py-1.5 text-left hover:bg-[var(--color-surface-sunken)]"
-      onclick={() => onrename(target.path)}
-    >
-      Rename
-    </button>
-    <button
-      class="px-3 py-1.5 text-left hover:bg-[var(--color-surface-sunken)]"
-      onclick={() => onduplicate(target.path)}
-    >
-      Duplicate
-    </button>
-    <button
-      class="px-3 py-1.5 text-left hover:bg-[var(--color-surface-sunken)]"
-      onclick={() => navigator.clipboard.writeText(target.path)}
-    >
-      Copy path
-    </button>
-    <button
-      class="px-3 py-1.5 text-left hover:bg-[var(--color-surface-sunken)]"
-      onclick={() => onreveal(target.path)}
-    >
-      Reveal in file manager
-    </button>
-    <div class="my-1 h-px bg-[var(--color-line)]"></div>
+    {#if single}
+      <button
+        class="px-3 py-1.5 text-left hover:bg-[var(--color-surface-sunken)]"
+        onclick={() => onrename(target.path)}
+      >
+        Rename
+      </button>
+      <button
+        class="px-3 py-1.5 text-left hover:bg-[var(--color-surface-sunken)]"
+        onclick={() => onduplicate(target.path)}
+      >
+        Duplicate
+      </button>
+      <button
+        class="px-3 py-1.5 text-left hover:bg-[var(--color-surface-sunken)]"
+        onclick={() => navigator.clipboard.writeText(target.path)}
+      >
+        Copy path
+      </button>
+      <button
+        class="px-3 py-1.5 text-left hover:bg-[var(--color-surface-sunken)]"
+        onclick={() => onreveal(target.path)}
+      >
+        Reveal in file manager
+      </button>
+      <div class="my-1 h-px bg-[var(--color-line)]"></div>
+    {/if}
+
     <button
       class="px-3 py-1.5 text-left text-[var(--color-danger)] hover:bg-[var(--color-surface-sunken)]"
-      onclick={() => ondelete(target.path)}
+      onclick={() => ondelete(menuPaths)}
     >
-      Delete
+      {single ? "Delete" : `Delete ${menuPaths.length} items`}
     </button>
   </div>
 {/if}

@@ -31,6 +31,30 @@
   --color-success: #4cc47f;
 }
 
+:root[data-contrast="high"] {
+  --color-line: #9aa0ab;
+  --color-ink-muted: #33363c;
+}
+
+:root[data-theme="dark"][data-contrast="high"] {
+  --color-line: #545b66;
+  --color-ink-muted: #c7cdd6;
+}
+
+[data-contrast="high"] :focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+[data-reduce-motion="true"] *,
+[data-reduce-motion="true"] *::before,
+[data-reduce-motion="true"] *::after {
+  transition-duration: 0.01ms !important;
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  scroll-behavior: auto !important;
+}
+
 html,
 body {
   height: 100%;

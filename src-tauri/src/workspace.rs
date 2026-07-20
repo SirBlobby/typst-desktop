@@ -115,7 +115,7 @@ pub fn workspace_root(app: &AppHandle, store: &Store) -> Result<PathBuf, String>
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ProjectMeta {
     pub entrypoint: String,
-    pub space_id: Option<String>,
+    pub cloud_project_id: Option<String>,
     pub last_synced_at: Option<String>,
     pub base_hashes: HashMap<String, String>,
 }
@@ -124,7 +124,7 @@ impl Default for ProjectMeta {
     fn default() -> Self {
         ProjectMeta {
             entrypoint: "main.typ".to_string(),
-            space_id: None,
+            cloud_project_id: None,
             last_synced_at: None,
             base_hashes: HashMap::new(),
         }
@@ -154,7 +154,7 @@ pub struct BrowseEntry {
     pub kind: String,
     pub size: u64,
     pub modified: Option<String>,
-    pub space_id: Option<String>,
+    pub cloud_project_id: Option<String>,
     pub last_synced_at: Option<String>,
     pub child_count: usize,
     pub cloud_linked: bool,
@@ -259,9 +259,9 @@ pub fn browse(app: &AppHandle, store: &Store, relative: &str) -> Result<Vec<Brow
                 })
                 .unwrap_or(0);
 
-            let space_id = meta.as_ref().and_then(|m| m.space_id.clone());
+            let cloud_project_id = meta.as_ref().and_then(|m| m.cloud_project_id.clone());
             let last_synced_at = meta.as_ref().and_then(|m| m.last_synced_at.clone());
-            let sync_state = if space_id.is_some() {
+            let sync_state = if cloud_project_id.is_some() {
                 sync_state_for(newest_change(&full), last_synced_at.as_deref())
             } else {
                 None
@@ -273,8 +273,8 @@ pub fn browse(app: &AppHandle, store: &Store, relative: &str) -> Result<Vec<Brow
                 kind: if project { "project" } else { "folder" }.to_string(),
                 size: 0,
                 modified: modified_at(&full),
-                cloud_linked: space_id.is_some(),
-                space_id,
+                cloud_linked: cloud_project_id.is_some(),
+                cloud_project_id,
                 last_synced_at,
                 sync_state,
                 child_count,
@@ -299,7 +299,7 @@ pub fn browse(app: &AppHandle, store: &Store, relative: &str) -> Result<Vec<Brow
                 kind: kind.to_string(),
                 size: std::fs::metadata(&full).map(|m| m.len()).unwrap_or(0),
                 modified: modified_at(&full),
-                space_id: None,
+                cloud_project_id: None,
                 last_synced_at: link.as_ref().and_then(|link| link.synced_at.clone()),
                 child_count: 0,
                 cloud_linked: link.is_some(),

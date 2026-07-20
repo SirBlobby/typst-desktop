@@ -10,15 +10,18 @@ import type {
   Diagnostic,
   DocumentLink,
   LinkedDocument,
-  LinkedSpace,
+  LinkedProject,
+  ProjectSummary,
   Settings,
-  SpaceSummary,
   TargetInfo,
 } from "./api";
 
 export type Scope = "local" | "cloud";
 export type View = "files" | "editor";
 export type LspStatus = "off" | "starting" | "on" | "unavailable";
+export type ThemePreference = "light" | "dark" | "system";
+export type TextScale = "small" | "default" | "large" | "xlarge";
+export type ContrastLevel = "normal" | "high";
 
 interface AppState {
   view: View;
@@ -28,7 +31,7 @@ interface AppState {
 
   currentDir: string;
   entries: BrowseEntry[];
-  spaces: SpaceSummary[];
+  cloudProjects: ProjectSummary[];
   cloudFolder: string | null | "shared";
   cloudFolders: CloudFolder[];
   cloudFolderTree: CloudFolder[];
@@ -36,7 +39,7 @@ interface AppState {
   cloudFiles: CloudFile[];
   cloudLoading: boolean;
   linkedDocuments: LinkedDocument[];
-  linkedSpaces: LinkedSpace[];
+  linkedProjects: LinkedProject[];
   documentLink: DocumentLink | null;
 
   target: TargetInfo | null;
@@ -54,6 +57,11 @@ interface AppState {
   status: string;
   error: string;
   theme: "light" | "dark";
+  themePreference: ThemePreference;
+  accent: string | null;
+  textScale: TextScale;
+  reduceMotion: boolean;
+  contrast: ContrastLevel;
 }
 
 export const app = $state<AppState>({
@@ -64,7 +72,7 @@ export const app = $state<AppState>({
 
   currentDir: "",
   entries: [],
-  spaces: [],
+  cloudProjects: [],
   cloudFolder: null,
   cloudFolders: [],
   cloudFolderTree: [],
@@ -72,7 +80,7 @@ export const app = $state<AppState>({
   cloudFiles: [],
   cloudLoading: false,
   linkedDocuments: [],
-  linkedSpaces: [],
+  linkedProjects: [],
   documentLink: null,
 
   target: null,
@@ -90,6 +98,11 @@ export const app = $state<AppState>({
   status: "",
   error: "",
   theme: "light",
+  themePreference: "light",
+  accent: null,
+  textScale: "default",
+  reduceMotion: false,
+  contrast: "normal",
 });
 
 export interface DownloadProgress {
@@ -132,10 +145,138 @@ export function clearMessages() {
   app.error = "";
 }
 
-export function applyTheme(theme: "light" | "dark") {
-  app.theme = theme;
-  document.documentElement.dataset.theme = theme;
-  localStorage.setItem("typst-desktop-theme", theme);
+const THEME_KEY = "typst-desktop-theme";
+const ACCENT_KEY = "typst-desktop-accent";
+const TEXT_SCALE_KEY = "typst-desktop-text-scale";
+const REDUCE_MOTION_KEY = "typst-desktop-reduce-motion";
+const CONTRAST_KEY = "typst-desktop-contrast";
+
+const TEXT_SCALE_PX: Record<TextScale, number> = {
+  small: 14,
+  default: 16,
+  large: 18,
+  xlarge: 20,
+};
+
+let systemThemeQuery: MediaQueryList | null = null;
+
+function resolveTheme(preference: ThemePreference): "light" | "dark" {
+  if (preference !== "system") return preference;
+
+  if (!systemThemeQuery) {
+    systemThemeQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    systemThemeQuery.addEventListener("change", () => {
+      if (app.themePreference === "system") applyTheme("system");
+    });
+  }
+
+  return systemThemeQuery.matches ? "dark" : "light";
+}
+
+export function applyTheme(preference: ThemePreference) {
+  app.themePreference = preference;
+  app.theme = resolveTheme(preference);
+  document.documentElement.dataset.theme = app.theme;
+  localStorage.setItem(THEME_KEY, preference);
+
+  if (app.accent) applyAccent(app.accent);
+}
+
+function hexToRgb(hex: string): [number, number, number] {
+  const value = parseInt(hex.replace("#", ""), 16);
+  return [(value >> 16) & 255, (value >> 8) & 255, value & 255];
+}
+
+function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
+  r /= 255;
+  g /= 255;
+  b /= 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  let h = 0;
+  let s = 0;
+
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r:
+        h = (g - b) / d + (g < b ? 6 : 0);
+        break;
+      case g:
+        h = (b - r) / d + 2;
+        break;
+      default:
+        h = (r - g) / d + 4;
+    }
+    h /= 6;
+  }
+
+  return [h * 360, s * 100, l * 100];
+}
+
+function hslToHex(h: number, s: number, l: number): string {
+  s /= 100;
+  l /= 100;
+  const k = (n: number) => (n + h / 30) % 12;
+  const a = s * Math.min(l, 1 - l);
+  const f = (n: number) =>
+    l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1));
+  const toHex = (n: number) =>
+    Math.round(n * 255)
+      .toString(16)
+      .padStart(2, "0");
+  return `#${toHex(f(0))}${toHex(f(8))}${toHex(f(4))}`;
+}
+
+function accentSoft(hex: string, dark: boolean): string {
+  const [r, g, b] = hexToRgb(hex);
+  const [h, s] = rgbToHsl(r, g, b);
+  return dark
+    ? hslToHex(h, Math.min(s, 55), 18)
+    : hslToHex(h, Math.min(s, 70), 92);
+}
+
+export function applyAccent(color: string | null) {
+  app.accent = color;
+  const root = document.documentElement.style;
+
+  if (color) {
+    root.setProperty("--color-accent", color);
+    root.setProperty("--color-accent-soft", accentSoft(color, app.theme === "dark"));
+    localStorage.setItem(ACCENT_KEY, color);
+  } else {
+    root.removeProperty("--color-accent");
+    root.removeProperty("--color-accent-soft");
+    localStorage.removeItem(ACCENT_KEY);
+  }
+}
+
+export function applyTextScale(scale: TextScale) {
+  app.textScale = scale;
+  document.documentElement.style.fontSize = `${TEXT_SCALE_PX[scale]}px`;
+  localStorage.setItem(TEXT_SCALE_KEY, scale);
+}
+
+export function applyReduceMotion(enabled: boolean) {
+  app.reduceMotion = enabled;
+  if (enabled) {
+    document.documentElement.dataset.reduceMotion = "true";
+  } else {
+    delete document.documentElement.dataset.reduceMotion;
+  }
+  localStorage.setItem(REDUCE_MOTION_KEY, String(enabled));
+}
+
+export function applyContrast(level: ContrastLevel) {
+  app.contrast = level;
+  if (level === "high") {
+    document.documentElement.dataset.contrast = "high";
+  } else {
+    delete document.documentElement.dataset.contrast;
+  }
+  localStorage.setItem(CONTRAST_KEY, level);
 }
 
 export function breadcrumbs(): { name: string; path: string }[] {
@@ -148,8 +289,27 @@ export function breadcrumbs(): { name: string; path: string }[] {
 }
 
 export async function bootstrap() {
-  const stored = localStorage.getItem("typst-desktop-theme");
-  applyTheme(stored === "dark" ? "dark" : "light");
+  const storedTheme = localStorage.getItem(THEME_KEY);
+  applyTheme(
+    storedTheme === "dark" || storedTheme === "light" || storedTheme === "system"
+      ? storedTheme
+      : "light",
+  );
+
+  const storedAccent = localStorage.getItem(ACCENT_KEY);
+  if (storedAccent) applyAccent(storedAccent);
+
+  const storedTextScale = localStorage.getItem(TEXT_SCALE_KEY);
+  applyTextScale(
+    storedTextScale === "small" ||
+      storedTextScale === "large" ||
+      storedTextScale === "xlarge"
+      ? storedTextScale
+      : "default",
+  );
+
+  applyReduceMotion(localStorage.getItem(REDUCE_MOTION_KEY) === "true");
+  applyContrast(localStorage.getItem(CONTRAST_KEY) === "high" ? "high" : "normal");
 
   try {
     app.settings = await api.getSettings();
@@ -179,18 +339,18 @@ export async function refreshAccount() {
   try {
     app.account = await api.cloudAccount();
     if (app.account) {
-      await refreshSpaces();
+      await refreshCloudProjects();
     } else {
-      app.spaces = [];
+      app.cloudProjects = [];
     }
   } catch {
     app.account = null;
   }
 }
 
-export async function refreshSpaces() {
+export async function refreshCloudProjects() {
   try {
-    app.spaces = await api.cloudListSpaces();
+    app.cloudProjects = await api.cloudListProjects();
   } catch (error) {
     setError(error);
   }
@@ -202,19 +362,19 @@ export async function refreshCloud() {
   app.cloudLoading = true;
   try {
     app.linkedDocuments = await api.cloudLinkedDocuments().catch(() => []);
-    app.linkedSpaces = await api.cloudLinkedSpaces().catch(() => []);
+    app.linkedProjects = await api.cloudLinkedProjects().catch(() => []);
 
     if (app.cloudFolder === "shared") {
       const shared = await api.cloudListShared();
       app.cloudDocuments = shared.documents;
-      app.spaces = shared.spaces;
+      app.cloudProjects = shared.projects;
       app.cloudFolders = [];
       app.cloudFiles = [];
     } else {
-      const [folders, documents, spaces, files] = await Promise.all([
+      const [folders, documents, projects, files] = await Promise.all([
         api.cloudListFolders(),
         api.cloudListDocuments(app.cloudFolder),
-        api.cloudListSpaces(),
+        api.cloudListProjects(),
         api.cloudListFiles(app.cloudFolder),
       ]);
       app.cloudFolderTree = folders;
@@ -222,7 +382,7 @@ export async function refreshCloud() {
         (folder) => (folder.parent_id ?? null) === app.cloudFolder,
       );
       app.cloudDocuments = documents;
-      app.spaces = spaces;
+      app.cloudProjects = projects;
       app.cloudFiles = files;
     }
   } catch (error) {
@@ -279,8 +439,10 @@ export async function downloadCloudFile(fileId: string, name: string) {
   }
 }
 
-export function linkedSpace(spaceId: string) {
-  return app.linkedSpaces.find((linked) => linked.space_id === spaceId);
+export function linkedProject(cloudProjectId: string) {
+  return app.linkedProjects.find(
+    (linked) => linked.cloud_project_id === cloudProjectId,
+  );
 }
 
 export async function removeDownloadedDocument(path: string) {
@@ -484,7 +646,7 @@ async function autoSync() {
   if (!app.account || app.syncing) return;
   if (app.conflicts.length > 0) return;
 
-  const linked = app.target?.space_id || app.documentLink;
+  const linked = app.target?.cloud_project_id || app.documentLink;
   const project = linked ? app.target?.path : null;
   if (!project) return;
 

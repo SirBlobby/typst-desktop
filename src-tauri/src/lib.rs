@@ -16,7 +16,7 @@ use assets::Asset;
 use db::Store;
 use compiler::{CompileResult, Diagnostic};
 use lsp::{LspHandle, LspState};
-use sync::{Account, SpaceSummary, SyncReport};
+use sync::{Account, ProjectSummary, SyncReport};
 use workspace::{
     browse, is_project_dir, is_text_file, list_files, load_settings, project_file_path,
     read_target_files, resolve_target, save_settings, workspace_path, BrowseEntry,
@@ -351,7 +351,7 @@ pub struct TargetInfo {
     pub entrypoint: String,
     pub standalone: bool,
     pub is_project: bool,
-    pub space_id: Option<String>,
+    pub cloud_project_id: Option<String>,
     pub files: Vec<FileEntry>,
 }
 
@@ -368,7 +368,7 @@ fn target_info(app: AppHandle, store: State<'_, Store>, path: String) -> Result<
             entrypoint: target.entrypoint.clone(),
             standalone: true,
             is_project: false,
-            space_id: None,
+            cloud_project_id: None,
             files: vec![FileEntry {
                 path: target.entrypoint.clone(),
                 name: target.entrypoint,
@@ -385,7 +385,7 @@ fn target_info(app: AppHandle, store: State<'_, Store>, path: String) -> Result<
         entrypoint: target.entrypoint,
         standalone: false,
         is_project: is_project_dir(&target.root),
-        space_id: meta.space_id,
+        cloud_project_id: meta.cloud_project_id,
         files: list_files(&target.root)?,
     })
 }
@@ -725,9 +725,9 @@ fn cloud_account(app: AppHandle, store: State<'_, Store>) -> Result<Option<Accou
 }
 
 #[tauri::command]
-fn cloud_list_spaces(app: AppHandle, store: State<'_, Store>) -> Result<Vec<SpaceSummary>, String> {
+fn cloud_list_projects(app: AppHandle, store: State<'_, Store>) -> Result<Vec<ProjectSummary>, String> {
     let (server_url, token) = cloud_credentials(&app, &store)?;
-    sync::list_spaces(&server_url, &token)
+    sync::list_cloud_projects(&server_url, &token)
 }
 
 #[tauri::command]
@@ -864,6 +864,30 @@ fn cloud_unlink_document(store: State<'_, Store>, path: String) -> Result<(), St
     store.forget_document_link(&path)
 }
 
+#[tauri::command]
+fn cloud_create_document(
+    app: AppHandle,
+    store: State<'_, Store>,
+    path: String,
+    title: String,
+) -> Result<String, String> {
+    let (server_url, token) = cloud_credentials(&app, &store)?;
+    let full = workspace_path(&app, &store, &path)?;
+    let content = std::fs::read_to_string(&full).map_err(|e| e.to_string())?;
+
+    let document = sync::create_document(&server_url, &token, title.trim(), &content)?;
+
+    store.save_document_link(
+        &path,
+        &document.id,
+        &document.hash,
+        &document.role,
+        &document.content,
+    )?;
+
+    Ok(document.id)
+}
+
 #[derive(Serialize)]
 pub struct LinkedDocument {
     pub path: String,
@@ -899,21 +923,21 @@ fn cloud_linked_documents(
 }
 
 #[derive(Serialize)]
-pub struct LinkedSpace {
+pub struct LinkedProject {
     pub path: String,
-    pub space_id: String,
+    pub cloud_project_id: String,
     pub synced_at: Option<String>,
     pub sync_state: Option<String>,
 }
 
 #[tauri::command]
-fn cloud_linked_spaces(
+fn cloud_linked_projects(
     app: AppHandle,
     store: State<'_, Store>,
-) -> Result<Vec<LinkedSpace>, String> {
+) -> Result<Vec<LinkedProject>, String> {
     let mut linked = Vec::new();
 
-    for (path, space_id, synced_at) in store.all_space_links()? {
+    for (path, cloud_project_id, synced_at) in store.all_cloud_project_links()? {
         let Ok(full) = workspace_path(&app, &store, &path) else {
             continue;
         };
@@ -921,10 +945,10 @@ fn cloud_linked_spaces(
             continue;
         }
 
-        linked.push(LinkedSpace {
+        linked.push(LinkedProject {
             sync_state: workspace::project_sync_state(&full, synced_at.as_deref()),
             path,
-            space_id,
+            cloud_project_id,
             synced_at,
         });
     }
@@ -941,22 +965,22 @@ fn cloud_document_link(
 }
 
 #[tauri::command]
-fn cloud_create_space(app: AppHandle, store: State<'_, Store>, name: String) -> Result<SpaceSummary, String> {
+fn cloud_create_project(app: AppHandle, store: State<'_, Store>, name: String) -> Result<ProjectSummary, String> {
     let (server_url, token) = cloud_credentials(&app, &store)?;
-    sync::create_space(&server_url, &token, name.trim())
+    sync::create_cloud_project(&server_url, &token, name.trim())
 }
 
 #[tauri::command]
-fn cloud_delete_space(app: AppHandle, store: State<'_, Store>, space_id: String) -> Result<(), String> {
+fn cloud_delete_project(app: AppHandle, store: State<'_, Store>, cloud_project_id: String) -> Result<(), String> {
     let (server_url, token) = cloud_credentials(&app, &store)?;
-    sync::delete_space(&server_url, &token, &space_id)
+    sync::delete_cloud_project(&server_url, &token, &cloud_project_id)
 }
 
 #[tauri::command]
-fn cloud_clone_space(
+fn cloud_clone_project(
     app: AppHandle,
     store: State<'_, Store>,
-    space_id: String,
+    cloud_project_id: String,
     project_name: String,
 ) -> Result<SyncReport, String> {
     let (server_url, token) = cloud_credentials(&app, &store)?;
@@ -965,7 +989,15 @@ fn cloud_clone_space(
     if dir.exists() {
         return Err(format!("A project named '{}' already exists", project_name));
     }
-    sync::clone_space(&server_url, &token, &app, &store, &project, &dir, &space_id)
+    sync::clone_cloud_project(
+        &server_url,
+        &token,
+        &app,
+        &store,
+        &project,
+        &dir,
+        &cloud_project_id,
+    )
 }
 
 #[tauri::command]
@@ -973,17 +1005,17 @@ fn cloud_link_project(
     app: AppHandle,
     store: State<'_, Store>,
     project: String,
-    space_id: Option<String>,
+    cloud_project_id: Option<String>,
 ) -> Result<SyncReport, String> {
     let (server_url, token) = cloud_credentials(&app, &store)?;
     let (dir, mut meta) = load_project(&app, &store, &project)?;
 
-    let space_id = match space_id {
+    let cloud_project_id = match cloud_project_id {
         Some(id) if !id.trim().is_empty() => id,
-        _ => sync::create_space(&server_url, &token, &project)?.id,
+        _ => sync::create_cloud_project(&server_url, &token, &project)?.id,
     };
 
-    meta.space_id = Some(space_id);
+    meta.cloud_project_id = Some(cloud_project_id);
     meta.base_hashes.clear();
     store.save_meta(&project, &meta)?;
 
@@ -993,7 +1025,7 @@ fn cloud_link_project(
 #[tauri::command]
 fn cloud_unlink_project(app: AppHandle, store: State<'_, Store>, project: String) -> Result<(), String> {
     let (dir, mut meta) = load_project(&app, &store, &project)?;
-    meta.space_id = None;
+    meta.cloud_project_id = None;
     meta.base_hashes.clear();
     meta.last_synced_at = None;
     let _ = dir;
@@ -1069,6 +1101,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_drag::init())
         .setup(|app| {
             let store = Store::open(&app.handle())?;
             app.manage(store);
@@ -1119,7 +1152,7 @@ pub fn run() {
             cloud_login,
             cloud_logout,
             cloud_account,
-            cloud_list_spaces,
+            cloud_list_projects,
             cloud_list_folders,
             cloud_list_documents,
             cloud_list_shared,
@@ -1130,11 +1163,12 @@ pub fn run() {
             cloud_resolve_document,
             cloud_document_link,
             cloud_linked_documents,
-            cloud_linked_spaces,
+            cloud_linked_projects,
             cloud_unlink_document,
-            cloud_create_space,
-            cloud_delete_space,
-            cloud_clone_space,
+            cloud_create_document,
+            cloud_create_project,
+            cloud_delete_project,
+            cloud_clone_project,
             cloud_link_project,
             cloud_unlink_project,
             cloud_push,

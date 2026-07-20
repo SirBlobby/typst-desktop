@@ -38,8 +38,8 @@
     openFile,
     openTarget,
     refreshAccount,
+    refreshCloudProjects,
     refreshEntries,
-    refreshSpaces,
     refreshTarget,
     removeDownloadedDocument,
     runSync,
@@ -60,13 +60,14 @@
     | { kind: "rename-entry"; entry: BrowseEntry }
     | { kind: "delete-entry"; entry: BrowseEntry }
     | { kind: "link-entry"; entry: BrowseEntry }
-    | { kind: "new-space" }
-    | { kind: "delete-space"; id: string }
-    | { kind: "clone-space"; id: string; name: string }
+    | { kind: "save-document-to-cloud"; entry: BrowseEntry }
+    | { kind: "new-cloud-project" }
+    | { kind: "delete-cloud-project"; id: string }
+    | { kind: "clone-cloud-project"; id: string; name: string }
     | { kind: "new-file"; parent: string }
     | { kind: "new-subfolder"; parent: string }
     | { kind: "rename-file"; path: string }
-    | { kind: "delete-file"; path: string }
+    | { kind: "delete-file"; paths: string[] }
     | { kind: "login" }
     | { kind: "settings" }
     | { kind: "assets" }
@@ -76,6 +77,7 @@
   let dialog = $state<Dialog>({ kind: "none" });
   let editorView = $state<EditorView | null>(null);
   let imageViewer = $state<{ paths: string[]; index: number } | null>(null);
+  let selectedEntries = $state<Set<string>>(new Set());
   let selectedEntry = $state<string | null>(null);
   let selectedIsDir = $state(false);
   let treeDropTarget = $state<string | null>(null);
@@ -152,25 +154,32 @@
     guard(async () => {
       const report = await api.cloudLinkProject(entry.path);
       await refreshEntries();
-      await refreshSpaces();
-      setStatus(`Uploaded ${report.pushed.length} files to a new cloud space`);
+      await refreshCloudProjects();
+      setStatus(`Uploaded ${report.pushed.length} files to a new cloud project`);
     });
 
-  const createSpace = (name: string) =>
+  const saveDocumentToCloud = (entry: BrowseEntry, title: string) =>
     guard(async () => {
-      await api.cloudCreateSpace(name);
-      await refreshSpaces();
+      await api.cloudCreateDocument(entry.path, title);
+      await refreshEntries();
+      setStatus(`Saved '${entry.name}' to the cloud`);
     });
 
-  const deleteSpace = (id: string) =>
+  const createCloudProject = (name: string) =>
     guard(async () => {
-      await api.cloudDeleteSpace(id);
-      await refreshSpaces();
+      await api.cloudCreateProject(name);
+      await refreshCloudProjects();
     });
 
-  const cloneSpace = (id: string, name: string) =>
+  const deleteCloudProject = (id: string) =>
     guard(async () => {
-      await api.cloudCloneSpace(id, name);
+      await api.cloudDeleteProject(id);
+      await refreshCloudProjects();
+    });
+
+  const cloneCloudProject = (id: string, name: string) =>
+    guard(async () => {
+      await api.cloudCloneProject(id, name);
       app.scope = "local";
       await browseTo("");
       setStatus(`Downloaded '${name}' to this device`);
@@ -250,13 +259,17 @@
       if (app.activePath === path) await openFile(next);
     });
 
-  const deleteFile = (path: string) =>
+  const deleteFile = (paths: string[]) =>
     guard(async () => {
-      await api.deleteEntry(`${app.target!.path}/${path}`);
-      if (app.activePath === path) {
-        app.activePath = null;
-        app.editorContent = "";
+      for (const path of paths) {
+        await api.deleteEntry(`${app.target!.path}/${path}`);
+        if (app.activePath === path) {
+          app.activePath = null;
+          app.editorContent = "";
+        }
       }
+      selectedEntries = new Set();
+      selectedEntry = null;
       await refreshTarget();
       await compile();
     });
@@ -495,7 +508,7 @@
         </div>
       </div>
 
-      {#if app.target?.space_id || app.documentLink}
+      {#if app.target?.cloud_project_id || app.documentLink}
         <button
           class="flex items-center gap-1.5 rounded-md bg-[var(--color-accent)] px-2.5 py-1.5 text-xs font-medium text-white transition hover:opacity-90 disabled:opacity-50"
           disabled={app.syncing}
@@ -598,14 +611,17 @@
           onrename={(entry) => (dialog = { kind: "rename-entry", entry })}
           ondelete={(entry) => (dialog = { kind: "delete-entry", entry })}
           onlink={(entry) => (dialog = { kind: "link-entry", entry })}
+          onsavetocloud={(entry) =>
+            (dialog = { kind: "save-document-to-cloud", entry })}
           onviewimage={(paths, index) => (imageViewer = { paths, index })}
           ondownloaddocument={(documentId, title) =>
             downloadDocument(documentId, title)}
           onremovedownload={removeDownloadedDocument}
           ondownloadfile={downloadCloudFile}
-          onnewspace={() => (dialog = { kind: "new-space" })}
-          onclonespace={(id, name) => (dialog = { kind: "clone-space", id, name })}
-          ondeletespace={(id) => (dialog = { kind: "delete-space", id })}
+          onnewcloudproject={() => (dialog = { kind: "new-cloud-project" })}
+          oncloneproject={(id, name) =>
+            (dialog = { kind: "clone-cloud-project", id, name })}
+          ondeleteproject={(id) => (dialog = { kind: "delete-cloud-project", id })}
           onsignin={() => (dialog = { kind: "login" })}
         />
       </div>
@@ -628,15 +644,17 @@
             files={app.target?.files ?? []}
             activePath={app.activePath}
             entrypoint={app.target?.entrypoint ?? "main.typ"}
-            selected={selectedEntry}
+            targetPath={app.target?.path ?? ""}
+            selected={selectedEntries}
             dropTarget={treeDropTarget}
             onopen={openFile}
-            onselect={(path, isDir) => {
-              selectedEntry = path;
+            onselect={(paths, primary, isDir) => {
+              selectedEntries = new Set(paths);
+              selectedEntry = primary;
               selectedIsDir = isDir;
             }}
             onrename={(path) => (dialog = { kind: "rename-file", path })}
-            ondelete={(path) => (dialog = { kind: "delete-file", path })}
+            ondelete={(paths) => (dialog = { kind: "delete-file", paths })}
             onduplicate={duplicateInTarget}
             onreveal={revealInTarget}
             onsetentry={setEntrypoint}
@@ -792,36 +810,47 @@
   {@const target = dialog}
   <ConfirmModal
     title="Upload to cloud"
-    message="A new cloud space will be created for '{target.entry.name}' and its files uploaded."
+    message="A new cloud project will be created for '{target.entry.name}' and its files uploaded."
     confirmLabel="Upload"
     onconfirm={() => linkEntry(target.entry)}
     onclose={close}
   />
-{:else if dialog.kind === "new-space"}
+{:else if dialog.kind === "save-document-to-cloud"}
+  {@const target = dialog}
   <PromptModal
-    title="New cloud space"
-    label="Space name"
-    icon="ph:cloud-plus"
-    onsubmit={createSpace}
+    title="Save to cloud"
+    label="Document title"
+    icon="ph:cloud-arrow-up"
+    value={target.entry.name.replace(/\.typ$/i, "")}
+    confirmLabel="Save"
+    onsubmit={(title) => saveDocumentToCloud(target.entry, title)}
     onclose={close}
   />
-{:else if dialog.kind === "delete-space"}
+{:else if dialog.kind === "new-cloud-project"}
+  <PromptModal
+    title="New cloud project"
+    label="Project name"
+    icon="ph:cloud-plus"
+    onsubmit={createCloudProject}
+    onclose={close}
+  />
+{:else if dialog.kind === "delete-cloud-project"}
   {@const target = dialog}
   <ConfirmModal
-    title="Delete cloud space"
-    message="This permanently deletes the space and its files from TypstDrive. Local copies are kept."
-    onconfirm={() => deleteSpace(target.id)}
+    title="Delete cloud project"
+    message="This permanently deletes the project and its files from TypstDrive. Local copies are kept."
+    onconfirm={() => deleteCloudProject(target.id)}
     onclose={close}
   />
-{:else if dialog.kind === "clone-space"}
+{:else if dialog.kind === "clone-cloud-project"}
   {@const target = dialog}
   <PromptModal
-    title="Download space"
+    title="Download project"
     label="Save as project"
     icon="ph:download-simple"
     value={target.name}
     confirmLabel="Download"
-    onsubmit={(name) => cloneSpace(target.id, name)}
+    onsubmit={(name) => cloneCloudProject(target.id, name)}
     onclose={close}
   />
 {:else if dialog.kind === "new-file"}
@@ -857,9 +886,11 @@
 {:else if dialog.kind === "delete-file"}
   {@const target = dialog}
   <ConfirmModal
-    title="Delete file"
-    message="'{target.path}' will be permanently deleted."
-    onconfirm={() => deleteFile(target.path)}
+    title={target.paths.length > 1 ? "Delete files" : "Delete file"}
+    message={target.paths.length > 1
+      ? `${target.paths.length} items will be permanently deleted.`
+      : `'${target.paths[0]}' will be permanently deleted.`}
+    onconfirm={() => deleteFile(target.paths)}
     onclose={close}
   />
 {:else if dialog.kind === "login"}

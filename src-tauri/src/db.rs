@@ -27,7 +27,7 @@ const SCHEMA: [&str; 5] = [
     "CREATE TABLE IF NOT EXISTS projects (
         path TEXT PRIMARY KEY,
         entrypoint TEXT NOT NULL DEFAULT 'main.typ',
-        space_id TEXT,
+        cloud_project_id TEXT,
         last_synced_at TEXT
     )",
     "CREATE TABLE IF NOT EXISTS base_files (
@@ -53,8 +53,10 @@ const SCHEMA: [&str; 5] = [
     )",
 ];
 
-const MIGRATIONS: [&str; 1] =
-    ["ALTER TABLE document_links ADD COLUMN synced_at TEXT"];
+const MIGRATIONS: [&str; 2] = [
+    "ALTER TABLE document_links ADD COLUMN synced_at TEXT",
+    "ALTER TABLE projects RENAME COLUMN space_id TO cloud_project_id",
+];
 
 impl Store {
     pub fn open(app: &AppHandle) -> Result<Self, String> {
@@ -130,14 +132,14 @@ impl Store {
         let row: Option<(String, Option<String>, Option<String>)> = self.with(|connection| {
             connection
                 .query_row(
-                    "SELECT entrypoint, space_id, last_synced_at FROM projects WHERE path = ?1",
+                    "SELECT entrypoint, cloud_project_id, last_synced_at FROM projects WHERE path = ?1",
                     params![project],
                     |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
                 )
                 .optional()
         })?;
 
-        let Some((entrypoint, space_id, last_synced_at)) = row else {
+        let Some((entrypoint, cloud_project_id, last_synced_at)) = row else {
             return Ok(ProjectMeta::default());
         };
 
@@ -158,7 +160,7 @@ impl Store {
 
         Ok(ProjectMeta {
             entrypoint,
-            space_id,
+            cloud_project_id,
             last_synced_at,
             base_hashes,
         })
@@ -180,16 +182,16 @@ impl Store {
     pub fn save_meta(&self, project: &str, meta: &ProjectMeta) -> Result<(), String> {
         self.with(|connection| {
             connection.execute(
-                "INSERT INTO projects (path, entrypoint, space_id, last_synced_at)
+                "INSERT INTO projects (path, entrypoint, cloud_project_id, last_synced_at)
                  VALUES (?1, ?2, ?3, ?4)
                  ON CONFLICT(path) DO UPDATE SET
                    entrypoint = excluded.entrypoint,
-                   space_id = excluded.space_id,
+                   cloud_project_id = excluded.cloud_project_id,
                    last_synced_at = excluded.last_synced_at",
                 params![
                     project,
                     meta.entrypoint,
-                    meta.space_id,
+                    meta.cloud_project_id,
                     meta.last_synced_at
                 ],
             )?;
@@ -335,11 +337,11 @@ impl Store {
         })
     }
 
-    pub fn all_space_links(&self) -> Result<Vec<(String, String, Option<String>)>, String> {
+    pub fn all_cloud_project_links(&self) -> Result<Vec<(String, String, Option<String>)>, String> {
         self.with(|connection| {
             let mut statement = connection.prepare(
-                "SELECT path, space_id, last_synced_at FROM projects
-                 WHERE space_id IS NOT NULL",
+                "SELECT path, cloud_project_id, last_synced_at FROM projects
+                 WHERE cloud_project_id IS NOT NULL",
             )?;
             let rows = statement.query_map([], |row| {
                 Ok((

@@ -17,6 +17,7 @@
     "opener:allow-reveal-item-in-dir",
     "dialog:default",
     "dialog:allow-open",
-    "dialog:allow-save"
+    "dialog:allow-save",
+    "drag:default"
   ]
 }

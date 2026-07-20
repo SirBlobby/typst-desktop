@@ -53,7 +53,7 @@ export interface Account {
   email: string;
 }
 
-export interface SpaceSummary {
+export interface ProjectSummary {
   id: string;
   name: string;
   entrypoint: string;
@@ -94,7 +94,7 @@ export interface BrowseEntry {
   kind: EntryKind;
   size: number;
   modified: string | null;
-  space_id: string | null;
+  cloud_project_id: string | null;
   last_synced_at: string | null;
   child_count: number;
   cloud_linked: boolean;
@@ -106,7 +106,7 @@ export interface TargetInfo {
   entrypoint: string;
   standalone: boolean;
   is_project: boolean;
-  space_id: string | null;
+  cloud_project_id: string | null;
   files: FileEntry[];
 }
 
@@ -261,8 +261,8 @@ export const cloudLogout = () => invoke<void>("cloud_logout");
 
 export const cloudAccount = () => invoke<Account | null>("cloud_account");
 
-export const cloudListSpaces = () =>
-  invoke<SpaceSummary[]>("cloud_list_spaces");
+export const cloudListProjects = () =>
+  invoke<ProjectSummary[]>("cloud_list_projects");
 
 export interface CloudFolder {
   id: string;
@@ -280,7 +280,7 @@ export interface CloudDocument {
 
 export interface SharedItems {
   documents: CloudDocument[];
-  spaces: SpaceSummary[];
+  projects: ProjectSummary[];
 }
 
 export interface DocumentLink {
@@ -317,6 +317,9 @@ export const cloudDownloadFile = (fileId: string) =>
 export const cloudDownloadDocument = (documentId: string, parent: string) =>
   invoke<string>("cloud_download_document", { documentId, parent });
 
+export const cloudCreateDocument = (path: string, title: string) =>
+  invoke<string>("cloud_create_document", { path, title });
+
 export const cloudSyncDocument = (path: string) =>
   invoke<SyncReport>("cloud_sync_document", { path });
 
@@ -333,9 +336,9 @@ export interface LinkedDocument {
   sync_state: "synced" | "pending" | null;
 }
 
-export interface LinkedSpace {
+export interface LinkedProject {
   path: string;
-  space_id: string;
+  cloud_project_id: string;
   synced_at: string | null;
   sync_state: "synced" | "pending" | null;
 }
@@ -343,8 +346,8 @@ export interface LinkedSpace {
 export const cloudLinkedDocuments = () =>
   invoke<LinkedDocument[]>("cloud_linked_documents");
 
-export const cloudLinkedSpaces = () =>
-  invoke<LinkedSpace[]>("cloud_linked_spaces");
+export const cloudLinkedProjects = () =>
+  invoke<LinkedProject[]>("cloud_linked_projects");
 
 export const cloudDocumentLink = (path: string) =>
   invoke<DocumentLink | null>("cloud_document_link", { path });
@@ -352,17 +355,20 @@ export const cloudDocumentLink = (path: string) =>
 export const cloudUnlinkDocument = (path: string) =>
   invoke<void>("cloud_unlink_document", { path });
 
-export const cloudCreateSpace = (name: string) =>
-  invoke<SpaceSummary>("cloud_create_space", { name });
+export const cloudCreateProject = (name: string) =>
+  invoke<ProjectSummary>("cloud_create_project", { name });
 
-export const cloudDeleteSpace = (spaceId: string) =>
-  invoke<void>("cloud_delete_space", { spaceId });
+export const cloudDeleteProject = (cloudProjectId: string) =>
+  invoke<void>("cloud_delete_project", { cloudProjectId });
 
-export const cloudCloneSpace = (spaceId: string, projectName: string) =>
-  invoke<SyncReport>("cloud_clone_space", { spaceId, projectName });
+export const cloudCloneProject = (cloudProjectId: string, projectName: string) =>
+  invoke<SyncReport>("cloud_clone_project", { cloudProjectId, projectName });
 
-export const cloudLinkProject = (project: string, spaceId?: string) =>
-  invoke<SyncReport>("cloud_link_project", { project, spaceId: spaceId ?? null });
+export const cloudLinkProject = (project: string, cloudProjectId?: string) =>
+  invoke<SyncReport>("cloud_link_project", {
+    project,
+    cloudProjectId: cloudProjectId ?? null,
+  });
 
 export const cloudUnlinkProject = (project: string) =>
   invoke<void>("cloud_unlink_project", { project });
