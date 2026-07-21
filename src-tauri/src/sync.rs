@@ -241,6 +241,7 @@ pub fn move_cloud_project(
 
 #[derive(Deserialize)]
 pub struct ManifestEntry {
+    pub id: String,
     pub path: String,
     pub hash: String,
 }

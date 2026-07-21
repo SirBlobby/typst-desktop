@@ -1,5 +1,9 @@
 <script lang="ts">
+  import { onDestroy } from "svelte";
   import Icon from "@iconify/svelte";
+  import { EditorView } from "@codemirror/view";
+  import { EditorState } from "@codemirror/state";
+  import { MergeView } from "@codemirror/merge";
   import Modal from "./Modal.svelte";
   import type { Conflict, Resolution } from "$lib/ts/api";
 
@@ -24,6 +28,37 @@
   });
 
   const current = $derived(conflicts[index]);
+
+  let diffHost: HTMLDivElement | undefined = $state();
+  let mergeView: MergeView | null = null;
+
+  function readOnlyState(doc: string) {
+    return EditorState.create({
+      doc,
+      extensions: [EditorView.editable.of(false), EditorView.lineWrapping],
+    });
+  }
+
+  $effect(() => {
+    const conflict = current;
+    mergeView?.destroy();
+    mergeView = null;
+
+    if (!diffHost || !conflict || conflict.binary) return;
+
+    mergeView = new MergeView({
+      a: readOnlyState(conflict.local_text),
+      b: readOnlyState(conflict.remote_text),
+      parent: diffHost,
+      gutter: true,
+      highlightChanges: true,
+      collapseUnchanged: {},
+    });
+  });
+
+  onDestroy(() => {
+    mergeView?.destroy();
+  });
 
   function choose(option: "merged" | "local" | "remote") {
     mode[index] = option;
@@ -97,6 +132,17 @@
           </p>
         </div>
       {:else}
+        <div class="flex flex-col gap-1">
+          <div class="flex justify-between text-[10px] text-[var(--color-ink-muted)]">
+            <span>This device</span>
+            <span>Cloud</span>
+          </div>
+          <div
+            class="scroll-thin h-64 w-full overflow-auto rounded-md border border-[var(--color-line)] text-xs"
+            bind:this={diffHost}
+          ></div>
+        </div>
+
         <div class="flex items-center gap-1.5">
           {#each [["merged", "Merged"], ["local", "This device"], ["remote", "Cloud"]] as [option, label]}
             <button

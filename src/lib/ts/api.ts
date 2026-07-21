@@ -404,6 +404,9 @@ export const cloudNewDocument = (title: string, folderId?: string | null) =>
 export const cloudSyncDocument = (path: string) =>
   invoke<SyncReport>("cloud_sync_document", { path });
 
+export const cloudRoomId = (path: string, file: string) =>
+  invoke<string | null>("cloud_room_id", { path, file });
+
 export const cloudResolveDocument = (
   path: string,
   content: string,

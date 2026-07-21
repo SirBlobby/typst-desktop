@@ -1063,6 +1063,32 @@ fn cloud_sync_document(
 }
 
 #[tauri::command]
+fn cloud_room_id(
+    app: AppHandle,
+    store: State<'_, Store>,
+    path: String,
+    file: String,
+) -> Result<Option<String>, String> {
+    if let Some(link) = store.document_link(&path)? {
+        return Ok(Some(link.document_id));
+    }
+
+    let meta = store.meta(&path)?;
+    let Some(cloud_project_id) = meta.cloud_project_id else {
+        return Ok(None);
+    };
+
+    let (server_url, token) = cloud_credentials(&app, &store)?;
+    let manifest = sync::get_manifest(&server_url, &token, &cloud_project_id)?;
+
+    Ok(manifest
+        .files
+        .into_iter()
+        .find(|entry| entry.path == file)
+        .map(|entry| format!("project:{}:{}", cloud_project_id, entry.id)))
+}
+
+#[tauri::command]
 fn cloud_resolve_document(
     app: AppHandle,
     store: State<'_, Store>,
@@ -1425,6 +1451,7 @@ pub fn run() {
             cloud_download_document,
             cloud_delete_document,
             cloud_sync_document,
+            cloud_room_id,
             cloud_resolve_document,
             cloud_document_link,
             cloud_linked_documents,

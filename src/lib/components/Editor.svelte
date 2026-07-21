@@ -28,6 +28,9 @@
   } from "@codemirror/autocomplete";
   import { lintGutter, setDiagnostics } from "@codemirror/lint";
   import { LSPClient, languageServerExtensions } from "@codemirror/lsp-client";
+  import { yCollab } from "y-codemirror.next";
+  import type { Awareness } from "y-protocols/awareness";
+  import type * as Y from "yjs";
 
   import { typstCompletions } from "$lib/ts/completions";
   import { editorTheme } from "$lib/ts/editor-theme";
@@ -41,6 +44,7 @@
     targetPath: string;
     enableLsp?: boolean;
     diagnostics?: Diagnostic[];
+    collab?: { text: Y.Text; awareness: Awareness } | null;
     onchange: (value: string) => void;
     onsave: () => void;
     onlspstatus?: (status: "off" | "starting" | "on" | "unavailable") => void;
@@ -53,6 +57,7 @@
     targetPath,
     enableLsp = true,
     diagnostics = [],
+    collab = null,
     onchange,
     onsave,
     onlspstatus,
@@ -65,6 +70,7 @@
   const languageSlot = new Compartment();
   const lspSlot = new Compartment();
   const themeSlot = new Compartment();
+  const collabSlot = new Compartment();
 
   const bridge = new LspBridge();
   let client: LSPClient | null = null;
@@ -158,6 +164,7 @@
           languageSlot.of(isToml ? StreamLanguage.define(toml) : []),
           lspSlot.of([]),
           themeSlot.of(editorTheme(app.theme === "dark")),
+          collabSlot.of([]),
           ...(isToml
             ? []
             : [autocompletion({ override: [typstCompletions] })]),
@@ -209,9 +216,34 @@
     });
   }
 
+  let boundCollab: { text: Y.Text; awareness: Awareness } | null = null;
+
+  $effect(() => {
+    const next = collab;
+    if (next === boundCollab) return;
+
+    laterDispatch((current) => {
+      if (next) {
+        current.dispatch({
+          changes: {
+            from: 0,
+            to: current.state.doc.length,
+            insert: next.text.toString(),
+          },
+          effects: collabSlot.reconfigure([
+            yCollab(next.text, next.awareness),
+          ]),
+        });
+      } else {
+        current.dispatch({ effects: collabSlot.reconfigure([]) });
+      }
+      boundCollab = next;
+    });
+  });
+
   $effect(() => {
     const next = content;
-    if (!view) return;
+    if (!view || collab) return;
     if (view.state.doc.toString() === next) return;
 
     laterDispatch((current) => {

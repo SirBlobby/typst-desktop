@@ -1,5 +1,10 @@
 import { listen } from "@tauri-apps/api/event";
 import * as api from "./api";
+import {
+  openCollabSession,
+  closeCollabSession,
+  type CollabSession,
+} from "./yjs-client";
 import type {
   Account,
   BrowseEntry,
@@ -67,6 +72,10 @@ interface AppState {
   download: DownloadProgress | null;
   syncing: boolean;
   conflicts: Conflict[];
+  collab: CollabSession | null;
+  collabIntent: boolean;
+  collabStatus: "connecting" | "connected" | "offline" | null;
+  collabConflict: Conflict | null;
   status: string;
   error: string;
   theme: "light" | "dark";
@@ -111,6 +120,10 @@ export const app = $state<AppState>({
   download: null,
   syncing: false,
   conflicts: [],
+  collab: null,
+  collabIntent: false,
+  collabStatus: null,
+  collabConflict: null,
   status: "",
   error: "",
   theme: "light",
@@ -382,6 +395,7 @@ function handleDeviceEvent(event: DeviceEvent) {
       event.document_id === linkedDocument);
 
   if (matchesOpenTarget) {
+    if (app.collabIntent) return;
     autoSync();
   } else if (app.scope === "cloud") {
     refreshCloud();
@@ -587,10 +601,19 @@ export async function openTarget(path: string) {
   }
 }
 
+function stopCollab() {
+  closeCollabSession(app.collab);
+  app.collab = null;
+  app.collabIntent = false;
+  app.collabStatus = null;
+  app.collabConflict = null;
+}
+
 export async function closeTarget() {
   cancelScheduledCompile();
   cancelAutosave();
   if (app.dirty) await saveActiveFile();
+  stopCollab();
   app.view = "files";
   app.target = null;
   app.activePath = null;
@@ -617,6 +640,7 @@ export async function openFile(file: string) {
   cancelAutosave();
 
   if (app.dirty && app.activePath) await saveActiveFile();
+  stopCollab();
 
   try {
     const payload = await api.readTargetFile(app.target.path, file);
@@ -624,9 +648,98 @@ export async function openFile(file: string) {
     app.editorContent = payload.is_text ? payload.content : "";
     app.dirty = false;
     if (payload.is_text) await compile();
+    if (payload.is_text) await tryOpenCollab(file, app.editorContent);
   } catch (error) {
     setError(error);
   }
+}
+
+function bindCollabSession(session: CollabSession) {
+  app.collab = session;
+  app.collabStatus = session.provider.wsconnected ? "connected" : "connecting";
+  session.provider.on("status", (event: { status: string }) => {
+    app.collabStatus =
+      event.status === "connected"
+        ? "connected"
+        : event.status === "connecting"
+          ? "connecting"
+          : "offline";
+  });
+}
+
+async function tryOpenCollab(file: string, diskContent: string) {
+  if (!app.target || !app.settings?.device_token) return;
+
+  let roomId: string | null;
+  try {
+    roomId = await api.cloudRoomId(app.target.path, file);
+  } catch {
+    roomId = null;
+  }
+  if (!roomId) return;
+
+  app.collabIntent = true;
+  app.collabStatus = "connecting";
+
+  const session = openCollabSession(
+    app.settings.server_url,
+    app.settings.device_token,
+    roomId,
+  );
+
+  const synced = await new Promise<boolean>((resolve) => {
+    session.provider.once("synced", (isSynced: boolean) => resolve(isSynced));
+  }).catch(() => false);
+
+  if (app.activePath !== file) {
+    closeCollabSession(session);
+    return;
+  }
+
+  if (!synced) {
+    bindCollabSession(session);
+    return;
+  }
+
+  const remoteText = session.text.toString();
+  if (remoteText !== diskContent) {
+    app.collabConflict = {
+      path: file,
+      local_text: diskContent,
+      remote_text: remoteText,
+      merged_text: remoteText,
+      server_hash: "",
+      auto_merged: false,
+      binary: false,
+    };
+    pendingCollabSession = session;
+    return;
+  }
+
+  bindCollabSession(session);
+}
+
+let pendingCollabSession: CollabSession | null = null;
+
+export function resolveCollabConflict(content: string) {
+  const session = pendingCollabSession;
+  pendingCollabSession = null;
+  app.collabConflict = null;
+  if (!session) return;
+
+  const ytext = session.text;
+  ytext.doc?.transact(() => {
+    ytext.delete(0, ytext.length);
+    ytext.insert(0, content);
+  });
+
+  bindCollabSession(session);
+}
+
+export function cancelCollabConflict() {
+  closeCollabSession(pendingCollabSession);
+  pendingCollabSession = null;
+  app.collabConflict = null;
 }
 
 export async function saveActiveFile() {
@@ -711,9 +824,14 @@ export function cancelScheduledCompile() {
 
 let autosaveTimer: ReturnType<typeof setTimeout> | null = null;
 
+const COLLAB_AUTOSAVE_SECONDS = 5;
+
 export function scheduleAutosave() {
-  const seconds = app.settings?.autosave_seconds ?? 0;
   if (autosaveTimer) clearTimeout(autosaveTimer);
+
+  const seconds = app.collabIntent
+    ? Math.min(app.settings?.autosave_seconds || COLLAB_AUTOSAVE_SECONDS, COLLAB_AUTOSAVE_SECONDS)
+    : (app.settings?.autosave_seconds ?? 0);
   if (seconds <= 0) return;
 
   autosaveTimer = setTimeout(() => {
