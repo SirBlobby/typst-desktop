@@ -499,6 +499,24 @@ fn export_target(
 }
 
 #[tauri::command]
+fn render_target_png(
+    app: AppHandle,
+    store: State<'_, Store>,
+    path: String,
+) -> Result<Vec<u8>, String> {
+    let target = resolve_target(&app, &store, &path)?;
+    let files = read_target_files(&app, &store, &target)?;
+
+    compiler::export_png(target.entrypoint, files).map_err(|diagnostics| {
+        diagnostics
+            .into_iter()
+            .map(|d| d.message)
+            .collect::<Vec<_>>()
+            .join("; ")
+    })
+}
+
+#[tauri::command]
 fn thumbnail(app: AppHandle, store: State<'_, Store>, path: String) -> Result<thumbnails::Thumbnail, String> {
     thumbnails::thumbnail(&app, &store, &path)
 }
@@ -1286,6 +1304,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .setup(|app| {
             let store = Store::open(&app.handle())?;
             app.manage(store);
@@ -1319,6 +1338,7 @@ pub fn run() {
             set_target_entrypoint,
             compile_target,
             export_target,
+            render_target_png,
             thumbnail,
             read_image,
             clear_thumbnails,

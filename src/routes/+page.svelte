@@ -2,6 +2,7 @@
   import Icon from "@iconify/svelte";
   import { onMount } from "svelte";
   import { save } from "@tauri-apps/plugin-dialog";
+  import { writeImage, writeText } from "@tauri-apps/plugin-clipboard-manager";
   import { revealItemInDir } from "@tauri-apps/plugin-opener";
   import { getCurrentWebview } from "@tauri-apps/api/webview";
   import { listen } from "@tauri-apps/api/event";
@@ -370,6 +371,27 @@
     }
   }
 
+  async function copyAs(format: string) {
+    if (!app.target) return;
+
+    try {
+      if (format === "png") {
+        const bytes = await api.renderTargetPng(app.target.path);
+        await writeImage(new Uint8Array(bytes));
+      } else if (format === "svg") {
+        const svg = app.compiled?.pages[0];
+        if (!svg) {
+          setStatus("Nothing to copy yet");
+          return;
+        }
+        await writeText(svg);
+      }
+      setStatus(`Copied ${format.toUpperCase()} to clipboard`);
+    } catch (error) {
+      setError(error);
+    }
+  }
+
   const resolveDocumentConflicts = (resolutions: api.Resolution[]) =>
     guard(async () => {
       for (const resolution of resolutions) {
@@ -588,6 +610,27 @@
             <button
               class="px-3 py-1.5 text-left uppercase hover:bg-[var(--color-surface-sunken)]"
               onclick={() => exportAs(format)}
+            >
+              {format}
+            </button>
+          {/each}
+        </div>
+      </div>
+
+      <div class="group relative">
+        <button
+          class="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-ink)]"
+        >
+          <Icon icon="ph:copy" />
+          Copy
+        </button>
+        <div
+          class="invisible absolute right-0 top-full z-20 flex w-32 flex-col rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] py-1 text-xs shadow-lg group-hover:visible"
+        >
+          {#each ["png", "svg"] as format}
+            <button
+              class="px-3 py-1.5 text-left uppercase hover:bg-[var(--color-surface-sunken)]"
+              onclick={() => copyAs(format)}
             >
               {format}
             </button>

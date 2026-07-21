@@ -168,6 +168,9 @@ export const exportTarget = (
   destination: string,
 ) => invoke<string>("export_target", { path, format, destination });
 
+export const renderTargetPng = (path: string) =>
+  invoke<number[]>("render_target_png", { path });
+
 export interface Asset {
   name: string;
   kind: "font" | "image" | "file";
