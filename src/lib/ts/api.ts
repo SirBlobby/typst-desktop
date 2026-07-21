@@ -277,6 +277,24 @@ export const cloudLogout = () => invoke<void>("cloud_logout");
 
 export const cloudAccount = () => invoke<Account | null>("cloud_account");
 
+export const cloudWsStart = () => invoke<void>("cloud_ws_start");
+
+export const cloudWsStop = () => invoke<void>("cloud_ws_stop");
+
+export const cloudWsStatus = () => invoke<string>("cloud_ws_status");
+
+export interface DeviceEvent {
+  kind: "project" | "document" | "structure";
+  project_id: string | null;
+  document_id: string | null;
+}
+
+export const getCloudCache = (key: string) =>
+  invoke<string | null>("get_cloud_cache", { key });
+
+export const saveCloudCache = (key: string, payload: string) =>
+  invoke<void>("save_cloud_cache", { key, payload });
+
 export const cloudListProjects = () =>
   invoke<ProjectSummary[]>("cloud_list_projects");
 

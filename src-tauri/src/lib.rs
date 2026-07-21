@@ -6,6 +6,7 @@ mod sync;
 mod thumbnails;
 mod workspace;
 mod world;
+mod ws;
 
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use serde::{Deserialize, Serialize};
@@ -16,6 +17,7 @@ use assets::Asset;
 use db::Store;
 use compiler::{CompileResult, Diagnostic};
 use lsp::{LspHandle, LspState};
+use ws::WsState;
 use sync::{Account, ProjectSummary, SyncReport};
 use workspace::{
     browse, is_project_dir, is_text_file, list_files, load_settings, project_file_path,
@@ -536,6 +538,16 @@ fn clear_thumbnails(store: State<'_, Store>) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn get_cloud_cache(store: State<'_, Store>, key: String) -> Result<Option<String>, String> {
+    store.cloud_cache(&key)
+}
+
+#[tauri::command]
+fn save_cloud_cache(store: State<'_, Store>, key: String, payload: String) -> Result<(), String> {
+    store.save_cloud_cache(&key, &payload)
+}
+
+#[tauri::command]
 fn list_assets(app: AppHandle, store: State<'_, Store>) -> Result<Vec<Asset>, String> {
     assets::list_assets(&app, &store)
 }
@@ -703,6 +715,7 @@ fn cloud_check_compatibility(server_url: String) -> sync::CompatibilityStatus {
 fn cloud_login(
     app: AppHandle,
     store: State<'_, Store>,
+    ws_state: State<'_, WsState>,
     server_url: String,
     email: String,
     password: String,
@@ -712,11 +725,13 @@ fn cloud_login(
     let response = sync::login(&server_url, &email, &password, &device_name)?;
 
     let mut settings = load_settings(&app, &store)?;
-    settings.server_url = server_url;
-    settings.device_token = Some(response.token);
+    settings.server_url = server_url.clone();
+    settings.device_token = Some(response.token.clone());
     settings.account_email = Some(response.email.clone());
     settings.account_username = Some(response.username.clone());
     save_settings(&store, &settings)?;
+
+    ws_state.start(app, server_url, response.token);
 
     Ok(Account {
         user_id: response.user_id,
@@ -726,7 +741,11 @@ fn cloud_login(
 }
 
 #[tauri::command]
-fn cloud_logout(app: AppHandle, store: State<'_, Store>) -> Result<(), String> {
+fn cloud_logout(
+    app: AppHandle,
+    store: State<'_, Store>,
+    ws_state: State<'_, WsState>,
+) -> Result<(), String> {
     let mut settings = load_settings(&app, &store)?;
     if let Some(token) = &settings.device_token {
         let _ = sync::logout(&settings.server_url, token);
@@ -735,7 +754,31 @@ fn cloud_logout(app: AppHandle, store: State<'_, Store>) -> Result<(), String> {
     settings.device_token = None;
     settings.account_email = None;
     settings.account_username = None;
-    save_settings(&store, &settings)
+    save_settings(&store, &settings)?;
+
+    ws_state.stop(&app);
+
+    Ok(())
+}
+
+#[tauri::command]
+fn cloud_ws_start(app: AppHandle, store: State<'_, Store>, ws_state: State<'_, WsState>) -> Result<(), String> {
+    let settings = load_settings(&app, &store)?;
+    if let Some(token) = settings.device_token {
+        ws_state.start(app, settings.server_url, token);
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn cloud_ws_stop(app: AppHandle, ws_state: State<'_, WsState>) -> Result<(), String> {
+    ws_state.stop(&app);
+    Ok(())
+}
+
+#[tauri::command]
+fn cloud_ws_status(ws_state: State<'_, WsState>) -> Result<String, String> {
+    Ok(ws_state.status())
 }
 
 #[tauri::command]
@@ -1311,6 +1354,7 @@ pub fn run() {
             Ok(())
         })
         .manage(LspState::default())
+        .manage(WsState::default())
         .on_window_event(|window, event| {
             if matches!(event, tauri::WindowEvent::Destroyed) {
                 if let Some(state) = window.app_handle().try_state::<LspState>() {
@@ -1342,6 +1386,8 @@ pub fn run() {
             thumbnail,
             read_image,
             clear_thumbnails,
+            get_cloud_cache,
+            save_cloud_cache,
             list_assets,
             list_resources,
             list_font_families,
@@ -1357,6 +1403,9 @@ pub fn run() {
             cloud_login,
             cloud_logout,
             cloud_account,
+            cloud_ws_start,
+            cloud_ws_stop,
+            cloud_ws_status,
             cloud_list_projects,
             cloud_list_folders,
             cloud_create_folder,

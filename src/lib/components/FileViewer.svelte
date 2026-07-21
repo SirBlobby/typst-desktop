@@ -947,6 +947,13 @@
           {/if}
         </div>
 
+        {#if app.cloudOffline}
+          <div class="mb-3 flex items-center gap-2 rounded-lg border border-[var(--color-line)] bg-[var(--color-surface-muted)] px-3 py-2 text-xs text-[var(--color-ink-muted)]">
+            <Icon icon="ph:wifi-slash" class="text-base" />
+            Offline — showing last synced data
+          </div>
+        {/if}
+
         {#if cloudTrail.length > 0}
           <div class="mb-3 flex flex-wrap items-center gap-1 text-xs">
             <button

@@ -454,8 +454,9 @@
               {/each}
             </select>
             <span class="text-[var(--color-ink-muted)]">
-              Pulls and pushes cloud-linked projects on a timer. Conflicts pause
-              syncing until they are resolved.
+              Pulls and pushes cloud-linked projects on a timer. Used as a
+              fallback when live sync (websocket) is unavailable. Conflicts
+              pause syncing until they are resolved.
             </span>
           </div>
         </div>

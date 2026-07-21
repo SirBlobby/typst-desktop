@@ -512,6 +512,12 @@
     on: "LSP ready",
     unavailable: "LSP unavailable",
   };
+
+  const wsLabel: Record<string, string> = {
+    connected: "Live sync",
+    connecting: "Connecting…",
+    offline: "Offline (polling)",
+  };
 </script>
 
 <svelte:window on:keydown={handleKeydown} />
@@ -587,6 +593,23 @@
         ></span>
         {lspLabel[app.lspStatus]}
       </span>
+
+      {#if app.account}
+        <span
+          class="flex items-center gap-1 text-[10px] text-[var(--color-ink-muted)]"
+          title="Cloud sync connection"
+        >
+          <span
+            class="h-1.5 w-1.5 rounded-full
+              {app.wsStatus === 'connected'
+              ? 'bg-[var(--color-success)]'
+              : app.wsStatus === 'connecting'
+                ? 'bg-[var(--color-accent)]'
+                : 'bg-[var(--color-ink-muted)]'}"
+          ></span>
+          {wsLabel[app.wsStatus] ?? "Offline (polling)"}
+        </span>
+      {/if}
 
       <button
         class="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-ink)]"

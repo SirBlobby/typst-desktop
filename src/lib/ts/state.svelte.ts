@@ -1,3 +1,4 @@
+import { listen } from "@tauri-apps/api/event";
 import * as api from "./api";
 import type {
   Account,
@@ -7,6 +8,7 @@ import type {
   CloudFolder,
   CompileResult,
   Conflict,
+  DeviceEvent,
   Diagnostic,
   DocumentLink,
   LinkedDocument,
@@ -47,6 +49,8 @@ interface AppState {
   cloudDocuments: CloudDocument[];
   cloudFiles: CloudFile[];
   cloudLoading: boolean;
+  cloudOffline: boolean;
+  wsStatus: string;
   linkedDocuments: LinkedDocument[];
   linkedProjects: LinkedProject[];
   documentLink: DocumentLink | null;
@@ -89,6 +93,8 @@ export const app = $state<AppState>({
   cloudDocuments: [],
   cloudFiles: [],
   cloudLoading: false,
+  cloudOffline: false,
+  wsStatus: "offline",
   linkedDocuments: [],
   linkedProjects: [],
   documentLink: null,
@@ -340,10 +346,45 @@ export async function bootstrap() {
   try {
     app.settings = await api.getSettings();
     restartAutoSync();
+    await initWsSync();
+    if (app.settings?.device_token) {
+      api.cloudWsStart().catch(() => {});
+    }
     await browseTo("");
     await refreshAccount();
   } catch (error) {
     setError(error);
+  }
+}
+
+async function initWsSync() {
+  await listen<string>("cloud://ws-status", (event) => {
+    app.wsStatus = event.payload;
+  });
+
+  await listen<DeviceEvent>("cloud://sync-event", (event) => {
+    handleDeviceEvent(event.payload);
+  });
+
+  app.wsStatus = await api.cloudWsStatus().catch(() => "offline");
+}
+
+function handleDeviceEvent(event: DeviceEvent) {
+  const linkedProject = app.target?.cloud_project_id;
+  const linkedDocument = app.documentLink?.document_id;
+
+  const matchesOpenTarget =
+    (event.kind === "project" &&
+      event.project_id &&
+      event.project_id === linkedProject) ||
+    (event.kind === "document" &&
+      event.document_id &&
+      event.document_id === linkedDocument);
+
+  if (matchesOpenTarget) {
+    autoSync();
+  } else if (app.scope === "cloud") {
+    refreshCloud();
   }
 }
 
@@ -382,20 +423,52 @@ export async function refreshCloudProjects() {
   }
 }
 
+interface CloudSnapshot {
+  folders: CloudFolder[];
+  documents: CloudDocument[];
+  projects: ProjectSummary[];
+  files: CloudFile[];
+}
+
+function cloudCacheKey() {
+  return `cloud:${app.cloudFolder ?? "root"}`;
+}
+
+function applyCloudSnapshot(snapshot: CloudSnapshot) {
+  if (app.cloudFolder === "shared") {
+    app.cloudDocuments = snapshot.documents;
+    app.cloudProjects = snapshot.projects;
+    app.cloudFolders = [];
+    app.cloudFiles = [];
+  } else {
+    app.cloudFolderTree = snapshot.folders;
+    app.cloudFolders = snapshot.folders.filter(
+      (folder) => (folder.parent_id ?? null) === app.cloudFolder,
+    );
+    app.cloudDocuments = snapshot.documents;
+    app.cloudProjects = snapshot.projects.filter(
+      (project) =>
+        project.role !== "owner" ||
+        (project.folder_id ?? null) === app.cloudFolder,
+    );
+    app.cloudFiles = snapshot.files;
+  }
+}
+
 export async function refreshCloud() {
   if (!app.account) return;
 
   app.cloudLoading = true;
+  const cacheKey = cloudCacheKey();
+
   try {
     app.linkedDocuments = await api.cloudLinkedDocuments().catch(() => []);
     app.linkedProjects = await api.cloudLinkedProjects().catch(() => []);
 
+    let snapshot: CloudSnapshot;
     if (app.cloudFolder === "shared") {
       const shared = await api.cloudListShared();
-      app.cloudDocuments = shared.documents;
-      app.cloudProjects = shared.projects;
-      app.cloudFolders = [];
-      app.cloudFiles = [];
+      snapshot = { folders: [], documents: shared.documents, projects: shared.projects, files: [] };
     } else {
       const [folders, documents, projects, files] = await Promise.all([
         api.cloudListFolders(),
@@ -403,20 +476,20 @@ export async function refreshCloud() {
         api.cloudListProjects(),
         api.cloudListFiles(app.cloudFolder),
       ]);
-      app.cloudFolderTree = folders;
-      app.cloudFolders = folders.filter(
-        (folder) => (folder.parent_id ?? null) === app.cloudFolder,
-      );
-      app.cloudDocuments = documents;
-      app.cloudProjects = projects.filter(
-        (project) =>
-          project.role !== "owner" ||
-          (project.folder_id ?? null) === app.cloudFolder,
-      );
-      app.cloudFiles = files;
+      snapshot = { folders, documents, projects, files };
     }
+
+    applyCloudSnapshot(snapshot);
+    app.cloudOffline = false;
+    api.saveCloudCache(cacheKey, JSON.stringify(snapshot)).catch(() => {});
   } catch (error) {
-    setError(error);
+    const cached = await api.getCloudCache(cacheKey).catch(() => null);
+    if (cached) {
+      applyCloudSnapshot(JSON.parse(cached));
+      app.cloudOffline = true;
+    } else {
+      setError(error);
+    }
   } finally {
     app.cloudLoading = false;
   }
@@ -668,7 +741,7 @@ export function restartAutoSync() {
   if (seconds <= 0) return;
 
   syncTimer = setInterval(() => {
-    autoSync();
+    if (app.wsStatus !== "connected") autoSync();
   }, seconds * 1000);
 }
 

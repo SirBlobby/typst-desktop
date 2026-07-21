@@ -42,4 +42,5 @@ base64 = "0.22"
 diffy = "0.4"
 walkdir = "2"
 ureq = { version = "2.12", features = ["json"] }
+tungstenite = { version = "0.24", features = ["native-tls"] }
 

@@ -19,7 +19,7 @@ pub struct DocumentLink {
     pub synced_at: Option<String>,
 }
 
-const SCHEMA: [&str; 5] = [
+const SCHEMA: [&str; 6] = [
     "CREATE TABLE IF NOT EXISTS settings (
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL
@@ -50,6 +50,11 @@ const SCHEMA: [&str; 5] = [
         kind TEXT NOT NULL,
         data TEXT NOT NULL,
         source_modified INTEGER NOT NULL
+    )",
+    "CREATE TABLE IF NOT EXISTS cloud_cache (
+        key TEXT PRIMARY KEY,
+        payload TEXT NOT NULL,
+        cached_at TEXT NOT NULL
     )",
 ];
 
@@ -413,6 +418,32 @@ impl Store {
     pub fn clear_thumbnails(&self) -> Result<(), String> {
         self.with(|connection| {
             connection.execute("DELETE FROM thumbnails", [])?;
+            Ok(())
+        })
+    }
+
+    pub fn cloud_cache(&self, key: &str) -> Result<Option<String>, String> {
+        self.with(|connection| {
+            connection
+                .query_row(
+                    "SELECT payload FROM cloud_cache WHERE key = ?1",
+                    params![key],
+                    |row| row.get(0),
+                )
+                .optional()
+        })
+    }
+
+    pub fn save_cloud_cache(&self, key: &str, payload: &str) -> Result<(), String> {
+        self.with(|connection| {
+            connection.execute(
+                "INSERT INTO cloud_cache (key, payload, cached_at)
+                 VALUES (?1, ?2, ?3)
+                 ON CONFLICT(key) DO UPDATE SET
+                   payload = excluded.payload,
+                   cached_at = excluded.cached_at",
+                params![key, payload, chrono::Utc::now().to_rfc3339()],
+            )?;
             Ok(())
         })
     }
