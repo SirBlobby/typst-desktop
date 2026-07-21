@@ -7,7 +7,7 @@ export interface Settings {
   account_email: string | null;
   account_username: string | null;
   autosave_seconds: number;
-  sync_minutes: number;
+  sync_seconds: number;
 }
 
 export interface FileEntry {
@@ -57,6 +57,7 @@ export interface ProjectSummary {
   id: string;
   name: string;
   entrypoint: string;
+  folder_id: string | null;
   role: string;
   updated_at: string;
 }
@@ -248,7 +249,7 @@ export const updateSettings = (changes: {
   workspaceRoot?: string;
   serverUrl?: string;
   autosaveSeconds?: number;
-  syncMinutes?: number;
+  syncSeconds?: number;
 }) => invoke<Settings>("update_settings", changes);
 
 export interface CompatibilityStatus {
@@ -305,6 +306,21 @@ export interface DocumentLink {
 export const cloudListFolders = () =>
   invoke<CloudFolder[]>("cloud_list_folders");
 
+export const cloudCreateFolder = (name: string, parentId?: string | null) =>
+  invoke<CloudFolder>("cloud_create_folder", {
+    name,
+    parentId: parentId ?? null,
+  });
+
+export const cloudRenameFolder = (folderId: string, name: string) =>
+  invoke<CloudFolder>("cloud_rename_folder", { folderId, name });
+
+export const cloudMoveFolder = (folderId: string, parentId: string | null) =>
+  invoke<CloudFolder>("cloud_move_folder", { folderId, parentId });
+
+export const cloudDeleteFolder = (folderId: string) =>
+  invoke<void>("cloud_delete_folder", { folderId });
+
 export const cloudListDocuments = (folderId?: string | null) =>
   invoke<CloudDocument[]>("cloud_list_documents", {
     folderId: folderId ?? null,
@@ -329,6 +345,15 @@ export const cloudDownloadFile = (fileId: string) =>
 export const cloudDeleteFile = (fileId: string) =>
   invoke<void>("cloud_delete_file", { fileId });
 
+export const cloudUploadFile = (path: string, folderId?: string | null) =>
+  invoke<CloudFile>("cloud_upload_file", { path, folderId: folderId ?? null });
+
+export const cloudRenameFile = (fileId: string, name: string) =>
+  invoke<CloudFile>("cloud_rename_file", { fileId, name });
+
+export const cloudMoveFile = (fileId: string, folderId: string | null) =>
+  invoke<CloudFile>("cloud_move_file", { fileId, folderId });
+
 export const cloudDownloadDocument = (documentId: string, parent: string) =>
   invoke<string>("cloud_download_document", { documentId, parent });
 
@@ -338,6 +363,9 @@ export const cloudDeleteDocument = (documentId: string) =>
 export const cloudCreateDocument = (path: string, title: string) =>
   invoke<string>("cloud_create_document", { path, title });
 
+export const cloudMoveDocument = (documentId: string, folderId: string | null) =>
+  invoke<CloudDocument>("cloud_move_document", { documentId, folderId });
+
 export interface DocumentContent {
   id: string;
   title: string;
@@ -346,8 +374,11 @@ export interface DocumentContent {
   content: string;
 }
 
-export const cloudNewDocument = (title: string) =>
-  invoke<DocumentContent>("cloud_new_document", { title });
+export const cloudNewDocument = (title: string, folderId?: string | null) =>
+  invoke<DocumentContent>("cloud_new_document", {
+    title,
+    folderId: folderId ?? null,
+  });
 
 export const cloudSyncDocument = (path: string) =>
   invoke<SyncReport>("cloud_sync_document", { path });
@@ -384,14 +415,25 @@ export const cloudDocumentLink = (path: string) =>
 export const cloudUnlinkDocument = (path: string) =>
   invoke<void>("cloud_unlink_document", { path });
 
-export const cloudCreateProject = (name: string) =>
-  invoke<ProjectSummary>("cloud_create_project", { name });
+export const cloudCreateProject = (name: string, folderId?: string | null) =>
+  invoke<ProjectSummary>("cloud_create_project", {
+    name,
+    folderId: folderId ?? null,
+  });
 
 export const cloudDeleteProject = (cloudProjectId: string) =>
   invoke<void>("cloud_delete_project", { cloudProjectId });
 
-export const cloudCloneProject = (cloudProjectId: string, projectName: string) =>
-  invoke<SyncReport>("cloud_clone_project", { cloudProjectId, projectName });
+export const cloudMoveProject = (
+  cloudProjectId: string,
+  folderId: string | null,
+) => invoke<ProjectSummary>("cloud_move_project", { cloudProjectId, folderId });
+
+export const cloudCloneProject = (
+  cloudProjectId: string,
+  projectName: string,
+  parent: string,
+) => invoke<SyncReport>("cloud_clone_project", { cloudProjectId, projectName, parent });
 
 export const cloudLinkProject = (project: string, cloudProjectId?: string) =>
   invoke<SyncReport>("cloud_link_project", {

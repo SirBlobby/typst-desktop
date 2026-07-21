@@ -1,7 +1,7 @@
 <script lang="ts">
   import Icon from "@iconify/svelte";
   import * as api from "$lib/ts/api";
-  import type { BrowseEntry, EntryKind } from "$lib/ts/api";
+  import type { BrowseEntry, CloudFile, CloudFolder, EntryKind } from "$lib/ts/api";
   import { clampMenu } from "$lib/ts/menu-position";
   import {
     app,
@@ -31,11 +31,16 @@
     onremovedownload: (path: string) => void;
     ondownloadfile: (fileId: string, name: string) => void;
     ondeletefile: (fileId: string) => void;
+    onuploadfile: () => void;
+    onrenamefile: (file: CloudFile) => void;
     oncloneproject: (cloudProjectId: string, name: string) => void;
     ondeleteproject: (cloudProjectId: string) => void;
     ondeletedocument: (documentId: string) => void;
     onnewcloudproject: () => void;
     onnewclouddocument: () => void;
+    onnewcloudfolder: () => void;
+    onrenamecloudfolder: (folder: CloudFolder) => void;
+    ondeletecloudfolder: (folder: CloudFolder) => void;
     onsignin: () => void;
   }
 
@@ -53,11 +58,16 @@
     onremovedownload,
     ondownloadfile,
     ondeletefile,
+    onuploadfile,
+    onrenamefile,
     oncloneproject,
     ondeleteproject,
     ondeletedocument,
     onnewcloudproject,
     onnewclouddocument,
+    onnewcloudfolder,
+    onrenamecloudfolder,
+    ondeletecloudfolder,
     onsignin,
   }: Props = $props();
 
@@ -234,6 +244,55 @@
     if (source) moveTo(source, destination);
   }
 
+  type CloudDragItem = {
+    kind: "project" | "document" | "folder" | "file";
+    id: string;
+  };
+  let cloudDragging = $state<CloudDragItem | null>(null);
+  let cloudDropTarget = $state<string | null>(null);
+
+  async function moveCloudItem(item: CloudDragItem, folderId: string | null) {
+    try {
+      if (item.kind === "folder") {
+        await api.cloudMoveFolder(item.id, folderId);
+      } else if (item.kind === "project") {
+        await api.cloudMoveProject(item.id, folderId);
+      } else if (item.kind === "document") {
+        await api.cloudMoveDocument(item.id, folderId);
+      } else {
+        await api.cloudMoveFile(item.id, folderId);
+      }
+      await refreshCloud();
+    } catch (error) {
+      setError(error);
+    }
+  }
+
+  function startCloudDrag(event: DragEvent, item: CloudDragItem) {
+    cloudDragging = item;
+    event.dataTransfer?.setData("text/plain", item.id);
+  }
+
+  function endCloudDrag() {
+    cloudDragging = null;
+    cloudDropTarget = null;
+  }
+
+  function allowCloudDrop(event: DragEvent, folderId: string) {
+    if (!cloudDragging) return;
+    if (cloudDragging.kind === "folder" && cloudDragging.id === folderId) return;
+    event.preventDefault();
+    cloudDropTarget = folderId;
+  }
+
+  function handleCloudDrop(event: DragEvent, folderId: string) {
+    event.preventDefault();
+    const item = cloudDragging;
+    cloudDragging = null;
+    cloudDropTarget = null;
+    if (item) moveCloudItem(item, folderId === "" ? null : folderId);
+  }
+
   function activate(entry: BrowseEntry) {
     if (entry.kind === "folder") {
       browseTo(entry.path);
@@ -262,6 +321,7 @@
   onopen: (() => void) | null,
   ondownload: () => void,
   onremove: (() => void) | null,
+  onrename: (() => void) | null,
   ondelete: (() => void) | null,
 )}
   {#if cloudMenuFor === id}
@@ -302,6 +362,17 @@
           Remove from this device
         </button>
       {/if}
+      {#if onrename}
+        <button
+          class="px-3 py-1.5 text-left hover:bg-[var(--color-surface-sunken)]"
+          onclick={() => {
+            onrename();
+            cloudMenuFor = null;
+          }}
+        >
+          Rename
+        </button>
+      {/if}
       {#if ondelete}
         <button
           class="px-3 py-1.5 text-left text-[var(--color-danger)] hover:bg-[var(--color-surface-sunken)]"
@@ -328,11 +399,18 @@
   onremove: (() => void) | null,
   ondelete: (() => void) | null,
 )}
+  {@const [dragKind, dragId] = id.split(":") as [
+    "project" | "document",
+    string,
+  ]}
   <div
     class="group flex flex-col overflow-hidden rounded-lg border border-[var(--color-line)] bg-[var(--color-surface)] transition hover:border-[var(--color-accent)] hover:shadow-sm"
     oncontextmenu={(event) => openCloudContextMenu(event, id)}
+    draggable="true"
+    ondragstart={(event) => startCloudDrag(event, { kind: dragKind, id: dragId })}
+    ondragend={endCloudDrag}
   >
-    {@render cloudMenu(id, onopen, ondownload, onremove, ondelete)}
+    {@render cloudMenu(id, onopen, ondownload, onremove, null, ondelete)}
     <div
       class="flex h-24 items-center justify-center overflow-hidden border-b border-[var(--color-line)] bg-[var(--color-surface-muted)]"
     >
@@ -545,20 +623,39 @@
   <div
     class="flex items-center gap-2 border-b border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-2.5"
   >
-    <div class="flex rounded-lg bg-[var(--color-surface-sunken)] p-0.5 text-xs font-medium">
-      {#each [["local", "Local", "ph:hard-drives"], ["cloud", "Cloud", "ph:cloud"]] as [value, label, icon]}
+    {#if app.scope === "local"}
+      <button
+        class="flex items-center gap-1.5 rounded px-2 py-1 text-xs transition hover:bg-[var(--color-surface-muted)]
+          {app.currentDir === '' ? 'font-medium' : 'text-[var(--color-ink-muted)]'}
+          {dropTarget === '' ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent)]' : ''}"
+        onclick={() => browseTo("")}
+        ondragover={(event) => allowDrop(event, "")}
+        ondragleave={() => {
+          if (dropTarget === "") dropTarget = null;
+        }}
+        ondrop={(event) => handleDrop(event, "")}
+      >
+        <Icon icon="ph:house" />
+        Workspace
+      </button>
+
+      {#each trail as crumb, index}
+        <Icon icon="ph:caret-right" class="text-[10px] text-[var(--color-ink-muted)]" />
         <button
-          class="flex items-center gap-1.5 rounded-md px-3 py-1.5 transition
-            {app.scope === value
-            ? 'bg-[var(--color-surface)] text-[var(--color-ink)] shadow-sm'
-            : 'text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]'}"
-          onclick={() => (app.scope = value as "local" | "cloud")}
+          class="rounded px-2 py-1 text-xs transition hover:bg-[var(--color-surface-muted)]
+            {index === trail.length - 1 ? 'font-medium' : 'text-[var(--color-ink-muted)]'}
+            {dropTarget === crumb.path ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent)]' : ''}"
+          onclick={() => browseTo(crumb.path)}
+          ondragover={(event) => allowDrop(event, crumb.path)}
+          ondragleave={() => {
+            if (dropTarget === crumb.path) dropTarget = null;
+          }}
+          ondrop={(event) => handleDrop(event, crumb.path)}
         >
-          <Icon {icon} />
-          {label}
+          {crumb.name}
         </button>
       {/each}
-    </div>
+    {/if}
 
     <div class="flex-1"></div>
 
@@ -594,6 +691,20 @@
     {:else if app.account}
       <button
         class="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-ink)]"
+        onclick={onuploadfile}
+      >
+        <Icon icon="ph:upload-simple" />
+        Upload
+      </button>
+      <button
+        class="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-ink)]"
+        onclick={onnewcloudfolder}
+      >
+        <Icon icon="ph:folder-plus" />
+        Folder
+      </button>
+      <button
+        class="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-ink)]"
         onclick={onnewcloudproject}
       >
         <Icon icon="ph:folder-star" />
@@ -610,42 +721,6 @@
   </div>
 
   {#if app.scope === "local"}
-    <div
-      class="flex items-center gap-1 border-b border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-2 text-xs"
-    >
-      <button
-        class="flex items-center gap-1.5 rounded px-2 py-1 transition hover:bg-[var(--color-surface-muted)]
-          {app.currentDir === '' ? 'font-medium' : 'text-[var(--color-ink-muted)]'}
-          {dropTarget === '' ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent)]' : ''}"
-        onclick={() => browseTo("")}
-        ondragover={(event) => allowDrop(event, "")}
-        ondragleave={() => {
-          if (dropTarget === "") dropTarget = null;
-        }}
-        ondrop={(event) => handleDrop(event, "")}
-      >
-        <Icon icon="ph:house" />
-        Workspace
-      </button>
-
-      {#each trail as crumb, index}
-        <Icon icon="ph:caret-right" class="text-[10px] text-[var(--color-ink-muted)]" />
-        <button
-          class="rounded px-2 py-1 transition hover:bg-[var(--color-surface-muted)]
-            {index === trail.length - 1 ? 'font-medium' : 'text-[var(--color-ink-muted)]'}
-            {dropTarget === crumb.path ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent)]' : ''}"
-          onclick={() => browseTo(crumb.path)}
-          ondragover={(event) => allowDrop(event, crumb.path)}
-          ondragleave={() => {
-            if (dropTarget === crumb.path) dropTarget = null;
-          }}
-          ondrop={(event) => handleDrop(event, crumb.path)}
-        >
-          {crumb.name}
-        </button>
-      {/each}
-    </div>
-
     <div class="scroll-thin flex-1 overflow-y-auto p-4">
       {#if app.entries.length === 0}
         <div
@@ -840,8 +915,14 @@
             class="flex items-center gap-2 rounded-lg border px-3.5 py-2 text-xs font-medium transition
               {app.cloudFolder !== 'shared'
               ? 'border-[var(--color-accent)] bg-[var(--color-accent)] text-white shadow-sm'
-              : 'border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink-muted)] hover:border-[var(--color-accent)] hover:text-[var(--color-ink)]'}"
+              : 'border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink-muted)] hover:border-[var(--color-accent)] hover:text-[var(--color-ink)]'}
+              {cloudDropTarget === '' ? 'ring-2 ring-[var(--color-accent)]' : ''}"
             onclick={() => openCloudFolder(null)}
+            ondragover={(event) => allowCloudDrop(event, "")}
+            ondragleave={() => {
+              if (cloudDropTarget === "") cloudDropTarget = null;
+            }}
+            ondrop={(event) => handleCloudDrop(event, "")}
           >
             <Icon icon="ph:cloud-fill" class="text-base" />
             My Drive
@@ -869,8 +950,14 @@
         {#if cloudTrail.length > 0}
           <div class="mb-3 flex flex-wrap items-center gap-1 text-xs">
             <button
-              class="rounded px-2 py-1 text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface)] hover:text-[var(--color-ink)]"
+              class="rounded px-2 py-1 text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface)] hover:text-[var(--color-ink)]
+                {cloudDropTarget === '' ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent)]' : ''}"
               onclick={() => openCloudFolder(null)}
+              ondragover={(event) => allowCloudDrop(event, "")}
+              ondragleave={() => {
+                if (cloudDropTarget === "") cloudDropTarget = null;
+              }}
+              ondrop={(event) => handleCloudDrop(event, "")}
             >
               My Drive
             </button>
@@ -884,8 +971,16 @@
                 class="rounded px-2 py-1 transition hover:bg-[var(--color-surface)]
                   {index === cloudTrail.length - 1
                   ? 'font-medium'
-                  : 'text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]'}"
+                  : 'text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]'}
+                  {cloudDropTarget === folder.id
+                  ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent)]'
+                  : ''}"
                 onclick={() => openCloudFolder(folder.id)}
+                ondragover={(event) => allowCloudDrop(event, folder.id)}
+                ondragleave={() => {
+                  if (cloudDropTarget === folder.id) cloudDropTarget = null;
+                }}
+                ondrop={(event) => handleCloudDrop(event, folder.id)}
               >
                 {folder.name}
               </button>
@@ -900,10 +995,22 @@
             {#each app.cloudFolders as folder (folder.id)}
               <div class="relative">
                 <button
-                  class="flex w-full items-center gap-2.5 rounded-lg border border-[var(--color-line)] bg-[var(--color-surface-sunken)] px-3 py-2.5 text-left transition hover:border-[var(--color-accent)] hover:bg-[var(--color-surface)]"
+                  class="flex w-full items-center gap-2.5 rounded-lg border px-3 py-2.5 text-left transition hover:border-[var(--color-accent)] hover:bg-[var(--color-surface)]
+                    {cloudDropTarget === folder.id
+                    ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)]'
+                    : 'border-[var(--color-line)] bg-[var(--color-surface-sunken)]'}"
                   onclick={() => openCloudFolder(folder.id)}
                   oncontextmenu={(event) =>
                     openCloudContextMenu(event, `folder:${folder.id}`)}
+                  draggable="true"
+                  ondragstart={(event) =>
+                    startCloudDrag(event, { kind: "folder", id: folder.id })}
+                  ondragend={endCloudDrag}
+                  ondragover={(event) => allowCloudDrop(event, folder.id)}
+                  ondragleave={() => {
+                    if (cloudDropTarget === folder.id) cloudDropTarget = null;
+                  }}
+                  ondrop={(event) => handleCloudDrop(event, folder.id)}
                 >
                   <Icon
                     icon="ph:folder-fill"
@@ -916,7 +1023,8 @@
                   () => openCloudFolder(folder.id),
                   () => {},
                   null,
-                  null,
+                  () => onrenamecloudfolder(folder),
+                  () => ondeletecloudfolder(folder),
                 )}
               </div>
             {/each}
@@ -965,12 +1073,17 @@
                 class="flex items-center gap-2.5 rounded-lg border border-[var(--color-line)] bg-[var(--color-surface)] p-3 transition hover:border-[var(--color-accent)]"
                 oncontextmenu={(event) =>
                   openCloudContextMenu(event, `file:${file.id}`)}
+                draggable="true"
+                ondragstart={(event) =>
+                  startCloudDrag(event, { kind: "file", id: file.id })}
+                ondragend={endCloudDrag}
               >
                 {@render cloudMenu(
                   `file:${file.id}`,
                   null,
                   () => ondownloadfile(file.id, file.name),
                   null,
+                  () => onrenamefile(file),
                   () => ondeletefile(file.id),
                 )}
                 <Icon

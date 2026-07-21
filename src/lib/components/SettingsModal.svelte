@@ -9,10 +9,12 @@
   import {
     app,
     applyTheme,
+    applyColorTheme,
     applyAccent,
     applyTextScale,
     applyReduceMotion,
     applyContrast,
+    colorThemes,
     refreshEntries,
     restartAutoSync,
     setError,
@@ -85,7 +87,7 @@
     }, 600);
   });
   let autosaveSeconds = $state(untrack(() => app.settings?.autosave_seconds ?? 0));
-  let syncMinutes = $state(untrack(() => app.settings?.sync_minutes ?? 0));
+  let syncSeconds = $state(untrack(() => app.settings?.sync_seconds ?? 0));
   let saving = $state(false);
   let info = $state<AppInfo | null>(null);
 
@@ -107,9 +109,11 @@
 
   const syncOptions = [
     { value: 0, label: "Off" },
-    { value: 1, label: "1 minute" },
-    { value: 2, label: "2 minutes" },
-    { value: 5, label: "5 minutes" },
+    { value: 15, label: "15 seconds" },
+    { value: 30, label: "30 seconds" },
+    { value: 60, label: "1 minute" },
+    { value: 120, label: "2 minutes" },
+    { value: 300, label: "5 minutes" },
   ];
 
   const links = [
@@ -149,7 +153,7 @@
         workspaceRoot,
         serverUrl,
         autosaveSeconds,
-        syncMinutes,
+        syncSeconds,
       });
       restartAutoSync();
       await refreshEntries();
@@ -247,6 +251,30 @@
             </div>
             <span class="text-[var(--color-ink-muted)]">
               System follows your OS setting and updates live.
+            </span>
+          </div>
+
+          <div class="flex flex-col gap-2 text-xs">
+            <span class="font-medium text-[var(--color-ink-muted)]">Color theme</span>
+            <div class="flex flex-wrap gap-2">
+              {#each colorThemes as entry}
+                <button
+                  class="flex items-center gap-1.5 rounded-md border px-3 py-2 transition
+                    {app.colorTheme === entry.id
+                    ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-[var(--color-accent)]'
+                    : 'border-[var(--color-line)] text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-muted)]'}"
+                  onclick={() => applyColorTheme(entry.id)}
+                >
+                  <span
+                    class="h-3 w-3 rounded-full"
+                    style="background-color: {entry.accent}"
+                  ></span>
+                  {entry.label}
+                </button>
+              {/each}
+            </div>
+            <span class="text-[var(--color-ink-muted)]">
+              Sets the surface colors and default accent for the app.
             </span>
           </div>
 
@@ -420,7 +448,7 @@
             <span class="font-medium text-[var(--color-ink-muted)]">
               Automatic sync
             </span>
-            <select class={fieldClass} bind:value={syncMinutes}>
+            <select class={fieldClass} bind:value={syncSeconds}>
               {#each syncOptions as option}
                 <option value={option.value}>{option.label}</option>
               {/each}
@@ -434,7 +462,11 @@
       {:else}
         <div class="flex flex-col gap-4">
           <div class="flex items-center gap-3">
-            <Icon icon="ph:file-code" class="text-3xl text-[var(--color-accent)]" />
+            <span
+              class="flex h-16 w-16 items-center justify-center rounded-lg bg-[var(--color-accent)]"
+            >
+              <img src="/favicon.png" alt="Typst Desktop" class="h-11 w-11" />
+            </span>
             <div>
               <p class="text-sm font-semibold">Typst Desktop</p>
               <p class="text-xs text-[var(--color-ink-muted)]">

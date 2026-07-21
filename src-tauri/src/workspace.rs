@@ -68,7 +68,7 @@ pub struct Settings {
     #[serde(default)]
     pub autosave_seconds: u32,
     #[serde(default)]
-    pub sync_minutes: u32,
+    pub sync_seconds: u32,
 }
 
 impl Settings {
@@ -84,7 +84,7 @@ impl Settings {
             account_email: None,
             account_username: None,
             autosave_seconds: 5,
-            sync_minutes: 0,
+            sync_seconds: 0,
         }
     }
 }

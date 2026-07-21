@@ -181,6 +181,7 @@ pub struct ProjectSummary {
     pub id: String,
     pub name: String,
     pub entrypoint: String,
+    pub folder_id: Option<String>,
     pub role: String,
     pub updated_at: String,
 }
@@ -199,11 +200,12 @@ pub fn create_cloud_project(
     server_url: &str,
     token: &str,
     name: &str,
+    folder_id: Option<&str>,
 ) -> Result<ProjectSummary, String> {
     agent()
         .post(&endpoint(server_url, "/projects"))
         .set("Authorization", &format!("Bearer {}", token))
-        .send_json(ureq::json!({ "name": name }))
+        .send_json(ureq::json!({ "name": name, "folder_id": folder_id }))
         .map_err(describe)?
         .into_json::<ProjectSummary>()
         .map_err(|e| e.to_string())
@@ -220,6 +222,21 @@ pub fn delete_cloud_project(
         .call()
         .map_err(describe)?;
     Ok(())
+}
+
+pub fn move_cloud_project(
+    server_url: &str,
+    token: &str,
+    cloud_project_id: &str,
+    folder_id: Option<&str>,
+) -> Result<ProjectSummary, String> {
+    agent()
+        .patch(&endpoint(server_url, &format!("/projects/{}", cloud_project_id)))
+        .set("Authorization", &format!("Bearer {}", token))
+        .send_json(ureq::json!({ "folder_id": folder_id }))
+        .map_err(describe)?
+        .into_json::<ProjectSummary>()
+        .map_err(|e| e.to_string())
 }
 
 #[derive(Deserialize)]
@@ -750,6 +767,66 @@ pub fn list_folders(server_url: &str, token: &str) -> Result<Vec<CloudFolder>, S
         .map_err(|e| e.to_string())
 }
 
+pub fn create_folder(
+    server_url: &str,
+    token: &str,
+    name: &str,
+    parent_id: Option<&str>,
+) -> Result<CloudFolder, String> {
+    agent()
+        .post(&endpoint(server_url, "/folders"))
+        .set("Authorization", &format!("Bearer {}", token))
+        .send_json(ureq::json!({
+            "name": name,
+            "parent_id": parent_id,
+        }))
+        .map_err(describe)?
+        .into_json::<CloudFolder>()
+        .map_err(|e| e.to_string())
+}
+
+pub fn rename_folder(
+    server_url: &str,
+    token: &str,
+    folder_id: &str,
+    name: &str,
+) -> Result<CloudFolder, String> {
+    agent()
+        .patch(&endpoint(server_url, &format!("/folders/{}", folder_id)))
+        .set("Authorization", &format!("Bearer {}", token))
+        .send_json(ureq::json!({ "name": name }))
+        .map_err(describe)?
+        .into_json::<CloudFolder>()
+        .map_err(|e| e.to_string())
+}
+
+pub fn move_folder(
+    server_url: &str,
+    token: &str,
+    folder_id: &str,
+    parent_id: Option<&str>,
+) -> Result<CloudFolder, String> {
+    agent()
+        .patch(&endpoint(
+            server_url,
+            &format!("/folders/{}/move", folder_id),
+        ))
+        .set("Authorization", &format!("Bearer {}", token))
+        .send_json(ureq::json!({ "parent_id": parent_id }))
+        .map_err(describe)?
+        .into_json::<CloudFolder>()
+        .map_err(|e| e.to_string())
+}
+
+pub fn delete_folder(server_url: &str, token: &str, folder_id: &str) -> Result<(), String> {
+    agent()
+        .delete(&endpoint(server_url, &format!("/folders/{}", folder_id)))
+        .set("Authorization", &format!("Bearer {}", token))
+        .call()
+        .map_err(describe)?;
+    Ok(())
+}
+
 pub fn list_documents(
     server_url: &str,
     token: &str,
@@ -808,6 +885,7 @@ pub fn create_document(
     token: &str,
     title: &str,
     content: &str,
+    folder_id: Option<&str>,
 ) -> Result<DocumentContent, String> {
     agent()
         .post(&endpoint(server_url, "/documents"))
@@ -815,10 +893,25 @@ pub fn create_document(
         .send_json(ureq::json!({
             "title": title,
             "content": content,
-            "folder_id": null,
+            "folder_id": folder_id,
         }))
         .map_err(describe)?
         .into_json::<DocumentContent>()
+        .map_err(|e| e.to_string())
+}
+
+pub fn move_document(
+    server_url: &str,
+    token: &str,
+    document_id: &str,
+    folder_id: Option<&str>,
+) -> Result<CloudDocument, String> {
+    agent()
+        .patch(&endpoint(server_url, &format!("/documents/{}", document_id)))
+        .set("Authorization", &format!("Bearer {}", token))
+        .send_json(ureq::json!({ "folder_id": folder_id }))
+        .map_err(describe)?
+        .into_json::<CloudDocument>()
         .map_err(|e| e.to_string())
 }
 
@@ -1060,6 +1153,29 @@ pub fn list_account_files(
         .map_err(|e| e.to_string())
 }
 
+pub fn upload_account_file(
+    server_url: &str,
+    token: &str,
+    name: &str,
+    mime_type: &str,
+    data: &[u8],
+    folder_id: Option<&str>,
+) -> Result<CloudFile, String> {
+    agent()
+        .post(&endpoint(server_url, "/files"))
+        .set("Authorization", &format!("Bearer {}", token))
+        .send_json(ureq::json!({
+            "name": name,
+            "mime_type": mime_type,
+            "encoding": "base64",
+            "content": BASE64.encode(data),
+            "folder_id": folder_id,
+        }))
+        .map_err(describe)?
+        .into_json::<CloudFile>()
+        .map_err(|e| e.to_string())
+}
+
 pub fn pull_account_file(
     server_url: &str,
     token: &str,
@@ -1081,4 +1197,34 @@ pub fn delete_account_file(server_url: &str, token: &str, file_id: &str) -> Resu
         .call()
         .map_err(describe)?;
     Ok(())
+}
+
+pub fn rename_account_file(
+    server_url: &str,
+    token: &str,
+    file_id: &str,
+    name: &str,
+) -> Result<CloudFile, String> {
+    agent()
+        .patch(&endpoint(server_url, &format!("/files/{}", file_id)))
+        .set("Authorization", &format!("Bearer {}", token))
+        .send_json(ureq::json!({ "name": name }))
+        .map_err(describe)?
+        .into_json::<CloudFile>()
+        .map_err(|e| e.to_string())
+}
+
+pub fn move_account_file(
+    server_url: &str,
+    token: &str,
+    file_id: &str,
+    folder_id: Option<&str>,
+) -> Result<CloudFile, String> {
+    agent()
+        .patch(&endpoint(server_url, &format!("/files/{}/move", file_id)))
+        .set("Authorization", &format!("Bearer {}", token))
+        .send_json(ureq::json!({ "folder_id": folder_id }))
+        .map_err(describe)?
+        .into_json::<CloudFile>()
+        .map_err(|e| e.to_string())
 }

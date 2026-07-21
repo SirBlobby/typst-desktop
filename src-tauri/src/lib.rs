@@ -89,7 +89,7 @@ fn update_settings(
     workspace_root: Option<String>,
     server_url: Option<String>,
     autosave_seconds: Option<u32>,
-    sync_minutes: Option<u32>,
+    sync_seconds: Option<u32>,
 ) -> Result<Settings, String> {
     let mut settings = load_settings(&app, &store)?;
     if let Some(root) = workspace_root {
@@ -104,8 +104,8 @@ fn update_settings(
     if let Some(seconds) = autosave_seconds {
         settings.autosave_seconds = seconds;
     }
-    if let Some(minutes) = sync_minutes {
-        settings.sync_minutes = minutes;
+    if let Some(seconds) = sync_seconds {
+        settings.sync_seconds = seconds;
     }
     save_settings(&store, &settings)?;
     Ok(settings)
@@ -746,6 +746,71 @@ fn cloud_list_folders(
 }
 
 #[tauri::command]
+fn cloud_create_folder(
+    app: AppHandle,
+    store: State<'_, Store>,
+    name: String,
+    parent_id: Option<String>,
+) -> Result<sync::CloudFolder, String> {
+    let (server_url, token) = cloud_credentials(&app, &store)?;
+    sync::create_folder(&server_url, &token, &name, parent_id.as_deref())
+}
+
+#[tauri::command]
+fn cloud_rename_folder(
+    app: AppHandle,
+    store: State<'_, Store>,
+    folder_id: String,
+    name: String,
+) -> Result<sync::CloudFolder, String> {
+    let (server_url, token) = cloud_credentials(&app, &store)?;
+    sync::rename_folder(&server_url, &token, &folder_id, &name)
+}
+
+#[tauri::command]
+fn cloud_move_folder(
+    app: AppHandle,
+    store: State<'_, Store>,
+    folder_id: String,
+    parent_id: Option<String>,
+) -> Result<sync::CloudFolder, String> {
+    let (server_url, token) = cloud_credentials(&app, &store)?;
+    sync::move_folder(&server_url, &token, &folder_id, parent_id.as_deref())
+}
+
+#[tauri::command]
+fn cloud_delete_folder(
+    app: AppHandle,
+    store: State<'_, Store>,
+    folder_id: String,
+) -> Result<(), String> {
+    let (server_url, token) = cloud_credentials(&app, &store)?;
+    sync::delete_folder(&server_url, &token, &folder_id)
+}
+
+#[tauri::command]
+fn cloud_move_project(
+    app: AppHandle,
+    store: State<'_, Store>,
+    cloud_project_id: String,
+    folder_id: Option<String>,
+) -> Result<ProjectSummary, String> {
+    let (server_url, token) = cloud_credentials(&app, &store)?;
+    sync::move_cloud_project(&server_url, &token, &cloud_project_id, folder_id.as_deref())
+}
+
+#[tauri::command]
+fn cloud_move_document(
+    app: AppHandle,
+    store: State<'_, Store>,
+    document_id: String,
+    folder_id: Option<String>,
+) -> Result<sync::CloudDocument, String> {
+    let (server_url, token) = cloud_credentials(&app, &store)?;
+    sync::move_document(&server_url, &token, &document_id, folder_id.as_deref())
+}
+
+#[tauri::command]
 fn cloud_list_documents(
     app: AppHandle,
     store: State<'_, Store>,
@@ -791,6 +856,73 @@ fn cloud_download_file(
 fn cloud_delete_file(app: AppHandle, store: State<'_, Store>, file_id: String) -> Result<(), String> {
     let (server_url, token) = cloud_credentials(&app, &store)?;
     sync::delete_account_file(&server_url, &token, &file_id)
+}
+
+fn guess_mime_type(name: &str) -> &'static str {
+    let extension = std::path::Path::new(name)
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+
+    match extension.as_str() {
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "gif" => "image/gif",
+        "svg" => "image/svg+xml",
+        "webp" => "image/webp",
+        "ttf" => "font/ttf",
+        "otf" => "font/otf",
+        "ttc" | "otc" => "font/collection",
+        "pdf" => "application/pdf",
+        _ => "application/octet-stream",
+    }
+}
+
+#[tauri::command]
+fn cloud_upload_file(
+    app: AppHandle,
+    store: State<'_, Store>,
+    path: String,
+    folder_id: Option<String>,
+) -> Result<sync::CloudFile, String> {
+    let (server_url, token) = cloud_credentials(&app, &store)?;
+    let name = std::path::Path::new(&path)
+        .file_name()
+        .map(|value| value.to_string_lossy().to_string())
+        .ok_or_else(|| format!("'{}' has no file name", path))?;
+    let data = std::fs::read(&path).map_err(|e| e.to_string())?;
+    let mime_type = guess_mime_type(&name);
+    sync::upload_account_file(
+        &server_url,
+        &token,
+        &name,
+        mime_type,
+        &data,
+        folder_id.as_deref(),
+    )
+}
+
+#[tauri::command]
+fn cloud_rename_file(
+    app: AppHandle,
+    store: State<'_, Store>,
+    file_id: String,
+    name: String,
+) -> Result<sync::CloudFile, String> {
+    let (server_url, token) = cloud_credentials(&app, &store)?;
+    sync::rename_account_file(&server_url, &token, &file_id, name.trim())
+}
+
+#[tauri::command]
+fn cloud_move_file(
+    app: AppHandle,
+    store: State<'_, Store>,
+    file_id: String,
+    folder_id: Option<String>,
+) -> Result<sync::CloudFile, String> {
+    let (server_url, token) = cloud_credentials(&app, &store)?;
+    sync::move_account_file(&server_url, &token, &file_id, folder_id.as_deref())
 }
 
 #[tauri::command]
@@ -905,7 +1037,7 @@ fn cloud_create_document(
     let full = workspace_path(&app, &store, &path)?;
     let content = std::fs::read_to_string(&full).map_err(|e| e.to_string())?;
 
-    let document = sync::create_document(&server_url, &token, title.trim(), &content)?;
+    let document = sync::create_document(&server_url, &token, title.trim(), &content, None)?;
 
     store.save_document_link(
         &path,
@@ -995,13 +1127,23 @@ fn cloud_document_link(
 }
 
 #[tauri::command]
-fn cloud_create_project(app: AppHandle, store: State<'_, Store>, name: String) -> Result<ProjectSummary, String> {
+fn cloud_create_project(
+    app: AppHandle,
+    store: State<'_, Store>,
+    name: String,
+    folder_id: Option<String>,
+) -> Result<ProjectSummary, String> {
     let (server_url, token) = cloud_credentials(&app, &store)?;
-    sync::create_cloud_project(&server_url, &token, name.trim())
+    sync::create_cloud_project(&server_url, &token, name.trim(), folder_id.as_deref())
 }
 
 #[tauri::command]
-fn cloud_new_document(app: AppHandle, store: State<'_, Store>, title: String) -> Result<sync::DocumentContent, String> {
+fn cloud_new_document(
+    app: AppHandle,
+    store: State<'_, Store>,
+    title: String,
+    folder_id: Option<String>,
+) -> Result<sync::DocumentContent, String> {
     let title = title.trim();
     if title.is_empty() {
         return Err("Document name cannot be empty".to_string());
@@ -1009,7 +1151,7 @@ fn cloud_new_document(app: AppHandle, store: State<'_, Store>, title: String) ->
 
     let (server_url, token) = cloud_credentials(&app, &store)?;
     let content = format!("= {}\n\nStart writing here.\n", title);
-    sync::create_document(&server_url, &token, title, &content)
+    sync::create_document(&server_url, &token, title, &content, folder_id.as_deref())
 }
 
 #[tauri::command]
@@ -1024,9 +1166,10 @@ fn cloud_clone_project(
     store: State<'_, Store>,
     cloud_project_id: String,
     project_name: String,
+    parent: String,
 ) -> Result<SyncReport, String> {
     let (server_url, token) = cloud_credentials(&app, &store)?;
-    let project = project_name.trim().to_string();
+    let project = join_path(&parent, project_name.trim());
     let dir = workspace_path(&app, &store, &project)?;
     if dir.exists() {
         return Err(format!("A project named '{}' already exists", project_name));
@@ -1054,7 +1197,7 @@ fn cloud_link_project(
 
     let cloud_project_id = match cloud_project_id {
         Some(id) if !id.trim().is_empty() => id,
-        _ => sync::create_cloud_project(&server_url, &token, &project)?.id,
+        _ => sync::create_cloud_project(&server_url, &token, &project, None)?.id,
     };
 
     meta.cloud_project_id = Some(cloud_project_id);
@@ -1196,11 +1339,20 @@ pub fn run() {
             cloud_account,
             cloud_list_projects,
             cloud_list_folders,
+            cloud_create_folder,
+            cloud_rename_folder,
+            cloud_move_folder,
+            cloud_delete_folder,
+            cloud_move_project,
+            cloud_move_document,
             cloud_list_documents,
             cloud_list_shared,
             cloud_list_files,
             cloud_download_file,
             cloud_delete_file,
+            cloud_upload_file,
+            cloud_rename_file,
+            cloud_move_file,
             cloud_download_document,
             cloud_delete_document,
             cloud_sync_document,

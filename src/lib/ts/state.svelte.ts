@@ -22,6 +22,15 @@ export type LspStatus = "off" | "starting" | "on" | "unavailable";
 export type ThemePreference = "light" | "dark" | "system";
 export type TextScale = "small" | "default" | "large" | "xlarge";
 export type ContrastLevel = "normal" | "high";
+export type ColorTheme = "default" | "slate" | "sunset" | "forest" | "grape";
+
+export const colorThemes: { id: ColorTheme; label: string; accent: string }[] = [
+  { id: "default", label: "Default", accent: "#3b6cf6" },
+  { id: "slate", label: "Slate", accent: "#0f9b8e" },
+  { id: "sunset", label: "Sunset", accent: "#e8623f" },
+  { id: "forest", label: "Forest", accent: "#2f9457" },
+  { id: "grape", label: "Grape", accent: "#8b47d6" },
+];
 
 interface AppState {
   view: View;
@@ -58,6 +67,7 @@ interface AppState {
   error: string;
   theme: "light" | "dark";
   themePreference: ThemePreference;
+  colorTheme: ColorTheme;
   accent: string | null;
   textScale: TextScale;
   reduceMotion: boolean;
@@ -99,6 +109,7 @@ export const app = $state<AppState>({
   error: "",
   theme: "light",
   themePreference: "light",
+  colorTheme: "default",
   accent: null,
   textScale: "default",
   reduceMotion: false,
@@ -146,6 +157,7 @@ export function clearMessages() {
 }
 
 const THEME_KEY = "typst-desktop-theme";
+const COLOR_THEME_KEY = "typst-desktop-color-theme";
 const ACCENT_KEY = "typst-desktop-accent";
 const TEXT_SCALE_KEY = "typst-desktop-text-scale";
 const REDUCE_MOTION_KEY = "typst-desktop-reduce-motion";
@@ -180,6 +192,13 @@ export function applyTheme(preference: ThemePreference) {
   localStorage.setItem(THEME_KEY, preference);
 
   if (app.accent) applyAccent(app.accent);
+}
+
+export function applyColorTheme(theme: ColorTheme) {
+  app.colorTheme = theme;
+  document.documentElement.dataset.colorTheme = theme;
+  localStorage.setItem(COLOR_THEME_KEY, theme);
+  applyAccent(null);
 }
 
 function hexToRgb(hex: string): [number, number, number] {
@@ -296,6 +315,13 @@ export async function bootstrap() {
       : "light",
   );
 
+  const storedColorTheme = localStorage.getItem(COLOR_THEME_KEY);
+  const validColorTheme = colorThemes.some((entry) => entry.id === storedColorTheme);
+  document.documentElement.dataset.colorTheme = validColorTheme
+    ? (storedColorTheme as ColorTheme)
+    : "default";
+  app.colorTheme = validColorTheme ? (storedColorTheme as ColorTheme) : "default";
+
   const storedAccent = localStorage.getItem(ACCENT_KEY);
   if (storedAccent) applyAccent(storedAccent);
 
@@ -382,7 +408,11 @@ export async function refreshCloud() {
         (folder) => (folder.parent_id ?? null) === app.cloudFolder,
       );
       app.cloudDocuments = documents;
-      app.cloudProjects = projects;
+      app.cloudProjects = projects.filter(
+        (project) =>
+          project.role !== "owner" ||
+          (project.folder_id ?? null) === app.cloudFolder,
+      );
       app.cloudFiles = files;
     }
   } catch (error) {
@@ -414,7 +444,7 @@ export async function openCloudFolder(id: string | null | "shared") {
 
 export async function downloadDocument(documentId: string, title: string) {
   try {
-    const path = await api.cloudDownloadDocument(documentId, "");
+    const path = await api.cloudDownloadDocument(documentId, app.currentDir);
     await refreshCloud();
     setStatus(`Downloaded '${title}' to this device`);
     return path;
@@ -634,12 +664,12 @@ export function restartAutoSync() {
     syncTimer = null;
   }
 
-  const minutes = app.settings?.sync_minutes ?? 0;
-  if (minutes <= 0) return;
+  const seconds = app.settings?.sync_seconds ?? 0;
+  if (seconds <= 0) return;
 
   syncTimer = setInterval(() => {
     autoSync();
-  }, minutes * 60 * 1000);
+  }, seconds * 1000);
 }
 
 async function autoSync() {

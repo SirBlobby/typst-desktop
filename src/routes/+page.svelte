@@ -25,7 +25,7 @@
   import { insertText } from "$lib/ts/editor-actions";
 
   import * as api from "$lib/ts/api";
-  import type { BrowseEntry } from "$lib/ts/api";
+  import type { BrowseEntry, CloudFile, CloudFolder } from "$lib/ts/api";
   import { pickFiles } from "$lib/ts/import";
   import {
     app,
@@ -39,7 +39,6 @@
     openTarget,
     refreshAccount,
     refreshCloud,
-    refreshCloudProjects,
     refreshEntries,
     refreshTarget,
     removeDownloadedDocument,
@@ -64,9 +63,13 @@
     | { kind: "save-document-to-cloud"; entry: BrowseEntry }
     | { kind: "new-cloud-project" }
     | { kind: "new-cloud-document" }
+    | { kind: "new-cloud-folder" }
+    | { kind: "rename-cloud-folder"; folder: CloudFolder }
+    | { kind: "delete-cloud-folder"; folder: CloudFolder }
     | { kind: "delete-cloud-project"; id: string }
     | { kind: "delete-cloud-document"; id: string }
     | { kind: "delete-cloud-file"; id: string }
+    | { kind: "rename-cloud-file"; file: CloudFile }
     | { kind: "clone-cloud-project"; id: string; name: string }
     | { kind: "new-file"; parent: string }
     | { kind: "new-subfolder"; parent: string }
@@ -154,11 +157,14 @@
       setStatus(`Deleted '${entry.name}'`);
     });
 
+  const currentCloudFolder = () =>
+    app.cloudFolder === "shared" ? null : app.cloudFolder;
+
   const linkEntry = (entry: BrowseEntry) =>
     guard(async () => {
       const report = await api.cloudLinkProject(entry.path);
       await refreshEntries();
-      await refreshCloudProjects();
+      await refreshCloud();
       setStatus(`Uploaded ${report.pushed.length} files to a new cloud project`);
     });
 
@@ -171,20 +177,38 @@
 
   const createCloudProject = (name: string) =>
     guard(async () => {
-      await api.cloudCreateProject(name);
-      await refreshCloudProjects();
+      await api.cloudCreateProject(name, currentCloudFolder());
+      await refreshCloud();
     });
 
   const createCloudDocument = (title: string) =>
     guard(async () => {
-      await api.cloudNewDocument(title);
+      await api.cloudNewDocument(title, currentCloudFolder());
+      await refreshCloud();
+    });
+
+  const createCloudFolder = (name: string) =>
+    guard(async () => {
+      await api.cloudCreateFolder(name, currentCloudFolder());
+      await refreshCloud();
+    });
+
+  const renameCloudFolder = (folder: CloudFolder, name: string) =>
+    guard(async () => {
+      await api.cloudRenameFolder(folder.id, name);
+      await refreshCloud();
+    });
+
+  const deleteCloudFolder = (folder: CloudFolder) =>
+    guard(async () => {
+      await api.cloudDeleteFolder(folder.id);
       await refreshCloud();
     });
 
   const deleteCloudProject = (id: string) =>
     guard(async () => {
       await api.cloudDeleteProject(id);
-      await refreshCloudProjects();
+      await refreshCloud();
     });
 
   const deleteCloudDocument = (id: string) =>
@@ -199,11 +223,31 @@
       await refreshCloud();
     });
 
+  const uploadCloudFiles = () =>
+    guard(async () => {
+      const sources = await pickFiles("assets");
+      if (sources.length === 0) return;
+
+      const folderId = currentCloudFolder();
+      for (const source of sources) {
+        await api.cloudUploadFile(source, folderId);
+      }
+      await refreshCloud();
+      setStatus(`Uploaded ${sources.length} file(s) to TypstDrive`);
+    });
+
+  const renameCloudFile = (file: CloudFile, name: string) =>
+    guard(async () => {
+      await api.cloudRenameFile(file.id, name);
+      await refreshCloud();
+    });
+
   const cloneCloudProject = (id: string, name: string) =>
     guard(async () => {
-      await api.cloudCloneProject(id, name);
+      const parent = app.currentDir;
+      await api.cloudCloneProject(id, name, parent);
       app.scope = "local";
-      await browseTo("");
+      await browseTo(parent);
       setStatus(`Downloaded '${name}' to this device`);
     });
 
@@ -477,13 +521,34 @@
         <span class="h-1.5 w-1.5 rounded-full bg-[var(--color-accent)]"></span>
       {/if}
     {:else}
-      <Icon icon="ph:file-code" class="text-lg text-[var(--color-accent)]" />
+      <span
+        class="flex h-6 w-6 items-center justify-center rounded-md bg-[var(--color-accent)]"
+      >
+        <img src="/favicon.png" alt="Typst Desktop" class="h-6 w-6" />
+      </span>
       <span data-tauri-drag-region class="text-sm font-semibold">
         Typst Desktop
       </span>
     {/if}
 
     <div data-tauri-drag-region class="h-full flex-1"></div>
+
+    {#if app.view !== "editor"}
+      <div class="flex rounded-lg bg-[var(--color-surface-sunken)] p-0.5 text-xs font-medium">
+        {#each [["local", "Local", "ph:hard-drives"], ["cloud", "Cloud", "ph:cloud"]] as [value, label, icon]}
+          <button
+            class="flex items-center gap-1.5 rounded-md px-3 py-1.5 transition
+              {app.scope === value
+              ? 'bg-[var(--color-surface)] text-[var(--color-ink)] shadow-sm'
+              : 'text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]'}"
+            onclick={() => (app.scope = value as "local" | "cloud")}
+          >
+            <Icon {icon} />
+            {label}
+          </button>
+        {/each}
+      </div>
+    {/if}
 
     {#if app.view === "editor"}
       <span
@@ -641,8 +706,15 @@
           onremovedownload={removeDownloadedDocument}
           ondownloadfile={downloadCloudFile}
           ondeletefile={(id) => (dialog = { kind: "delete-cloud-file", id })}
+          onuploadfile={uploadCloudFiles}
+          onrenamefile={(file) => (dialog = { kind: "rename-cloud-file", file })}
           onnewcloudproject={() => (dialog = { kind: "new-cloud-project" })}
           onnewclouddocument={() => (dialog = { kind: "new-cloud-document" })}
+          onnewcloudfolder={() => (dialog = { kind: "new-cloud-folder" })}
+          onrenamecloudfolder={(folder) =>
+            (dialog = { kind: "rename-cloud-folder", folder })}
+          ondeletecloudfolder={(folder) =>
+            (dialog = { kind: "delete-cloud-folder", folder })}
           oncloneproject={(id, name) =>
             (dialog = { kind: "clone-cloud-project", id, name })}
           ondeleteproject={(id) => (dialog = { kind: "delete-cloud-project", id })}
@@ -866,6 +938,32 @@
     onsubmit={createCloudDocument}
     onclose={close}
   />
+{:else if dialog.kind === "new-cloud-folder"}
+  <PromptModal
+    title="New cloud folder"
+    label="Folder name"
+    icon="ph:folder-plus"
+    onsubmit={createCloudFolder}
+    onclose={close}
+  />
+{:else if dialog.kind === "rename-cloud-folder"}
+  {@const target = dialog}
+  <PromptModal
+    title="Rename folder"
+    label="New name"
+    value={target.folder.name}
+    confirmLabel="Rename"
+    onsubmit={(name) => renameCloudFolder(target.folder, name)}
+    onclose={close}
+  />
+{:else if dialog.kind === "delete-cloud-folder"}
+  {@const target = dialog}
+  <ConfirmModal
+    title="Delete cloud folder"
+    message="'{target.folder.name}' will be permanently removed from TypstDrive. It must be empty first."
+    onconfirm={() => deleteCloudFolder(target.folder)}
+    onclose={close}
+  />
 {:else if dialog.kind === "delete-cloud-project"}
   {@const target = dialog}
   <ConfirmModal
@@ -888,6 +986,16 @@
     title="Delete cloud file"
     message="This permanently deletes the file from TypstDrive."
     onconfirm={() => deleteCloudFile(target.id)}
+    onclose={close}
+  />
+{:else if dialog.kind === "rename-cloud-file"}
+  {@const target = dialog}
+  <PromptModal
+    title="Rename file"
+    label="New name"
+    value={target.file.name}
+    confirmLabel="Rename"
+    onsubmit={(name) => renameCloudFile(target.file, name)}
     onclose={close}
   />
 {:else if dialog.kind === "clone-cloud-project"}

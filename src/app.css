@@ -31,6 +31,94 @@
   --color-success: #4cc47f;
 }
 
+:root[data-color-theme="slate"] {
+  --color-surface: #ffffff;
+  --color-surface-muted: #f2f5f7;
+  --color-surface-sunken: #e6ebef;
+  --color-line: #d7dee4;
+  --color-ink: #12181f;
+  --color-ink-muted: #5a6672;
+  --color-accent: #0f9b8e;
+  --color-accent-soft: #e1f5f2;
+}
+
+:root[data-color-theme="slate"][data-theme="dark"] {
+  --color-surface: #12181e;
+  --color-surface-muted: #182027;
+  --color-surface-sunken: #1f2830;
+  --color-line: #2b3640;
+  --color-ink: #eef2f5;
+  --color-ink-muted: #8b98a5;
+  --color-accent: #3fc2b3;
+  --color-accent-soft: #163330;
+}
+
+:root[data-color-theme="sunset"] {
+  --color-surface: #fffdf9;
+  --color-surface-muted: #faf3e9;
+  --color-surface-sunken: #f3e6d3;
+  --color-line: #e7d5b8;
+  --color-ink: #241a10;
+  --color-ink-muted: #7a6650;
+  --color-accent: #e8623f;
+  --color-accent-soft: #fbe4dc;
+}
+
+:root[data-color-theme="sunset"][data-theme="dark"] {
+  --color-surface: #1f1712;
+  --color-surface-muted: #261c15;
+  --color-surface-sunken: #2f241a;
+  --color-line: #3d2f22;
+  --color-ink: #f7ede1;
+  --color-ink-muted: #b9a48c;
+  --color-accent: #f4805c;
+  --color-accent-soft: #3a2419;
+}
+
+:root[data-color-theme="forest"] {
+  --color-surface: #fbfdfb;
+  --color-surface-muted: #eef5ee;
+  --color-surface-sunken: #dfebe0;
+  --color-line: #c9dccb;
+  --color-ink: #12201a;
+  --color-ink-muted: #57685c;
+  --color-accent: #2f9457;
+  --color-accent-soft: #dcf0e2;
+}
+
+:root[data-color-theme="forest"][data-theme="dark"] {
+  --color-surface: #121a15;
+  --color-surface-muted: #17211b;
+  --color-surface-sunken: #1e2c22;
+  --color-line: #2b3c30;
+  --color-ink: #e9f3ec;
+  --color-ink-muted: #8fa896;
+  --color-accent: #4fbf7c;
+  --color-accent-soft: #1a3324;
+}
+
+:root[data-color-theme="grape"] {
+  --color-surface: #fdfbff;
+  --color-surface-muted: #f4eefb;
+  --color-surface-sunken: #e8daf5;
+  --color-line: #d7c3ec;
+  --color-ink: #1c1526;
+  --color-ink-muted: #6a5d7c;
+  --color-accent: #8b47d6;
+  --color-accent-soft: #f0e2fb;
+}
+
+:root[data-color-theme="grape"][data-theme="dark"] {
+  --color-surface: #17121e;
+  --color-surface-muted: #1d1725;
+  --color-surface-sunken: #251d30;
+  --color-line: #362a42;
+  --color-ink: #f1eaf7;
+  --color-ink-muted: #a998b8;
+  --color-accent: #b47af0;
+  --color-accent-soft: #2e2140;
+}
+
 :root[data-contrast="high"] {
   --color-line: #9aa0ab;
   --color-ink-muted: #33363c;
