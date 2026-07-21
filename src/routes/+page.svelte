@@ -3,6 +3,7 @@
   import { onMount } from "svelte";
   import { save } from "@tauri-apps/plugin-dialog";
   import { writeImage, writeText } from "@tauri-apps/plugin-clipboard-manager";
+  import { Image } from "@tauri-apps/api/image";
   import { revealItemInDir } from "@tauri-apps/plugin-opener";
   import { getCurrentWebview } from "@tauri-apps/api/webview";
   import { listen } from "@tauri-apps/api/event";
@@ -23,7 +24,7 @@
   import PageSettingsModal from "$lib/components/PageSettingsModal.svelte";
 
   import type { EditorView } from "@codemirror/view";
-  import { insertText } from "$lib/ts/editor-actions";
+  import { insertText, redoEdit, undoEdit } from "$lib/ts/editor-actions";
 
   import * as api from "$lib/ts/api";
   import type { BrowseEntry, CloudFile, CloudFolder } from "$lib/ts/api";
@@ -43,6 +44,8 @@
     refreshEntries,
     refreshTarget,
     removeDownloadedDocument,
+    resolveCollabConflict,
+    cancelCollabConflict,
     runSync,
     saveAndCompile,
     scheduleAutosave,
@@ -89,6 +92,16 @@
   let selectedEntry = $state<string | null>(null);
   let selectedIsDir = $state(false);
   let treeDropTarget = $state<string | null>(null);
+
+  const SIDEBAR_COLLAPSED_KEY = "editor-sidebar-collapsed";
+  let sidebarCollapsed = $state(
+    localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true",
+  );
+
+  function toggleSidebar() {
+    sidebarCollapsed = !sidebarCollapsed;
+    localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(sidebarCollapsed));
+  }
 
   const selectedFolder = $derived(
     !selectedEntry
@@ -371,13 +384,28 @@
     }
   }
 
+  async function pngBytesToRgba(bytes: Uint8Array) {
+    const blob = new Blob([bytes], { type: "image/png" });
+    const bitmap = await createImageBitmap(blob);
+    const canvas = document.createElement("canvas");
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Could not create canvas context");
+    context.drawImage(bitmap, 0, 0);
+    const { data } = context.getImageData(0, 0, canvas.width, canvas.height);
+    return { rgba: new Uint8Array(data.buffer), width: canvas.width, height: canvas.height };
+  }
+
   async function copyAs(format: string) {
     if (!app.target) return;
 
     try {
       if (format === "png") {
         const bytes = await api.renderTargetPng(app.target.path);
-        await writeImage(new Uint8Array(bytes));
+        const { rgba, width, height } = await pngBytesToRgba(new Uint8Array(bytes));
+        const image = await Image.new(rgba, width, height);
+        await writeImage(image);
       } else if (format === "svg") {
         const svg = app.compiled?.pages[0];
         if (!svg) {
@@ -506,21 +534,40 @@
     };
   });
 
-  const lspLabel: Record<string, string> = {
-    off: "LSP off",
-    starting: "LSP starting",
-    on: "LSP ready",
-    unavailable: "LSP unavailable",
-  };
 
   const wsLabel: Record<string, string> = {
     connected: "Live sync",
     connecting: "Connecting…",
     offline: "Offline (polling)",
   };
+
+  const collabLabel: Record<string, string> = {
+    connected: "Live",
+    connecting: "Connecting…",
+    offline: "Offline — editing locally",
+  };
 </script>
 
 <svelte:window on:keydown={handleKeydown} />
+
+{#snippet statusBadge(
+  icon: string,
+  label: string,
+  tone: "success" | "accent" | "muted",
+  spin = false,
+)}
+  <span
+    class="flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium
+      {tone === 'success'
+      ? 'bg-[var(--color-success)]/10 text-[var(--color-success)]'
+      : tone === 'accent'
+        ? 'bg-[var(--color-accent)]/10 text-[var(--color-accent)]'
+        : 'bg-[var(--color-surface-sunken)] text-[var(--color-ink-muted)]'}"
+  >
+    <Icon {icon} class="text-xs {spin ? 'animate-spin' : ''}" />
+    {label}
+  </span>
+{/snippet}
 
 <div class="flex h-screen flex-col">
   <header
@@ -535,15 +582,31 @@
         <Icon icon="ph:arrow-left" />
         Files
       </button>
+
+      {#if editorView}
+        <button
+          class="rounded-md p-1.5 text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-ink)]"
+          title="Undo"
+          aria-label="Undo"
+          onclick={() => undoEdit(editorView)}
+        >
+          <Icon icon="ph:arrow-counter-clockwise" class="text-sm" />
+        </button>
+        <button
+          class="rounded-md p-1.5 text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-ink)]"
+          title="Redo"
+          aria-label="Redo"
+          onclick={() => redoEdit(editorView)}
+        >
+          <Icon icon="ph:arrow-clockwise" class="text-sm" />
+        </button>
+      {/if}
+
       <span data-tauri-drag-region class="text-sm font-medium">
         {app.target?.path.split("/").pop()}
       </span>
       {#if app.target?.standalone}
-        <span
-          class="rounded bg-[var(--color-surface-sunken)] px-1.5 py-0.5 text-[10px] text-[var(--color-ink-muted)]"
-        >
-          single file
-        </span>
+        {@render statusBadge("ph:file", "Single file", "muted")}
       {/if}
       {#if app.dirty}
         <span class="h-1.5 w-1.5 rounded-full bg-[var(--color-accent)]"></span>
@@ -579,45 +642,53 @@
     {/if}
 
     {#if app.view === "editor"}
-      <span
-        class="flex items-center gap-1 text-[10px] text-[var(--color-ink-muted)]"
-        title="Typst language server (tinymist)"
-      >
-        <span
-          class="h-1.5 w-1.5 rounded-full
-            {app.lspStatus === 'on'
-            ? 'bg-[var(--color-success)]'
-            : app.lspStatus === 'starting'
-              ? 'bg-[var(--color-accent)]'
-              : 'bg-[var(--color-ink-muted)]'}"
-        ></span>
-        {lspLabel[app.lspStatus]}
-      </span>
-
-      {#if app.account}
-        <span
-          class="flex items-center gap-1 text-[10px] text-[var(--color-ink-muted)]"
-          title="Cloud sync connection"
-        >
-          <span
-            class="h-1.5 w-1.5 rounded-full
-              {app.wsStatus === 'connected'
-              ? 'bg-[var(--color-success)]'
-              : app.wsStatus === 'connecting'
-                ? 'bg-[var(--color-accent)]'
-                : 'bg-[var(--color-ink-muted)]'}"
-          ></span>
-          {wsLabel[app.wsStatus] ?? "Offline (polling)"}
+      {#if app.account && (app.target?.cloud_project_id || app.documentLink) && !app.collabIntent}
+        <span title="Cloud sync connection">
+          {@render statusBadge(
+            app.wsStatus === "connected"
+              ? "ph:cloud-check"
+              : app.wsStatus === "connecting"
+                ? "ph:circle-notch"
+                : "ph:cloud-slash",
+            wsLabel[app.wsStatus] ?? "Offline (polling)",
+            app.wsStatus === "connected"
+              ? "success"
+              : app.wsStatus === "connecting"
+                ? "accent"
+                : "muted",
+            app.wsStatus === "connecting",
+          )}
         </span>
       {/if}
 
-      <button
-        class="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-ink)]"
-        onclick={saveAndCompile}
-      >
-        <Icon icon="ph:floppy-disk" />
-        Save
-      </button>
+      {#if app.collabIntent}
+        <span title="Realtime cloud sync">
+          {@render statusBadge(
+            app.collabStatus === "connected"
+              ? "ph:broadcast"
+              : app.collabStatus === "connecting"
+                ? "ph:circle-notch"
+                : "ph:wifi-slash",
+            collabLabel[app.collabStatus ?? "offline"],
+            app.collabStatus === "connected"
+              ? "success"
+              : app.collabStatus === "connecting"
+                ? "accent"
+                : "muted",
+            app.collabStatus === "connecting",
+          )}
+        </span>
+      {/if}
+
+      {#if !app.collabIntent}
+        <button
+          class="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-ink)]"
+          onclick={saveAndCompile}
+        >
+          <Icon icon="ph:floppy-disk" />
+          Save
+        </button>
+      {/if}
 
       <div class="group relative">
         <button
@@ -661,7 +732,7 @@
         </div>
       </div>
 
-      {#if app.target?.cloud_project_id || app.documentLink}
+      {#if (app.target?.cloud_project_id || app.documentLink) && !app.collabIntent}
         <button
           class="flex items-center gap-1.5 rounded-md bg-[var(--color-accent)] px-2.5 py-1.5 text-xs font-medium text-white transition hover:opacity-90 disabled:opacity-50"
           disabled={app.syncing}
@@ -789,7 +860,20 @@
         />
       </div>
     {:else}
-      {#if !app.target?.standalone}
+      {#if !app.target?.standalone && sidebarCollapsed}
+        <div
+          class="flex w-8 shrink-0 flex-col items-center border-r border-[var(--color-line)] bg-[var(--color-surface)] py-1.5"
+        >
+          <button
+            class="rounded p-1 text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
+            title="Show files"
+            aria-label="Show files"
+            onclick={toggleSidebar}
+          >
+            <Icon icon="ph:sidebar-simple" class="text-base" />
+          </button>
+        </div>
+      {:else if !app.target?.standalone}
         <div
           class="flex w-56 shrink-0 flex-col border-r border-[var(--color-line)] bg-[var(--color-surface)]"
         >
@@ -801,6 +885,14 @@
             >
               {selectedFolder ? selectedFolder : "Files"}
             </span>
+            <button
+              class="shrink-0 rounded p-1 text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
+              title="Hide files"
+              aria-label="Hide files"
+              onclick={toggleSidebar}
+            >
+              <Icon icon="ph:sidebar-simple" class="text-sm" />
+            </button>
           </div>
 
           <FileTree
@@ -855,6 +947,9 @@
                   filePath={app.activePath}
                   targetPath={app.target?.path ?? ""}
                   diagnostics={app.diagnostics}
+                  collab={app.collab
+                    ? { text: app.collab.text, awareness: app.collab.provider.awareness }
+                    : null}
                   onchange={(value) => {
                     app.editorContent = value;
                     app.dirty = true;
@@ -1146,5 +1241,13 @@
     conflicts={app.conflicts}
     onresolve={app.documentLink ? resolveDocumentConflicts : resolveConflicts}
     onclose={close}
+  />
+{/if}
+
+{#if app.collabConflict}
+  <ConflictModal
+    conflicts={[app.collabConflict]}
+    onresolve={(resolutions) => resolveCollabConflict(resolutions[0]?.content ?? "")}
+    onclose={cancelCollabConflict}
   />
 {/if}

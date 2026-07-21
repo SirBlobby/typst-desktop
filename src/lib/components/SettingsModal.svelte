@@ -34,6 +34,7 @@
     | "appearance"
     | "accessibility"
     | "account"
+    | "lsp"
     | "about";
 
   const sections: { id: Section; label: string; icon: string }[] = [
@@ -41,8 +42,16 @@
     { id: "appearance", label: "Appearance", icon: "ph:palette" },
     { id: "accessibility", label: "Accessibility", icon: "ph:wheelchair" },
     { id: "account", label: "Account", icon: "ph:user-circle" },
+    { id: "lsp", label: "Language Server", icon: "ph:plugs-connected" },
     { id: "about", label: "About", icon: "ph:info" },
   ];
+
+  const lspLabel: Record<string, string> = {
+    off: "Off",
+    starting: "Starting…",
+    on: "Running",
+    unavailable: "Unavailable",
+  };
 
   const accentPresets = [
     "#3b6cf6",
@@ -227,7 +236,9 @@
               {/each}
             </select>
             <span class="text-[var(--color-ink-muted)]">
-              Saves the file being edited after you stop typing.
+              Saves the file being edited after you stop typing. Cloud-linked
+              files always save to disk every few seconds regardless of this
+              setting, since they sync live and have no manual Save button.
             </span>
           </div>
         </div>
@@ -460,6 +471,42 @@
             </span>
           </div>
         </div>
+      {:else if section === "lsp"}
+        <div class="flex flex-col gap-5">
+          <div class="flex items-center gap-3 rounded-md border border-[var(--color-line)] bg-[var(--color-surface-muted)] p-3">
+            <span
+              class="h-2.5 w-2.5 rounded-full
+                {app.lspStatus === 'on'
+                ? 'bg-[var(--color-success)]'
+                : app.lspStatus === 'starting'
+                  ? 'bg-[var(--color-accent)]'
+                  : 'bg-[var(--color-ink-muted)]'}"
+            ></span>
+            <div class="text-xs">
+              <p class="font-medium">{lspLabel[app.lspStatus]}</p>
+              <p class="text-[var(--color-ink-muted)]">
+                Reflects the file currently open in the editor.
+              </p>
+            </div>
+          </div>
+
+          <p class="text-xs text-[var(--color-ink-muted)]">
+            Typst Desktop uses <span class="font-medium">tinymist</span>, the
+            official Typst language server, to provide autocomplete, diagnostics,
+            and hover info while editing. It must be installed and available on
+            your system PATH — Typst Desktop does not bundle or install it for
+            you.
+          </p>
+
+          {#if app.lspStatus === "unavailable"}
+            <div
+              class="rounded-md border border-[var(--color-danger)]/30 bg-[var(--color-danger)]/10 p-3 text-xs text-[var(--color-danger)]"
+            >
+              tinymist could not be started. Confirm it's installed and on your
+              PATH, then reopen the file.
+            </div>
+          {/if}
+        </div>
       {:else}
         <div class="flex flex-col gap-4">
           <div class="flex items-center gap-3">
@@ -521,7 +568,8 @@
     {@const draftless =
       section === "about" ||
       section === "appearance" ||
-      section === "accessibility"}
+      section === "accessibility" ||
+      section === "lsp"}
     <button
       class="rounded-md px-3 py-1.5 text-xs text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)]"
       onclick={onclose}

@@ -5,9 +5,7 @@
   import {
     insertText,
     prefixLines,
-    redoEdit,
     setTypstConfig,
-    undoEdit,
     wrapSelection,
   } from "$lib/ts/editor-actions";
   import { app } from "$lib/ts/state.svelte";
@@ -37,10 +35,10 @@
   icon: string,
   label: string,
   run: () => void,
-  size = "text-base",
+  size = "text-sm",
 )}
   <button
-    class="rounded p-1.5 text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] disabled:opacity-40 disabled:hover:bg-transparent"
+    class="rounded p-1 text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] disabled:opacity-40 disabled:hover:bg-transparent"
     title={label}
     aria-label={label}
     {disabled}
@@ -51,17 +49,12 @@
 {/snippet}
 
 {#snippet divider()}
-  <div class="mx-1 h-4 w-px shrink-0 bg-[var(--color-line)]"></div>
+  <div class="mx-0.5 h-3.5 w-px shrink-0 bg-[var(--color-line)]"></div>
 {/snippet}
 
 <div
-  class="scroll-thin flex shrink-0 items-center gap-0.5 overflow-x-auto border-b border-[var(--color-line)] bg-[var(--color-surface)] px-2 py-1"
+  class="scroll-thin flex shrink-0 items-center gap-px overflow-x-auto border-b border-[var(--color-line)] bg-[var(--color-surface)] px-1.5 py-0.5"
 >
-  {@render action("ph:arrow-counter-clockwise", "Undo", () => undoEdit(view))}
-  {@render action("ph:arrow-clockwise", "Redo", () => redoEdit(view))}
-
-  {@render divider()}
-
   {@render action("ph:text-h", "Heading", () => prefixLines(view, "= ", "Heading"))}
   {@render action("ph:text-b", "Bold", () => wrapSelection(view, "*", "*", "bold"))}
   {@render action("ph:text-italic", "Italic", () =>
@@ -103,7 +96,7 @@
   {@render divider()}
 
   <select
-    class="max-w-36 rounded border border-[var(--color-line)] bg-[var(--color-surface)] px-1.5 py-1 text-xs text-[var(--color-ink)] focus:border-[var(--color-accent)] focus:outline-none disabled:opacity-40"
+    class="max-w-24 rounded border border-[var(--color-line)] bg-[var(--color-surface)] px-1 py-0.5 text-xs text-[var(--color-ink)] focus:border-[var(--color-accent)] focus:outline-none disabled:opacity-40"
     aria-label="Document font"
     {disabled}
     bind:value={selectedFont}
@@ -118,14 +111,7 @@
     {/each}
   </select>
 
-  <button
-    class="flex items-center gap-1.5 rounded px-2 py-1 text-xs text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] disabled:opacity-40"
-    {disabled}
-    onclick={onpagesettings}
-  >
-    <Icon icon="ph:file-text" />
-    Page
-  </button>
+  {@render action("ph:file-text", "Page settings", onpagesettings)}
 
   <div class="flex-1"></div>
 </div>
