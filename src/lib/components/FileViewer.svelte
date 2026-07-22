@@ -405,6 +405,7 @@
   ]}
   <div
     class="group flex flex-col overflow-hidden rounded-lg border border-[var(--color-line)] bg-[var(--color-surface)] transition hover:border-[var(--color-accent)] hover:shadow-sm"
+    role="group"
     oncontextmenu={(event) => openCloudContextMenu(event, id)}
     draggable="true"
     ondragstart={(event) => startCloudDrag(event, { kind: dragKind, id: dragId })}
@@ -618,6 +619,7 @@
 
 <div
   class="flex h-full flex-col bg-[var(--color-surface-muted)]"
+  role="presentation"
   oncontextmenu={(event) => event.preventDefault()}
 >
   <div
@@ -759,6 +761,7 @@
                       {dropTarget === entry.path
                       ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)]'
                       : 'border-[var(--color-line)] bg-[var(--color-surface-sunken)]'}"
+                    role="group"
                     draggable="true"
                     ondragstart={(event) => startDrag(event, entry.path)}
                     ondragend={endDrag}
@@ -819,6 +822,7 @@
                 {#each documents as entry (entry.path)}
                   <div
                     class="group relative flex flex-col overflow-hidden rounded-lg border border-[var(--color-line)] bg-[var(--color-surface)] transition hover:border-[var(--color-accent)] hover:shadow-md"
+                    role="group"
                     draggable="true"
                     ondragstart={(event) => startDrag(event, entry.path)}
                     ondragend={endDrag}
@@ -1078,6 +1082,7 @@
             {#each app.cloudFiles as file (file.id)}
               <div
                 class="flex items-center gap-2.5 rounded-lg border border-[var(--color-line)] bg-[var(--color-surface)] p-3 transition hover:border-[var(--color-accent)]"
+                role="group"
                 oncontextmenu={(event) =>
                   openCloudContextMenu(event, `file:${file.id}`)}
                 draggable="true"
