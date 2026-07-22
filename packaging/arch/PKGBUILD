@@ -1,6 +1,6 @@
 # Maintainer: SirBlobby
 pkgname=typst-desktop
-pkgver=1.0.0
+pkgver=1.1.0
 pkgrel=1
 pkgdesc="A desktop editor for Typst documents with a built-in compiler, live preview, and optional TypstDrive sync"
 arch=('x86_64')
