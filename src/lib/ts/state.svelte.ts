@@ -688,7 +688,7 @@ async function tryOpenCollab(file: string, diskContent: string) {
   );
 
   const synced = await new Promise<boolean>((resolve) => {
-    session.provider.once("synced", (isSynced: boolean) => resolve(isSynced));
+    session.provider.once("sync", (isSynced: boolean) => resolve(isSynced));
   }).catch(() => false);
 
   if (app.activePath !== file) {
