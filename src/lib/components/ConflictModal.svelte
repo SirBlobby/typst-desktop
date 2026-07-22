@@ -110,7 +110,7 @@
             : 'border-[var(--color-line)] text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-muted)]'}"
           onclick={() => (index = position)}
         >
-          {#if choices[position].includes("<<<<<<<")}
+          {#if choices[position]?.includes("<<<<<<<")}
             <Icon icon="ph:warning" class="text-[var(--color-danger)]" />
           {:else}
             <Icon icon="ph:check-circle" class="text-[var(--color-success)]" />
