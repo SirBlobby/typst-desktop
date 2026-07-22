@@ -41,8 +41,8 @@ jobs:
 
       - name: Clone Typst compiler
         run: |
-          git clone https://github.com/typst/typst.git typstdrive/typst
-          git -C typstdrive/typst checkout "$TYPST_COMMIT"
+          git clone https://github.com/typst/typst.git typst-desktop/typst
+          git -C typst-desktop/typst checkout "$TYPST_COMMIT"
 
       - name: Install build dependencies
         run: |

@@ -23,8 +23,8 @@ jobs:
 
       - name: Clone Typst compiler
         run: |
-          git clone https://github.com/typst/typst.git typstdrive/typst
-          git -C typstdrive/typst checkout "$TYPST_COMMIT"
+          git clone https://github.com/typst/typst.git typst-desktop/typst
+          git -C typst-desktop/typst checkout "$TYPST_COMMIT"
 
       - name: Install build dependencies
         run: |
@@ -85,17 +85,18 @@ jobs:
           path: packages/*
           if-no-files-found: error
 
-      - name: Publish to GitHub release
+      - name: Publish to Gitea release
         if: startsWith(github.ref, 'refs/tags/v')
         env:
-          TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITEA_URL: https://git.sirblob.co
           REPOSITORY: sirblobby/typst-desktop
           TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
 
-          api="https://api.github.com/repos/$REPOSITORY"
-          auth="Authorization: Bearer $TOKEN"
+          api="$GITEA_URL/api/v1/repos/$REPOSITORY"
+          auth="Authorization: token $TOKEN"
           json="Content-Type: application/json"
 
           existing=$(curl -sS -H "$auth" "$api/releases/tags/$TAG" | jq -r '.id // empty')
@@ -118,9 +119,8 @@ jobs:
             name=$(basename "$package")
             echo "Uploading $name"
             curl -sS --fail -X POST -H "$auth" \
-              -H "Content-Type: application/octet-stream" \
-              --data-binary "@$package" \
-              "https://uploads.github.com/repos/$REPOSITORY/releases/$release_id/assets?name=$name" \
+              -F "attachment=@$package" \
+              "$api/releases/$release_id/assets?name=$name" \
               > /dev/null
           done
 

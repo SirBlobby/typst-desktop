@@ -27,13 +27,13 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 rusqlite = { version = "0.32", features = ["bundled"] }
 
-typst = { version = "0.15.1", path = "../../typstdrive/typst/crates/typst" }
-typst-kit = { path = "../../typstdrive/typst/crates/typst-kit", features = ["system-downloader", "system-packages", "embedded-fonts"] }
-typst-pdf = { path = "../../typstdrive/typst/crates/typst-pdf" }
-typst-render = { path = "../../typstdrive/typst/crates/typst-render" }
-typst-svg = { path = "../../typstdrive/typst/crates/typst-svg" }
-typst-html = { path = "../../typstdrive/typst/crates/typst-html" }
-typst-layout = { path = "../../typstdrive/typst/crates/typst-layout" }
+typst = { version = "0.15.1", path = "../typst/crates/typst" }
+typst-kit = { path = "../typst/crates/typst-kit", features = ["system-downloader", "system-packages", "embedded-fonts"] }
+typst-pdf = { path = "../typst/crates/typst-pdf" }
+typst-render = { path = "../typst/crates/typst-render" }
+typst-svg = { path = "../typst/crates/typst-svg" }
+typst-html = { path = "../typst/crates/typst-html" }
+typst-layout = { path = "../typst/crates/typst-layout" }
 typst-assets = { version = "0.15.1", features = ["fonts"] }
 
 chrono = { version = "0.4", features = ["serde"] }

@@ -169,10 +169,10 @@ The editor header shows the language server status. Without `tinymist` the edito
 
 ## Development
 
-The app compiles Typst from source, so clone the compiler into TypstDrive's `typst/` folder first — both projects share it:
+The app compiles Typst from source, so clone the compiler into this repo's `typst/` folder first:
 
 ```bash
-git clone https://github.com/typst/typst.git ../typstdrive/typst
+git clone https://github.com/typst/typst.git typst
 ```
 
 Then:
@@ -200,11 +200,11 @@ macOS builds are unsigned. Gatekeeper blocks unsigned apps on first launch, so o
 
 ### Building locally for another platform
 
-Building on the target platform is the supported path. The Typst compiler is a path dependency, so any machine or runner needs it checked out beside this repository:
+Building on the target platform is the supported path. The Typst compiler is a path dependency, so any machine or runner needs it checked out inside this repository:
 
 ```bash
-git clone https://github.com/typst/typst.git ../typstdrive/typst
-git -C ../typstdrive/typst checkout 44b3f78ed37fedea75e911dde2269ef86c45316f
+git clone https://github.com/typst/typst.git typst
+git -C typst checkout 9dfd3a08500b7896045f907433cf7b4b02434fad
 ```
 
 Linux builds also need the WebKit and GTK development packages:
@@ -216,6 +216,8 @@ sudo apt-get install libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev patchelf
 ```bash
 bun run build:linux
 ```
+
+Build on Ubuntu 22.04 (the CI baseline) rather than a rolling-release distro. glibc compatibility only works forward, so a binary is only guaranteed to run on distros with a glibc version equal to or newer than the one it was built against. This won't cover musl-based distros like Alpine, or glibc-based distros older than the build machine.
 
 ## License
 

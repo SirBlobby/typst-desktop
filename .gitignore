@@ -1,5 +1,6 @@
 .DS_Store
 node_modules
+/typst
 /build
 /.svelte-kit
 /package
