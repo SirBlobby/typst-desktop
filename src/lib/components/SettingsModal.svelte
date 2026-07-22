@@ -7,6 +7,14 @@
   import * as api from "$lib/ts/api";
   import type { AppInfo, CompatibilityStatus } from "$lib/ts/api";
   import {
+    HOTKEY_DEFS,
+    comboFromEvent,
+    isCustomized,
+    keysFor,
+    rebindHotkey,
+    resetHotkey,
+  } from "$lib/ts/hotkeys";
+  import {
     app,
     applyTheme,
     applyColorTheme,
@@ -35,6 +43,7 @@
     | "accessibility"
     | "account"
     | "lsp"
+    | "hotkeys"
     | "about";
 
   const sections: { id: Section; label: string; icon: string }[] = [
@@ -43,7 +52,113 @@
     { id: "accessibility", label: "Accessibility", icon: "ph:wheelchair" },
     { id: "account", label: "Account", icon: "ph:user-circle" },
     { id: "lsp", label: "Language Server", icon: "ph:plugs-connected" },
+    { id: "hotkeys", label: "Hotkeys", icon: "ph:keyboard" },
     { id: "about", label: "About", icon: "ph:info" },
+  ];
+
+  const isMac =
+    typeof navigator !== "undefined" &&
+    /mac/i.test(navigator.platform ?? navigator.userAgent);
+
+  function formatKeys(combo: string): string[] {
+    const variants = combo.split(",");
+    const preferred =
+      variants.find((variant) =>
+        isMac ? variant.includes("command") : !variant.includes("command"),
+      ) ?? variants[0];
+
+    return preferred.split("+").map((part) => {
+      switch (part) {
+        case "command":
+          return "⌘";
+        case "ctrl":
+          return "Ctrl";
+        case "alt":
+          return isMac ? "⌥" : "Alt";
+        case "shift":
+          return "Shift";
+        case "esc":
+          return "Esc";
+        case "space":
+          return "Space";
+        case "up":
+          return "↑";
+        case "down":
+          return "↓";
+        case "left":
+          return "←";
+        case "right":
+          return "→";
+        default:
+          return part.length === 1 ? part.toUpperCase() : part;
+      }
+    });
+  }
+
+  let editingId = $state<string | null>(null);
+  let hotkeyVersion = $state(0);
+
+  const editableHotkeyGroups = $derived.by(() => {
+    hotkeyVersion;
+    const groups = new Map<string, typeof HOTKEY_DEFS>();
+    for (const def of HOTKEY_DEFS) {
+      if (!groups.has(def.group)) groups.set(def.group, []);
+      groups.get(def.group)!.push(def);
+    }
+    return Array.from(groups.entries()).map(([title, defs]) => ({
+      title,
+      items: defs.map((def) => ({
+        id: def.id,
+        label: def.label,
+        keys: keysFor(def.id),
+        customized: isCustomized(def.id),
+      })),
+    }));
+  });
+
+  $effect(() => {
+    if (!editingId) return;
+    const id = editingId;
+
+    function handleCapture(event: KeyboardEvent) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.key === "Escape") {
+        editingId = null;
+        return;
+      }
+      const combo = comboFromEvent(event);
+      if (!combo) return;
+      rebindHotkey(id, combo);
+      hotkeyVersion++;
+      editingId = null;
+    }
+
+    window.addEventListener("keydown", handleCapture, true);
+    return () => window.removeEventListener("keydown", handleCapture, true);
+  });
+
+  const staticHotkeyGroups: { title: string; items: { keys: string[]; label: string }[] }[] = [
+    {
+      title: "File browser",
+      items: [
+        { keys: ["F2"], label: "Rename selected entry" },
+        { keys: ["Delete"], label: "Delete selected entries" },
+        { keys: ["Esc"], label: "Cancel rename or clear selection" },
+      ],
+    },
+    {
+      title: "Image viewer",
+      items: [
+        { keys: ["←"], label: "Previous image" },
+        { keys: ["→"], label: "Next image" },
+        { keys: ["Esc"], label: "Close viewer" },
+      ],
+    },
+    {
+      title: "General",
+      items: [{ keys: ["Esc"], label: "Close dialog" }],
+    },
   ];
 
   const lspLabel: Record<string, string> = {
@@ -507,6 +622,88 @@
             </div>
           {/if}
         </div>
+      {:else if section === "hotkeys"}
+        <div class="flex flex-col gap-5">
+          <p class="text-xs text-[var(--color-ink-muted)]">
+            Click the pencil next to a shortcut and press a new key combination.
+            Press Esc while listening to cancel.
+          </p>
+
+          {#each editableHotkeyGroups as group}
+            <div class="flex flex-col gap-1.5">
+              <span class="text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-muted)]">
+                {group.title}
+              </span>
+              <div class="flex flex-col divide-y divide-[var(--color-line)] rounded-md border border-[var(--color-line)]">
+                {#each group.items as item}
+                  <div class="flex items-center justify-between gap-4 px-3 py-2">
+                    <span class="text-xs">{item.label}</span>
+                    {#if editingId === item.id}
+                      <span class="text-xs text-[var(--color-accent)]">
+                        Press keys… (Esc to cancel)
+                      </span>
+                    {:else}
+                      <span class="flex shrink-0 items-center gap-1">
+                        {#each formatKeys(item.keys) as key}
+                          <kbd
+                            class="rounded border border-[var(--color-line)] bg-[var(--color-surface-muted)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-ink-muted)]"
+                          >
+                            {key}
+                          </kbd>
+                        {/each}
+                        {#if item.customized}
+                          <button
+                            class="rounded p-1 text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
+                            title="Reset to default"
+                            aria-label="Reset to default"
+                            onclick={() => {
+                              resetHotkey(item.id);
+                              hotkeyVersion++;
+                            }}
+                          >
+                            <Icon icon="ph:arrow-counter-clockwise" class="text-xs" />
+                          </button>
+                        {/if}
+                        <button
+                          class="rounded p-1 text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
+                          title="Change shortcut"
+                          aria-label="Change shortcut"
+                          onclick={() => (editingId = item.id)}
+                        >
+                          <Icon icon="ph:pencil-simple" class="text-xs" />
+                        </button>
+                      </span>
+                    {/if}
+                  </div>
+                {/each}
+              </div>
+            </div>
+          {/each}
+
+          {#each staticHotkeyGroups as group}
+            <div class="flex flex-col gap-1.5">
+              <span class="text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-muted)]">
+                {group.title}
+              </span>
+              <div class="flex flex-col divide-y divide-[var(--color-line)] rounded-md border border-[var(--color-line)]">
+                {#each group.items as item}
+                  <div class="flex items-center justify-between gap-4 px-3 py-2">
+                    <span class="text-xs">{item.label}</span>
+                    <span class="flex shrink-0 items-center gap-1">
+                      {#each item.keys as key}
+                        <kbd
+                          class="rounded border border-[var(--color-line)] bg-[var(--color-surface-muted)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-ink-muted)]"
+                        >
+                          {key}
+                        </kbd>
+                      {/each}
+                    </span>
+                  </div>
+                {/each}
+              </div>
+            </div>
+          {/each}
+        </div>
       {:else}
         <div class="flex flex-col gap-4">
           <div class="flex items-center gap-3">
@@ -569,7 +766,8 @@
       section === "about" ||
       section === "appearance" ||
       section === "accessibility" ||
-      section === "lsp"}
+      section === "lsp" ||
+      section === "hotkeys"}
     <button
       class="rounded-md px-3 py-1.5 text-xs text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)]"
       onclick={onclose}

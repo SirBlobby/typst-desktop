@@ -40,7 +40,7 @@ const palette: Record<"light" | "dark", ThemeColors> = {
     background: "#16181d",
     surface: "#1d2026",
     text: "#eef0f4",
-    selection: "#2f3a52",
+    selection: "#3f5a91",
     activeLine: "#1d2026",
     cursor: "#6b93ff",
     border: "#2f343d",

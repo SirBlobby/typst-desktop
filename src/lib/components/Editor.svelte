@@ -7,12 +7,7 @@
     highlightActiveLine,
   } from "@codemirror/view";
   import { EditorState, Compartment, StateField } from "@codemirror/state";
-  import {
-    defaultKeymap,
-    history,
-    historyKeymap,
-    indentWithTab,
-  } from "@codemirror/commands";
+  import { defaultKeymap, history, indentWithTab } from "@codemirror/commands";
   import {
     bracketMatching,
     indentOnInput,
@@ -46,7 +41,6 @@
     diagnostics?: Diagnostic[];
     collab?: { text: Y.Text; awareness: Awareness } | null;
     onchange: (value: string) => void;
-    onsave: () => void;
     onlspstatus?: (status: "off" | "starting" | "on" | "unavailable") => void;
     onready?: (view: EditorView | null) => void;
   }
@@ -59,7 +53,6 @@
     diagnostics = [],
     collab = null,
     onchange,
-    onsave,
     onlspstatus,
     onready,
   }: Props = $props();
@@ -170,17 +163,8 @@
             : [autocompletion({ override: [typstCompletions] })]),
           EditorView.lineWrapping,
           keymap.of([
-            {
-              key: "Mod-s",
-              preventDefault: true,
-              run: () => {
-                onsave();
-                return true;
-              },
-            },
             ...closeBracketsKeymap,
             ...defaultKeymap,
-            ...historyKeymap,
             indentWithTab,
           ]),
           EditorView.updateListener.of((update) => {

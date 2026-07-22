@@ -1,6 +1,7 @@
 <script lang="ts">
   import Icon from "@iconify/svelte";
   import { onMount } from "svelte";
+  import { registerHotkey, unregisterAll } from "$lib/ts/hotkeys";
   import { save } from "@tauri-apps/plugin-dialog";
   import { writeImage, writeText } from "@tauri-apps/plugin-clipboard-manager";
   import { Image } from "@tauri-apps/api/image";
@@ -24,7 +25,13 @@
   import PageSettingsModal from "$lib/components/PageSettingsModal.svelte";
 
   import type { EditorView } from "@codemirror/view";
-  import { insertText, redoEdit, undoEdit } from "$lib/ts/editor-actions";
+  import {
+    insertText,
+    prefixLines,
+    redoEdit,
+    undoEdit,
+    wrapSelection,
+  } from "$lib/ts/editor-actions";
 
   import * as api from "$lib/ts/api";
   import type { BrowseEntry, CloudFile, CloudFolder } from "$lib/ts/api";
@@ -446,13 +453,6 @@
       setStatus("Conflicts resolved and uploaded");
     });
 
-  function handleKeydown(event: KeyboardEvent) {
-    if ((event.metaKey || event.ctrlKey) && event.key === "s") {
-      event.preventDefault();
-      if (app.view === "editor") saveAndCompile();
-    }
-  }
-
   let dropActive = $state(false);
 
   function dropDestination():
@@ -528,9 +528,64 @@
       }
     });
 
+    registerHotkey("save", (event) => {
+      event.preventDefault();
+      if (app.view === "editor") saveAndCompile();
+    });
+    registerHotkey("undo", (event) => {
+      event.preventDefault();
+      if (app.view === "editor") undoEdit(editorView);
+    });
+    registerHotkey("redo", (event) => {
+      event.preventDefault();
+      if (app.view === "editor") redoEdit(editorView);
+    });
+    registerHotkey("toggleSidebar", (event) => {
+      event.preventDefault();
+      if (app.view === "editor" && !app.target?.standalone) toggleSidebar();
+    });
+    registerHotkey("bold", (event) => {
+      event.preventDefault();
+      if (app.view === "editor") wrapSelection(editorView, "*", "*", "bold");
+    });
+    registerHotkey("italic", (event) => {
+      event.preventDefault();
+      if (app.view === "editor") wrapSelection(editorView, "_", "_", "italic");
+    });
+    registerHotkey("underline", (event) => {
+      event.preventDefault();
+      if (app.view === "editor")
+        wrapSelection(editorView, "#underline[", "]", "underlined");
+    });
+    registerHotkey("strikethrough", (event) => {
+      event.preventDefault();
+      if (app.view === "editor")
+        wrapSelection(editorView, "#strike[", "]", "struck through");
+    });
+    registerHotkey("link", (event) => {
+      event.preventDefault();
+      if (app.view === "editor") insertText(editorView, '#link("https://")[text]');
+    });
+    registerHotkey("numberedList", (event) => {
+      event.preventDefault();
+      if (app.view === "editor") prefixLines(editorView, "+ ", "Numbered item");
+    });
+    registerHotkey("bulletedList", (event) => {
+      event.preventDefault();
+      if (app.view === "editor") prefixLines(editorView, "- ", "List item");
+    });
+    for (const level of [1, 2, 3, 4, 5, 6]) {
+      registerHotkey(`heading${level}`, (event) => {
+        event.preventDefault();
+        if (app.view === "editor")
+          prefixLines(editorView, "=".repeat(level) + " ", "Heading");
+      });
+    }
+
     return () => {
       pending.then((unlisten) => unlisten());
       downloads.then((unlisten) => unlisten());
+      unregisterAll();
     };
   });
 
@@ -548,7 +603,6 @@
   };
 </script>
 
-<svelte:window on:keydown={handleKeydown} />
 
 {#snippet statusBadge(
   icon: string,
@@ -956,7 +1010,6 @@
                     scheduleCompile();
                     scheduleAutosave();
                   }}
-                  onsave={saveAndCompile}
                   onlspstatus={(status) => (app.lspStatus = status)}
                   onready={(view) => (editorView = view)}
                 />

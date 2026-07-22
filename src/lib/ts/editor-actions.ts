@@ -18,17 +18,48 @@ export function wrapSelection(
   placeholder = "",
 ) {
   if (!view) return;
-  const selection = view.state.selection.main;
-  const selected = view.state.doc.sliceString(selection.from, selection.to);
-  const body = selected || placeholder;
+  const { state } = view;
+  const selection = state.selection.main;
+  const selected = state.doc.sliceString(selection.from, selection.to);
 
-  view.dispatch({
-    changes: { from: selection.from, to: selection.to, insert: prefix + body + suffix },
-    selection: {
-      anchor: selection.from + prefix.length,
-      head: selection.from + prefix.length + body.length,
-    },
-  });
+  const innerWrapped =
+    selected.length >= prefix.length + suffix.length &&
+    selected.startsWith(prefix) &&
+    selected.endsWith(suffix);
+
+  const before = state.doc.sliceString(
+    Math.max(0, selection.from - prefix.length),
+    selection.from,
+  );
+  const after = state.doc.sliceString(
+    selection.to,
+    Math.min(state.doc.length, selection.to + suffix.length),
+  );
+  const outerWrapped = before === prefix && after === suffix;
+
+  if (innerWrapped) {
+    const inner = selected.slice(prefix.length, selected.length - suffix.length);
+    view.dispatch({
+      changes: { from: selection.from, to: selection.to, insert: inner },
+      selection: { anchor: selection.from, head: selection.from + inner.length },
+    });
+  } else if (outerWrapped) {
+    const from = selection.from - prefix.length;
+    const to = selection.to + suffix.length;
+    view.dispatch({
+      changes: { from, to, insert: selected },
+      selection: { anchor: from, head: from + selected.length },
+    });
+  } else {
+    const body = selected || placeholder;
+    view.dispatch({
+      changes: { from: selection.from, to: selection.to, insert: prefix + body + suffix },
+      selection: {
+        anchor: selection.from + prefix.length,
+        head: selection.from + prefix.length + body.length,
+      },
+    });
+  }
   view.focus();
 }
 
