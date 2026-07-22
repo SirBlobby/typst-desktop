@@ -1,3 +1,5 @@
+<img src="src-tauri/icons/icon.png" width="96" alt="Typst Desktop icon" />
+
 # Typst Desktop
 
 [![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/sirblobby/typst-desktop)
@@ -218,7 +220,7 @@ On Arch, `packaging/arch/PKGBUILD` builds and installs a native package via `mak
 Apache License 2.0. See [LICENSE](LICENSE).
 
 
-<img width="1908" height="1038" alt="image" src="https://github.com/user-attachments/assets/86f84d9f-7b76-453b-aefa-c15531e49600" />
-<img width="1908" height="1038" alt="image" src="https://github.com/user-attachments/assets/272a0178-7b5c-48a2-8af1-691ca3f100ef" />
-<img width="1908" height="1038" alt="image" src="https://github.com/user-attachments/assets/5f3f982e-29d0-4b3b-b7eb-fa6e888fe01a" />
+<img src="images/preview1.png" alt="Typst Desktop editor preview" />
+<img src="images/preview2.png" alt="Typst Desktop project editor preview" />
+<img src="images/preview3.png" alt="Typst Desktop editor preview" />
 
