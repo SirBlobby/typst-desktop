@@ -70,6 +70,12 @@
 
   const isToml = $derived(filePath.toLowerCase().endsWith(".toml"));
 
+  function disableTypstLanguage() {
+    queueMicrotask(() => {
+      view?.dispatch({ effects: languageSlot.reconfigure([]) });
+    });
+  }
+
   function resilientSync(parser: any) {
     return StateField.define<null>({
       create: () => null,
@@ -78,7 +84,11 @@
           transaction.startState.facet(language) !==
           transaction.state.facet(language)
         ) {
-          parser.clearParser();
+          try {
+            parser.clearParser();
+          } catch {
+            disableTypstLanguage();
+          }
           return null;
         }
 
@@ -94,7 +104,13 @@
             for (const edit of edits.edits) parser.applyTreeEdit(edit);
           });
         } catch {
-          parser.clearParser();
+          try {
+            parser.clearParser();
+          } catch {
+            // The wasm parser instance panicked and is no longer usable.
+            // Drop syntax highlighting rather than crash on every keystroke.
+            disableTypstLanguage();
+          }
         }
 
         return null;
