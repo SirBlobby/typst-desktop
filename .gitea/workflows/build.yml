@@ -79,7 +79,7 @@ jobs:
           ls -la packages
 
       - name: Upload packages
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: typst-desktop-linux-x86_64
           path: packages/*
