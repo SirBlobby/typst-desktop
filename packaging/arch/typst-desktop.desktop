@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Typst Desktop
+Comment=A desktop editor for Typst documents with a built-in compiler, live preview, and optional TypstDrive sync
+Exec=typst-desktop %U
+Icon=typst-desktop
+Terminal=false
+Categories=Office;Utility;TextEditor;
+StartupWMClass=typst-desktop

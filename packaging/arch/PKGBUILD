@@ -1,0 +1,55 @@
+# Maintainer: SirBlobby
+pkgname=typst-desktop
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="A desktop editor for Typst documents with a built-in compiler, live preview, and optional TypstDrive sync"
+arch=('x86_64')
+url="https://github.com/sirblobby/typst-desktop"
+license=('Apache-2.0')
+depends=('webkit2gtk-4.1' 'gtk3' 'openssl')
+makedepends=('rust' 'git' 'bun' 'webkit2gtk-4.1' 'gtk3' 'openssl')
+options=('!lto')
+source=("$pkgname.desktop")
+sha256sums=('SKIP')
+
+_typst_commit=${TYPST_COMMIT:-9dfd3a08500b7896045f907433cf7b4b02434fad}
+
+prepare() {
+  rm -rf "$srcdir/$pkgname-src"
+  git -C "$startdir/../.." archive --format=tar HEAD | \
+    (mkdir -p "$srcdir/$pkgname-src" && tar -x -C "$srcdir/$pkgname-src")
+
+  git clone https://github.com/typst/typst.git "$srcdir/$pkgname-src/typst"
+  git -C "$srcdir/$pkgname-src/typst" checkout "$_typst_commit"
+}
+
+build() {
+  cd "$srcdir/$pkgname-src"
+  export CARGO_TARGET_DIR="$srcdir/target"
+  bun install --frozen-lockfile
+  bun run tauri build -- --no-bundle
+}
+
+package() {
+  cd "$srcdir/$pkgname-src"
+
+  install -Dm755 "$srcdir/target/release/typst-desktop" \
+    "$pkgdir/usr/bin/typst-desktop"
+
+  install -Dm644 "$srcdir/$pkgname.desktop" \
+    "$pkgdir/usr/share/applications/$pkgname.desktop"
+
+  install -Dm644 src-tauri/icons/32x32.png \
+    "$pkgdir/usr/share/icons/hicolor/32x32/apps/$pkgname.png"
+  install -Dm644 src-tauri/icons/64x64.png \
+    "$pkgdir/usr/share/icons/hicolor/64x64/apps/$pkgname.png"
+  install -Dm644 src-tauri/icons/128x128.png \
+    "$pkgdir/usr/share/icons/hicolor/128x128/apps/$pkgname.png"
+  install -Dm644 "src-tauri/icons/128x128@2x.png" \
+    "$pkgdir/usr/share/icons/hicolor/256x256/apps/$pkgname.png"
+  install -Dm644 src-tauri/icons/icon.png \
+    "$pkgdir/usr/share/icons/hicolor/512x512/apps/$pkgname.png"
+
+  install -Dm644 LICENSE \
+    "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

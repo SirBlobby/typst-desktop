@@ -44,24 +44,16 @@ Remove it with `sudo dnf remove typst-desktop`.
 
 ### Arch
 
-There is no package in the AUR. Use the AppImage, which needs FUSE:
-
 ```bash
-sudo pacman -S fuse2
-wget "$BASE/typst-desktop_${VERSION}_amd64.AppImage"
-chmod +x "typst-desktop_${VERSION}_amd64.AppImage"
-./typst-desktop_${VERSION}_amd64.AppImage
+wget "$BASE/typst-desktop-${VERSION}-1-x86_64.pkg.tar.zst"
+sudo pacman -U "typst-desktop-${VERSION}-1-x86_64.pkg.tar.zst"
 ```
 
-To keep it on your `PATH`:
+Remove it with `sudo pacman -R typst-desktop`.
 
-```bash
-sudo install -Dm755 "typst-desktop_${VERSION}_amd64.AppImage" /usr/local/bin/typst-desktop
-```
+There is no AUR package; the `.pkg.tar.zst` above is attached to each release directly. Prefer it over the AppImage on Arch specifically — a [known WebKitGTK issue](https://bugs.webkit.org/show_bug.cgi?id=280239) on Wayland crashes the AppImage build (`Could not create default EGL display`) against Arch's current webkit2gtk version. The native package links against your system's webkit2gtk instead, which avoids it.
 
-Remove it with `sudo rm /usr/local/bin/typst-desktop`.
-
-The AppImage runs on any distribution, so it also works as a fallback on Debian or Fedora. Building from source is covered under [Development](#development).
+The AppImage runs on any distribution, so it also works as a fallback on Debian or Fedora — and on Arch too, but may hit the WebKitGTK/EGL crash described above there. Building from source is covered under [Development](#development).
 
 ## Features
 
@@ -218,6 +210,8 @@ bun run build:linux
 ```
 
 Build on Ubuntu 22.04 (the CI baseline) rather than a rolling-release distro. glibc compatibility only works forward, so a binary is only guaranteed to run on distros with a glibc version equal to or newer than the one it was built against. This won't cover musl-based distros like Alpine, or glibc-based distros older than the build machine.
+
+On Arch, `packaging/arch/PKGBUILD` builds and installs a native package via `makepkg -si` from within `packaging/arch/`, instead of `bun run build:linux`.
 
 ## License
 

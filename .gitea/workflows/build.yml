@@ -85,43 +85,48 @@ jobs:
           path: packages/*
           if-no-files-found: error
 
-      - name: Publish to Gitea release
-        if: startsWith(github.ref, 'refs/tags/v')
-        env:
-          TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITEA_URL: https://git.sirblob.co
-          REPOSITORY: sirblobby/typst-desktop
-          TAG: ${{ github.ref_name }}
+  build-arch:
+    runs-on: ubuntu-22.04
+    container:
+      image: archlinux:base-devel
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          path: typst-desktop
+
+      - name: Update pacman and install build dependencies
         run: |
-          set -euo pipefail
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm --needed \
+            git rust bun webkit2gtk-4.1 gtk3 openssl
 
-          api="$GITEA_URL/api/v1/repos/$REPOSITORY"
-          auth="Authorization: token $TOKEN"
-          json="Content-Type: application/json"
+      - name: Create unprivileged build user
+        run: |
+          useradd -m builder
+          chown -R builder:builder "$GITHUB_WORKSPACE"
 
-          existing=$(curl -sS -H "$auth" "$api/releases/tags/$TAG" | jq -r '.id // empty')
+      - name: Set package version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        working-directory: typst-desktop/packaging/arch
+        run: sed -i "s/^pkgver=.*/pkgver=${TAG#v}/" PKGBUILD
+        env:
+          TAG: ${{ github.ref_name }}
 
-          if [ -n "$existing" ]; then
-            release_id=$existing
-          else
-            release_id=$(curl -sS -X POST -H "$auth" -H "$json" "$api/releases" \
-              -d "$(jq -n --arg tag "$TAG" \
-                '{tag_name: $tag, name: ("Typst Desktop " + $tag), body: "Download the package for your distribution below.", draft: true, prerelease: false}')" \
-              | jq -r '.id')
-          fi
+      - name: Build package
+        working-directory: typst-desktop/packaging/arch
+        run: runuser -u builder -- env TYPST_COMMIT="$TYPST_COMMIT" makepkg --noconfirm
 
-          if [ -z "$release_id" ] || [ "$release_id" = "null" ]; then
-            echo "Could not create or find the release"
-            exit 1
-          fi
+      - name: Collect package
+        run: |
+          mkdir -p packages
+          find typst-desktop/packaging/arch -maxdepth 1 -name "*.pkg.tar.zst" -exec cp {} packages/ \;
+          ls -la packages
 
-          for package in packages/*; do
-            name=$(basename "$package")
-            echo "Uploading $name"
-            curl -sS --fail -X POST -H "$auth" \
-              -F "attachment=@$package" \
-              "$api/releases/$release_id/assets?name=$name" \
-              > /dev/null
-          done
-
-          echo "Uploaded to the draft release for $TAG"
+      - name: Upload package
+        uses: actions/upload-artifact@v3
+        with:
+          name: typst-desktop-arch-x86_64
+          path: packages/*
+          if-no-files-found: error
