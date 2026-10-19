@@ -248,8 +248,6 @@ pub struct ManifestEntry {
 
 #[derive(Deserialize)]
 pub struct ProjectManifest {
-    pub project_id: String,
-    pub name: String,
     pub entrypoint: String,
     pub files: Vec<ManifestEntry>,
 }
