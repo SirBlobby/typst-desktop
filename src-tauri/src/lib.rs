@@ -1,6 +1,7 @@
 mod assets;
 mod compiler;
 mod db;
+mod fonts;
 mod lsp;
 mod sync;
 mod thumbnails;

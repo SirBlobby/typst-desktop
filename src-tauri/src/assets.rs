@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use tauri::AppHandle;
 
 use crate::db::Store;
+use crate::fonts::shared_fonts;
 use crate::workspace::workspace_root;
 
 pub const ASSETS_DIR: &str = ".assets";
@@ -96,10 +97,8 @@ pub fn list_assets(app: &AppHandle, store: &Store) -> Result<Vec<Asset>, String>
 pub fn font_families(files: &HashMap<String, Vec<u8>>) -> Vec<String> {
     let mut families = BTreeSet::new();
 
-    for data in typst_assets::fonts() {
-        for font in typst::text::Font::iter(typst::foundations::Bytes::new(data)) {
-            families.insert(font.info().family.clone());
-        }
+    for family in shared_fonts().family_names() {
+        families.insert(family.to_string());
     }
 
     for (name, data) in files {

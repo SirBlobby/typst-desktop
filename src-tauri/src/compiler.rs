@@ -1,14 +1,15 @@
 use serde::Serialize;
 use std::collections::HashMap;
 use typst::diag::Warned;
+use typst::format::Complete;
 use typst::layout::{Frame, FrameItem};
-use typst::utils::Scalar;
+use typst::model::Document;
 use typst::WorldExt;
 use typst_html::{HtmlDocument, HtmlOptions};
 use typst_layout::PagedDocument;
 use typst_pdf::{pdf, PdfOptions};
-use typst_render::{render, RenderOptions};
-use typst_svg::SvgOptions;
+use typst_render::{render, PngFormat, RenderOptions};
+use typst_svg::{SvgFormat, SvgOptions};
 
 use crate::world::ProjectWorld;
 
@@ -58,6 +59,16 @@ fn extract_stats(document: &PagedDocument) -> DocumentStats {
         words: text.split_whitespace().count(),
         characters: text.chars().filter(|c| !c.is_whitespace()).count(),
     }
+}
+
+fn svg_options(document: &PagedDocument) -> SvgOptions<Complete> {
+    let requested: SvgOptions = SvgOptions::default();
+    requested.resolve(document.options().get::<SvgFormat>())
+}
+
+fn png_options(document: &PagedDocument) -> RenderOptions<Complete> {
+    let requested: RenderOptions = RenderOptions::default();
+    requested.resolve(document.options().get::<PngFormat>())
 }
 
 fn line_and_column(source: &str, offset: usize) -> (usize, usize) {
@@ -121,7 +132,7 @@ pub fn compile_to_svg(
             output: Ok(document),
             warnings,
         } => {
-            let options = SvgOptions::default();
+            let options = svg_options(&document);
             let pages = document
                 .pages()
                 .iter()
@@ -152,7 +163,7 @@ pub fn export_pdf(
         Warned {
             output: Ok(document),
             warnings: _,
-        } => pdf(&document, &PdfOptions::default()).map_err(|errors| {
+        } => pdf(&document, &PdfOptions::default()).output.map_err(|errors| {
             collect_diagnostics(&world, &source_text, errors)
         }),
         Warned {
@@ -174,10 +185,7 @@ pub fn export_png(
             output: Ok(document),
             warnings: _,
         } => {
-            let options = RenderOptions {
-                pixel_per_pt: Scalar::new(2.0),
-                ..RenderOptions::default()
-            };
+            let options = png_options(&document);
             match document.pages().first() {
                 Some(page) => Ok(render(page, &options).encode_png().unwrap_or_default()),
                 None => Ok(Vec::new()),

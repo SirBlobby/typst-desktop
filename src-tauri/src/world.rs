@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 
 use typst::diag::{FileError, FileResult};
+use typst::format::Format;
 use typst::foundations::{Bytes, Datetime, Duration};
 use typst::syntax::{FileId, RootedPath, Source, VirtualPath, VirtualRoot};
 use typst::text::{Font, FontBook};
@@ -10,6 +11,8 @@ use typst::World;
 use typst::{Library, LibraryExt};
 use typst_kit::downloader::SystemDownloader;
 use typst_kit::packages::SystemPackages;
+
+use crate::fonts::shared_fonts;
 
 pub struct ProjectWorld {
     library: typst::utils::LazyHash<Library>,
@@ -24,15 +27,13 @@ fn normalize_path(path: &str) -> String {
     path.trim_start_matches('/').replace('\\', "/")
 }
 
-fn bundled_fonts() -> &'static Vec<Font> {
-    static FONTS: OnceLock<Vec<Font>> = OnceLock::new();
-    FONTS.get_or_init(|| {
-        let mut fonts = Vec::new();
-        for data in typst_assets::fonts() {
-            fonts.extend(Font::iter(Bytes::new(data)));
-        }
-        fonts
-    })
+fn export_formats() -> [Format; 4] {
+    [
+        typst_html::FORMAT,
+        typst_pdf::FORMAT,
+        typst_svg::FORMAT,
+        typst_render::FORMAT,
+    ]
 }
 
 fn custom_fonts(name: &str, data: &[u8]) -> Vec<Font> {
@@ -65,7 +66,7 @@ impl ProjectWorld {
         let downloader = SystemDownloader::new("TypstDesktop (typst-kit)");
         let packages = SystemPackages::new(downloader);
 
-        let mut fonts = bundled_fonts().clone();
+        let mut fonts = Vec::new();
 
         for (name, data) in &files {
             let lower = name.to_lowercase();
@@ -77,18 +78,17 @@ impl ProjectWorld {
             }
         }
 
-        let mut book = FontBook::new();
+        let mut book = shared_fonts().book();
         for font in &fonts {
             book.push(font.info().clone());
         }
 
-        let library = if enable_html {
-            Library::builder()
-                .with_features([typst::Feature::Html].into_iter().collect())
-                .build()
-        } else {
-            Library::builder().build()
-        };
+        let mut library_builder = Library::builder(export_formats());
+        if enable_html {
+            library_builder =
+                library_builder.with_features([typst::Feature::Html].into_iter().collect());
+        }
+        let library = library_builder.build();
 
         Self {
             library: typst::utils::LazyHash::new(library),
@@ -145,7 +145,11 @@ impl World for ProjectWorld {
     }
 
     fn font(&self, index: usize) -> Option<Font> {
-        self.fonts.get(index).cloned()
+        let shared = shared_fonts();
+        if index < shared.count() {
+            return shared.font(index);
+        }
+        self.fonts.get(index - shared.count()).cloned()
     }
 
     fn today(&self, offset: Option<Duration>) -> Option<Datetime> {

@@ -24,7 +24,7 @@ pub fn is_text_file(path: &str) -> bool {
 }
 
 pub fn content_hash(bytes: &[u8]) -> String {
-    format!("{:x}", Sha256::digest(bytes))
+    Sha256::digest(bytes).iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
 pub fn read_file_cached(path: &Path) -> Option<Vec<u8>> {

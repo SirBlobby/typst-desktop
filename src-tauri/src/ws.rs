@@ -121,7 +121,7 @@ fn connect_and_listen(app: &AppHandle, url: &str, token: &str, generation: u64) 
 
         match socket.read() {
             Ok(Message::Text(text)) => {
-                if let Ok(event) = serde_json::from_str::<DeviceEvent>(text.as_ref()) {
+                if let Ok(event) = serde_json::from_str::<DeviceEvent>(text.as_str()) {
                     let _ = app.emit(SYNC_EVENT, event);
                 }
             }

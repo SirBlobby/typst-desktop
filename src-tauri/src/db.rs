@@ -75,7 +75,7 @@ impl Store {
             Connection::open(dir.join("typst-desktop.db")).map_err(|e| e.to_string())?;
 
         connection
-            .pragma_update(None, "journal_mode", "WAL")
+            .pragma_update_and_check(None, "journal_mode", "WAL", |_| Ok(()))
             .map_err(|e| e.to_string())?;
         connection
             .pragma_update(None, "foreign_keys", "ON")
