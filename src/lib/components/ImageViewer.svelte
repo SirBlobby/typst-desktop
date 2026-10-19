@@ -132,7 +132,7 @@
   <div class="relative flex min-h-0 flex-1 items-center justify-center">
     {#if paths.length > 1}
       <button
-        class="absolute left-3 z-10 rounded-full bg-black/50 p-2 text-white transition hover:bg-black/70 disabled:opacity-30"
+        class="absolute left-3 z-10 rounded-md bg-black/50 p-2 text-white transition hover:bg-black/70 disabled:opacity-30"
         disabled={current === 0}
         onclick={() => step(-1)}
         aria-label="Previous image"
@@ -140,7 +140,7 @@
         <Icon icon="ph:caret-left" class="text-lg" />
       </button>
       <button
-        class="absolute right-3 z-10 rounded-full bg-black/50 p-2 text-white transition hover:bg-black/70 disabled:opacity-30"
+        class="absolute right-3 z-10 rounded-md bg-black/50 p-2 text-white transition hover:bg-black/70 disabled:opacity-30"
         disabled={current === paths.length - 1}
         onclick={() => step(1)}
         aria-label="Next image"

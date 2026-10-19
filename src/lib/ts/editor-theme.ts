@@ -1,6 +1,7 @@
 import { EditorView } from "@codemirror/view";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { tags as t } from "@lezer/highlight";
+import type { ColorTheme } from "$lib/ts/state.svelte";
 
 interface ThemeColors {
   background: string;
@@ -19,43 +20,55 @@ interface ThemeColors {
   heading: string;
 }
 
-const palette: Record<"light" | "dark", ThemeColors> = {
-  light: {
-    background: "#ffffff",
-    surface: "#f6f7f9",
-    text: "#14161a",
-    selection: "#dbe6fe",
-    activeLine: "#f6f7f9",
-    cursor: "#3b6cf6",
-    border: "#dfe2e7",
-    keyword: "#7c3aed",
-    string: "#0f766e",
-    number: "#b45309",
-    comment: "#6b7280",
-    variable: "#14161a",
-    function: "#2563eb",
-    heading: "#1d4ed8",
+type Mode = "light" | "dark";
+
+const palettes: Record<ColorTheme, Record<Mode, ThemeColors>> = {
+  catppuccin: {
+    light: {
+      background: "#eff1f5", surface: "#e6e9ef", text: "#4c4f69", selection: "#ccd0da",
+      activeLine: "#e6e9ef", cursor: "#dc8a78", border: "#ccd0da", keyword: "#8839ef",
+      string: "#40a02b", number: "#fe640b", comment: "#8c8fa1", variable: "#4c4f69",
+      function: "#1e66f5", heading: "#1e66f5",
+    },
+    dark: {
+      background: "#1e1e2e", surface: "#181825", text: "#cdd6f4", selection: "#45475a",
+      activeLine: "#313244", cursor: "#f5e0dc", border: "#313244", keyword: "#cba6f7",
+      string: "#a6e3a1", number: "#fab387", comment: "#6c7086", variable: "#cdd6f4",
+      function: "#89b4fa", heading: "#89b4fa",
+    },
   },
-  dark: {
-    background: "#16181d",
-    surface: "#1d2026",
-    text: "#eef0f4",
-    selection: "#3f5a91",
-    activeLine: "#1d2026",
-    cursor: "#6b93ff",
-    border: "#2f343d",
-    keyword: "#c4a7f7",
-    string: "#8ddba4",
-    number: "#f0b37e",
-    comment: "#7b8496",
-    variable: "#eef0f4",
-    function: "#7aa2ff",
-    heading: "#8fb3ff",
+  cerberus: {
+    light: {
+      background: "#ffffff", surface: "#f8f8fa", text: "#18181b", selection: "#c7d2fe",
+      activeLine: "#f5f5f8", cursor: "#4f46e5", border: "#e2e2e8", keyword: "#9333ea",
+      string: "#0f766e", number: "#c2410c", comment: "#71717a", variable: "#18181b",
+      function: "#4f46e5", heading: "#4f46e5",
+    },
+    dark: {
+      background: "#171717", surface: "#121212", text: "#f5f5f5", selection: "#3a3a4a",
+      activeLine: "#262626", cursor: "#f5f5f5", border: "#262626", keyword: "#e879f9",
+      string: "#2dd4bf", number: "#fbbf24", comment: "#737373", variable: "#f5f5f5",
+      function: "#818cf8", heading: "#818cf8",
+    },
+  },
+  archlinux: {
+    light: {
+      background: "#ffffff", surface: "#f5f7f9", text: "#1f2328", selection: "#b6e3ff",
+      activeLine: "#f5f7f9", cursor: "#0a6ea8", border: "#d5dde3", keyword: "#cf222e",
+      string: "#0a3069", number: "#0550ae", comment: "#6e7781", variable: "#1f2328",
+      function: "#8250df", heading: "#0a6ea8",
+    },
+    dark: {
+      background: "#0d1117", surface: "#010409", text: "#c9d1d9", selection: "#264f78",
+      activeLine: "#161b22", cursor: "#c9d1d9", border: "#21262d", keyword: "#ff7b72",
+      string: "#a5d6ff", number: "#79c0ff", comment: "#6e7681", variable: "#c9d1d9",
+      function: "#d2a8ff", heading: "#1793d1",
+    },
   },
 };
 
-export function editorTheme(isDark: boolean) {
-  const colors = palette[isDark ? "dark" : "light"];
+export function editorTheme(isDark: boolean, colorTheme: ColorTheme) {
+  const colors = (palettes[colorTheme] ?? palettes.catppuccin)[isDark ? "dark" : "light"];
 
   const theme = EditorView.theme(
     {
@@ -88,7 +101,7 @@ export function editorTheme(isDark: boolean) {
         backgroundColor: colors.surface,
         color: colors.text,
         border: `1px solid ${colors.border}`,
-        borderRadius: "6px",
+        borderRadius: "3px",
         maxWidth: "500px",
       },
       ".cm-tooltip-hover": { maxHeight: "300px", overflow: "auto" },
@@ -113,7 +126,7 @@ export function editorTheme(isDark: boolean) {
       ".cm-tooltip.cm-tooltip-autocomplete > ul > li": {
         color: colors.text,
         padding: "3px 8px",
-        borderRadius: "4px",
+        borderRadius: "2px",
         display: "flex",
         alignItems: "center",
         gap: "6px",
@@ -145,7 +158,7 @@ export function editorTheme(isDark: boolean) {
         backgroundColor: colors.surface,
         color: colors.text,
         border: `1px solid ${colors.border}`,
-        borderRadius: "6px",
+        borderRadius: "3px",
         padding: "6px 8px",
       },
 

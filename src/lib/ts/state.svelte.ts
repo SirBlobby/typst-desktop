@@ -29,14 +29,12 @@ export type LspStatus = "off" | "starting" | "on" | "unavailable";
 export type ThemePreference = "light" | "dark" | "system";
 export type TextScale = "small" | "default" | "large" | "xlarge";
 export type ContrastLevel = "normal" | "high";
-export type ColorTheme = "default" | "slate" | "sunset" | "forest" | "grape";
+export type ColorTheme = "catppuccin" | "cerberus" | "archlinux";
 
-export const colorThemes: { id: ColorTheme; label: string; accent: string }[] = [
-  { id: "default", label: "Default", accent: "#3b6cf6" },
-  { id: "slate", label: "Slate", accent: "#0f9b8e" },
-  { id: "sunset", label: "Sunset", accent: "#e8623f" },
-  { id: "forest", label: "Forest", accent: "#2f9457" },
-  { id: "grape", label: "Grape", accent: "#8b47d6" },
+export const colorThemes: { id: ColorTheme; label: string; accent: string; icon: string }[] = [
+  { id: "cerberus", label: "Cerberus", accent: "#4f46e5", icon: "mdi:dog" },
+  { id: "catppuccin", label: "Catppuccin", accent: "#1e66f5", icon: "mdi:cat" },
+  { id: "archlinux", label: "Arch Linux", accent: "#0a6ea8", icon: "mdi:penguin" },
 ];
 
 interface AppState {
@@ -128,7 +126,7 @@ export const app = $state<AppState>({
   error: "",
   theme: "light",
   themePreference: "light",
-  colorTheme: "default",
+  colorTheme: "catppuccin",
   accent: null,
   textScale: "default",
   reduceMotion: false,
@@ -336,10 +334,9 @@ export async function bootstrap() {
 
   const storedColorTheme = localStorage.getItem(COLOR_THEME_KEY);
   const validColorTheme = colorThemes.some((entry) => entry.id === storedColorTheme);
-  document.documentElement.dataset.colorTheme = validColorTheme
-    ? (storedColorTheme as ColorTheme)
-    : "default";
-  app.colorTheme = validColorTheme ? (storedColorTheme as ColorTheme) : "default";
+  const initialColorTheme: ColorTheme = validColorTheme ? (storedColorTheme as ColorTheme) : "catppuccin";
+  document.documentElement.dataset.colorTheme = initialColorTheme;
+  app.colorTheme = initialColorTheme;
 
   const storedAccent = localStorage.getItem(ACCENT_KEY);
   if (storedAccent) applyAccent(storedAccent);
@@ -423,9 +420,11 @@ export async function refreshAccount() {
       await refreshCloudProjects();
     } else {
       app.cloudProjects = [];
+      app.scope = "local";
     }
   } catch {
     app.account = null;
+    app.scope = "local";
   }
 }
 

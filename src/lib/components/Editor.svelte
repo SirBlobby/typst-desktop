@@ -16,17 +16,14 @@
     StreamLanguage,
   } from "@codemirror/language";
   import { toml } from "@codemirror/legacy-modes/mode/toml";
-  import {
-    autocompletion,
-    closeBrackets,
-    closeBracketsKeymap,
-  } from "@codemirror/autocomplete";
+  import { autocompletion } from "@codemirror/autocomplete";
   import { lintGutter, setDiagnostics } from "@codemirror/lint";
   import { LSPClient, languageServerExtensions } from "@codemirror/lsp-client";
   import { yCollab } from "y-codemirror.next";
   import type { Awareness } from "y-protocols/awareness";
   import type * as Y from "yjs";
 
+  import { bracketExtensions } from "$lib/ts/editor-brackets";
   import { typstCompletions } from "$lib/ts/completions";
   import { editorTheme } from "$lib/ts/editor-theme";
   import { LspBridge } from "$lib/ts/lsp";
@@ -167,19 +164,18 @@
           lintGutter(),
           history(),
           bracketMatching(),
-          closeBrackets(),
+          ...bracketExtensions(isToml),
           indentOnInput(),
           highlightActiveLine(),
           languageSlot.of(isToml ? StreamLanguage.define(toml) : []),
           lspSlot.of([]),
-          themeSlot.of(editorTheme(app.theme === "dark")),
+          themeSlot.of(editorTheme(app.theme === "dark", app.colorTheme)),
           collabSlot.of([]),
           ...(isToml
             ? []
             : [autocompletion({ override: [typstCompletions] })]),
           EditorView.lineWrapping,
           keymap.of([
-            ...closeBracketsKeymap,
             ...defaultKeymap,
             indentWithTab,
           ]),
@@ -256,8 +252,9 @@
 
   $effect(() => {
     const isDark = app.theme === "dark";
+    const colorTheme = app.colorTheme;
     laterDispatch((current) => {
-      current.dispatch({ effects: themeSlot.reconfigure(editorTheme(isDark)) });
+      current.dispatch({ effects: themeSlot.reconfigure(editorTheme(isDark, colorTheme)) });
     });
   });
 
