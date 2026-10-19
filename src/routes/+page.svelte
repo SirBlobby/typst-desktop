@@ -11,6 +11,7 @@
 
   import FileViewer from "$lib/components/FileViewer.svelte";
   import FileTree from "$lib/components/FileTree.svelte";
+  import BrowserSidebar from "$lib/components/BrowserSidebar.svelte";
   import Editor from "$lib/components/Editor.svelte";
   import Preview from "$lib/components/Preview.svelte";
   import PromptModal from "$lib/components/PromptModal.svelte";
@@ -611,7 +612,7 @@
   spin = false,
 )}
   <span
-    class="flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium
+    class="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium
       {tone === 'success'
       ? 'bg-[var(--color-success)]/10 text-[var(--color-success)]'
       : tone === 'accent'
@@ -677,23 +678,6 @@
     {/if}
 
     <div data-tauri-drag-region class="h-full flex-1"></div>
-
-    {#if app.view !== "editor"}
-      <div class="flex rounded-lg bg-[var(--color-surface-sunken)] p-0.5 text-xs font-medium">
-        {#each [["local", "Local", "ph:hard-drives"], ["cloud", "Cloud", "ph:cloud"]] as [value, label, icon]}
-          <button
-            class="flex items-center gap-1.5 rounded-md px-3 py-1.5 transition
-              {app.scope === value
-              ? 'bg-[var(--color-surface)] text-[var(--color-ink)] shadow-sm'
-              : 'text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]'}"
-            onclick={() => (app.scope = value as "local" | "cloud")}
-          >
-            <Icon {icon} />
-            {label}
-          </button>
-        {/each}
-      </div>
-    {/if}
 
     {#if app.view === "editor"}
       {#if app.account && (app.target?.cloud_project_id || app.documentLink) && !app.collabIntent}
@@ -832,10 +816,10 @@
       </span>
 
       <div
-        class="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-[var(--color-surface-sunken)]"
+        class="h-1.5 min-w-0 flex-1 overflow-hidden rounded-sm bg-[var(--color-surface-sunken)]"
       >
         <div
-          class="h-full rounded-full transition-all duration-200
+          class="h-full rounded-sm transition-all duration-200
             {progress.done
             ? 'bg-[var(--color-success)]'
             : 'bg-[var(--color-accent)]'}"
@@ -880,7 +864,8 @@
 
   <div class="flex min-h-0 flex-1">
     {#if app.view === "files"}
-      <div class="flex-1">
+      <BrowserSidebar onsettings={() => (dialog = { kind: "settings" })} />
+      <div class="min-w-0 flex-1">
         <FileViewer
           onnewproject={() => (dialog = { kind: "new-project" })}
           onnewfolder={() => (dialog = { kind: "new-folder" })}

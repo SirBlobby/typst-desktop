@@ -4,6 +4,10 @@
   import { open } from "@tauri-apps/plugin-dialog";
   import { openUrl } from "@tauri-apps/plugin-opener";
   import Modal from "./Modal.svelte";
+  import SettingsHeader from "./settings/SettingsHeader.svelte";
+  import SettingsCard from "./settings/SettingsCard.svelte";
+  import SettingsRow from "./settings/SettingsRow.svelte";
+  import ToggleSwitch from "./settings/ToggleSwitch.svelte";
   import * as api from "$lib/ts/api";
   import type { AppInfo, CompatibilityStatus } from "$lib/ts/api";
   import {
@@ -294,6 +298,7 @@
       await api.cloudLogout();
       app.account = null;
       app.cloudProjects = [];
+      app.scope = "local";
       app.settings = await api.getSettings();
     } catch (error) {
       setError(error);
@@ -304,457 +309,317 @@
     "rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2 text-sm focus:border-[var(--color-accent)] focus:outline-none";
 </script>
 
-<Modal title="Settings" icon="ph:gear-six" width="max-w-3xl" {onclose}>
-  <div class="flex min-h-[360px] gap-5">
-    <nav class="flex w-36 shrink-0 flex-col gap-0.5">
+{#snippet choiceButton(active: boolean, onclick: () => void, label: string, icon?: string, swatch?: string)}
+  <button
+    class="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs transition
+      {active
+      ? 'bg-[var(--color-surface)] font-medium text-[var(--color-accent)] shadow-sm'
+      : 'text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]'}"
+    {onclick}
+  >
+    {#if swatch}
+      <span class="h-2.5 w-2.5 rounded-full" style="background-color: {swatch}"></span>
+    {/if}
+    {#if icon}
+      <Icon {icon} class="text-sm" />
+    {/if}
+    {label}
+  </button>
+{/snippet}
+
+{#snippet hotkeyGroup(title: string, items: { id?: string; label: string; keys: string | string[]; customized?: boolean }[], editable: boolean)}
+  <SettingsCard {title}>
+    {#each items as item}
+      <div class="flex items-center justify-between gap-4 px-4 py-2">
+        <span class="text-xs">{item.label}</span>
+        {#if editable && editingId === item.id}
+          <span class="text-xs text-[var(--color-accent)]">Press keys… (Esc to cancel)</span>
+        {:else}
+          <span class="flex shrink-0 items-center gap-1">
+            {#each typeof item.keys === "string" ? formatKeys(item.keys) : item.keys as key}
+              <kbd class="rounded border border-[var(--color-line)] bg-[var(--color-surface-muted)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-ink-muted)]">
+                {key}
+              </kbd>
+            {/each}
+            {#if editable && item.customized}
+              <button
+                class="rounded p-1 text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
+                title="Reset to default"
+                aria-label="Reset to default"
+                onclick={() => {
+                  resetHotkey(item.id!);
+                  hotkeyVersion++;
+                }}
+              >
+                <Icon icon="ph:arrow-counter-clockwise" class="text-xs" />
+              </button>
+            {/if}
+            {#if editable}
+              <button
+                class="rounded p-1 text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
+                title="Change shortcut"
+                aria-label="Change shortcut"
+                onclick={() => (editingId = item.id!)}
+              >
+                <Icon icon="ph:pencil-simple" class="text-xs" />
+              </button>
+            {/if}
+          </span>
+        {/if}
+      </div>
+    {/each}
+  </SettingsCard>
+{/snippet}
+
+<Modal title="Settings" icon="ph:gear-six" width="max-w-4xl" {onclose}>
+  <div class="-mx-5 -my-4 flex h-[520px] max-h-[70vh]">
+    <nav class="flex w-44 shrink-0 flex-col gap-0.5 border-r border-[var(--color-line)] bg-[var(--color-surface-muted)] p-2">
       {#each sections as item}
         <button
-          class="flex items-center gap-2 rounded-md px-2.5 py-2 text-xs transition
+          class="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs transition
             {section === item.id
-            ? 'bg-[var(--color-accent-soft)] font-medium text-[var(--color-accent)]'
-            : 'text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-ink)]'}"
+            ? 'bg-[var(--color-surface-sunken)] font-semibold text-[var(--color-ink)]'
+            : 'text-[var(--color-ink-muted)] hover:bg-[var(--color-surface)] hover:text-[var(--color-ink)]'}"
           onclick={() => (section = item.id)}
         >
-          <Icon icon={item.icon} class="text-base" />
+          <Icon icon={item.icon} class="text-base {section === item.id ? 'text-[var(--color-accent)]' : ''}" />
           {item.label}
         </button>
       {/each}
     </nav>
 
-    <div class="min-w-0 flex-1">
+    <div class="scroll-thin min-w-0 flex-1 overflow-y-auto p-5">
       {#if section === "files"}
-        <div class="flex flex-col gap-5">
-          <div class="flex flex-col gap-1 text-xs">
-            <span class="font-medium text-[var(--color-ink-muted)]">
-              Workspace folder
-            </span>
-            <div class="flex gap-2">
+        <SettingsHeader title="Files" description="Where Typst Desktop keeps your work and when it saves." icon="ph:folder" />
+        <div class="flex flex-col gap-4">
+          <SettingsCard>
+            <SettingsRow label="Workspace folder" description="Projects and documents are stored as plain files here." stacked>
               <input class="flex-1 {fieldClass}" bind:value={workspaceRoot} />
               <button
-                class="flex items-center gap-1 rounded-md border border-[var(--color-line)] px-3 text-xs hover:bg-[var(--color-surface-muted)]"
+                class="flex items-center gap-1 rounded-md border border-[var(--color-line)] px-3 py-1.5 text-xs hover:bg-[var(--color-surface-muted)]"
                 onclick={browse}
               >
                 <Icon icon="ph:folder-open" />
                 Browse
               </button>
-            </div>
-            <span class="text-[var(--color-ink-muted)]">
-              Projects and documents are stored as plain files here.
-            </span>
-          </div>
-
-          <div class="flex flex-col gap-1 text-xs">
-            <span class="font-medium text-[var(--color-ink-muted)]">Autosave</span>
-            <select class={fieldClass} bind:value={autosaveSeconds}>
-              {#each autosaveOptions as option}
-                <option value={option.value}>{option.label}</option>
-              {/each}
-            </select>
-            <span class="text-[var(--color-ink-muted)]">
-              Saves the file being edited after you stop typing. Cloud-linked
-              files always save to disk every few seconds regardless of this
-              setting, since they sync live and have no manual Save button.
-            </span>
-          </div>
+            </SettingsRow>
+            <SettingsRow
+              label="Autosave"
+              description="Saves the open file after you stop typing. Cloud-linked files always save every few seconds because they sync live."
+            >
+              <select class={fieldClass} bind:value={autosaveSeconds}>
+                {#each autosaveOptions as option}
+                  <option value={option.value}>{option.label}</option>
+                {/each}
+              </select>
+            </SettingsRow>
+          </SettingsCard>
         </div>
       {:else if section === "appearance"}
-        <div class="flex flex-col gap-5">
-          <div class="flex flex-col gap-2 text-xs">
-            <span class="font-medium text-[var(--color-ink-muted)]">Theme</span>
-            <div class="flex gap-2">
-              {#each [["light", "Light", "ph:sun"], ["dark", "Dark", "ph:moon"], ["system", "System", "ph:desktop"]] as [value, label, icon]}
-                <button
-                  class="flex flex-1 items-center justify-center gap-1.5 rounded-md border px-3 py-2.5 transition
-                    {app.themePreference === value
-                    ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-[var(--color-accent)]'
-                    : 'border-[var(--color-line)] text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-muted)]'}"
-                  onclick={() => applyTheme(value as ThemePreference)}
-                >
-                  <Icon {icon} class="text-base" />
-                  {label}
-                </button>
-              {/each}
-            </div>
-            <span class="text-[var(--color-ink-muted)]">
-              System follows your OS setting and updates live.
-            </span>
-          </div>
-
-          <div class="flex flex-col gap-2 text-xs">
-            <span class="font-medium text-[var(--color-ink-muted)]">Color theme</span>
-            <div class="flex flex-wrap gap-2">
-              {#each colorThemes as entry}
-                <button
-                  class="flex items-center gap-1.5 rounded-md border px-3 py-2 transition
-                    {app.colorTheme === entry.id
-                    ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-[var(--color-accent)]'
-                    : 'border-[var(--color-line)] text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-muted)]'}"
-                  onclick={() => applyColorTheme(entry.id)}
-                >
-                  <span
-                    class="h-3 w-3 rounded-full"
-                    style="background-color: {entry.accent}"
-                  ></span>
-                  {entry.label}
-                </button>
-              {/each}
-            </div>
-            <span class="text-[var(--color-ink-muted)]">
-              Sets the surface colors and default accent for the app.
-            </span>
-          </div>
-
-          <div class="flex flex-col gap-2 text-xs">
-            <span class="font-medium text-[var(--color-ink-muted)]">
-              Accent color
-            </span>
-            <div class="flex items-center gap-2">
+        <SettingsHeader title="Appearance" description="The same themes as TypstDrive, in light or dark." icon="ph:palette" />
+        <div class="flex flex-col gap-4">
+          <SettingsCard title="Theme">
+            <SettingsRow label="Mode" description="System follows your operating system and updates live.">
+              <div class="flex rounded-md border border-[var(--color-line)] bg-[var(--color-surface-muted)] p-0.5">
+                {#each [["light", "Light", "ph:sun"], ["dark", "Dark", "ph:moon"], ["system", "System", "ph:desktop"]] as [value, label, icon]}
+                  {@render choiceButton(app.themePreference === value, () => applyTheme(value as ThemePreference), label, icon)}
+                {/each}
+              </div>
+            </SettingsRow>
+            <SettingsRow label="Color theme" description="Sets the surfaces, editor colors and default accent.">
+              <div class="flex rounded-md border border-[var(--color-line)] bg-[var(--color-surface-muted)] p-0.5">
+                {#each colorThemes as entry}
+                  {@render choiceButton(app.colorTheme === entry.id, () => applyColorTheme(entry.id), entry.label, entry.icon)}
+                {/each}
+              </div>
+            </SettingsRow>
+            <SettingsRow label="Accent color" description="Overrides the theme's accent color.">
               <button
-                class="flex h-7 w-7 items-center justify-center rounded-full border transition
+                class="flex h-6 w-6 items-center justify-center rounded-full border transition
                   {app.accent === null
                   ? 'border-[var(--color-accent)] text-[var(--color-accent)]'
                   : 'border-[var(--color-line)] text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-muted)]'}"
-                title="Default"
+                title="Use the theme accent"
+                aria-label="Use the theme accent"
                 onclick={() => applyAccent(null)}
               >
-                <Icon icon="ph:arrow-counter-clockwise" class="text-sm" />
+                <Icon icon="ph:arrow-counter-clockwise" class="text-xs" />
               </button>
               {#each accentPresets as preset}
                 <button
-                  class="h-7 w-7 rounded-full border-2 transition
-                    {app.accent === preset
-                    ? 'border-[var(--color-ink)]'
-                    : 'border-transparent hover:opacity-80'}"
+                  class="h-6 w-6 rounded-full border-2 transition {app.accent === preset ? 'border-[var(--color-ink)]' : 'border-transparent hover:opacity-80'}"
                   style="background-color: {preset}"
                   title={preset}
+                  aria-label={`Accent ${preset}`}
                   onclick={() => applyAccent(preset)}
                 ></button>
               {/each}
               <input
                 type="color"
-                class="h-7 w-7 cursor-pointer rounded-full border border-[var(--color-line)] bg-transparent p-0"
-                value={app.accent ?? "#3b6cf6"}
+                class="h-6 w-6 cursor-pointer rounded-full border border-[var(--color-line)] bg-transparent p-0"
+                value={app.accent ?? "#1e66f5"}
                 title="Custom color"
-                oninput={(event) =>
-                  applyAccent((event.target as HTMLInputElement).value)}
+                oninput={(event) => applyAccent((event.target as HTMLInputElement).value)}
               />
-            </div>
-            <span class="text-[var(--color-ink-muted)]">
-              Overrides the accent color used across the app.
-            </span>
-          </div>
+            </SettingsRow>
+          </SettingsCard>
         </div>
       {:else if section === "accessibility"}
-        <div class="flex flex-col gap-5">
-          <div class="flex flex-col gap-2 text-xs">
-            <span class="font-medium text-[var(--color-ink-muted)]">
-              UI text scale
-            </span>
-            <div class="flex gap-2">
+        <SettingsHeader title="Accessibility" description="Make the app easier to read and calmer to use." icon="ph:wheelchair" />
+        <SettingsCard>
+          <SettingsRow label="Text size" description="Scales text and controls throughout the app.">
+            <div class="flex rounded-md border border-[var(--color-line)] bg-[var(--color-surface-muted)] p-0.5">
               {#each textScaleOptions as option}
-                <button
-                  class="flex flex-1 items-center justify-center rounded-md border px-3 py-2.5 transition
-                    {app.textScale === option.value
-                    ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-[var(--color-accent)]'
-                    : 'border-[var(--color-line)] text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-muted)]'}"
-                  onclick={() => applyTextScale(option.value)}
-                >
-                  {option.label}
-                </button>
+                {@render choiceButton(app.textScale === option.value, () => applyTextScale(option.value), option.label)}
               {/each}
             </div>
-            <span class="text-[var(--color-ink-muted)]">
-              Scales text and controls throughout the app.
-            </span>
-          </div>
-
-          <div class="flex flex-col gap-2 text-xs">
-            <label class="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={app.reduceMotion}
-                onchange={(event) =>
-                  applyReduceMotion(
-                    (event.target as HTMLInputElement).checked,
-                  )}
-              />
-              <span class="font-medium text-[var(--color-ink-muted)]">
-                Reduce motion
-              </span>
-            </label>
-            <span class="text-[var(--color-ink-muted)]">
-              Shortens transitions and animations across the app.
-            </span>
-          </div>
-
-          <div class="flex flex-col gap-2 text-xs">
-            <label class="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={app.contrast === "high"}
-                onchange={(event) =>
-                  applyContrast(
-                    (event.target as HTMLInputElement).checked
-                      ? "high"
-                      : "normal",
-                  )}
-              />
-              <span class="font-medium text-[var(--color-ink-muted)]">
-                High contrast
-              </span>
-            </label>
-            <span class="text-[var(--color-ink-muted)]">
-              Increases contrast for borders, muted text, and focus outlines.
-            </span>
-          </div>
-        </div>
+          </SettingsRow>
+          <SettingsRow label="Reduce motion" description="Shortens transitions and animations.">
+            <ToggleSwitch label="Reduce motion" checked={app.reduceMotion} onchange={applyReduceMotion} />
+          </SettingsRow>
+          <SettingsRow label="High contrast" description="Stronger text, borders, backgrounds and focus outlines.">
+            <ToggleSwitch label="High contrast" checked={app.contrast === "high"} onchange={(value) => applyContrast(value ? "high" : "normal")} />
+          </SettingsRow>
+        </SettingsCard>
       {:else if section === "account"}
-        <div class="flex flex-col gap-5">
-          <div
-            class="flex items-center gap-3 rounded-md border border-[var(--color-line)] bg-[var(--color-surface-muted)] p-3"
-          >
-            <Icon
-              icon={app.account ? "ph:user-circle-check" : "ph:user-circle"}
-              class="text-2xl {app.account
-                ? 'text-[var(--color-success)]'
-                : 'text-[var(--color-ink-muted)]'}"
-            />
-            <div class="flex-1 text-xs">
+        <SettingsHeader title="Account" description="Connect to a TypstDrive server to sync projects and documents." icon="ph:user-circle" />
+        <div class="flex flex-col gap-4">
+          <SettingsCard>
+            <div class="flex items-center gap-3 px-4 py-3">
+              <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--color-accent-soft)] text-sm font-bold text-[var(--color-accent)]">
+                {app.account ? app.account.username.charAt(0).toUpperCase() : "?"}
+              </span>
+              <div class="min-w-0 flex-1 text-xs">
+                {#if app.account}
+                  <p class="truncate font-semibold">{app.account.username}</p>
+                  <p class="truncate text-[var(--color-ink-muted)]">{app.account.email}</p>
+                {:else}
+                  <p class="font-semibold">Not connected</p>
+                  <p class="text-[var(--color-ink-muted)]">Sign in to sync projects to the cloud.</p>
+                {/if}
+              </div>
               {#if app.account}
-                <p class="font-medium">{app.account.username}</p>
-                <p class="text-[var(--color-ink-muted)]">{app.account.email}</p>
+                <button class="rounded-md border border-[var(--color-line)] px-3 py-1.5 text-xs hover:bg-[var(--color-surface-muted)]" onclick={signOut}>
+                  Sign out
+                </button>
               {:else}
-                <p class="font-medium">Not connected</p>
-                <p class="text-[var(--color-ink-muted)]">
-                  Sign in to sync projects to the cloud.
-                </p>
+                <button class="rounded-md bg-[var(--color-accent)] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90" onclick={onsignin}>
+                  Sign in
+                </button>
               {/if}
             </div>
-            {#if app.account}
-              <button
-                class="rounded-md border border-[var(--color-line)] px-3 py-1.5 text-xs hover:bg-[var(--color-surface)]"
-                onclick={signOut}
-              >
-                Sign out
-              </button>
-            {:else}
-              <button
-                class="rounded-md bg-[var(--color-accent)] px-3 py-1.5 text-xs font-medium text-white hover:opacity-90"
-                onclick={onsignin}
-              >
-                Sign in
-              </button>
-            {/if}
-          </div>
+          </SettingsCard>
 
-          <div class="flex flex-col gap-1 text-xs">
-            <span class="font-medium text-[var(--color-ink-muted)]">
-              TypstDrive server
-            </span>
-            <input class={fieldClass} bind:value={serverUrl} />
-            {#if checkingCompatibility}
-              <span class="flex items-center gap-1 text-[var(--color-ink-muted)]">
-                <Icon icon="ph:circle-notch" class="animate-spin" />
-                Checking server version...
-              </span>
-            {:else if compatibility && !compatibility.compatible}
-              <span class="flex items-center gap-1 text-[var(--color-danger)]">
-                <Icon icon="ph:warning-circle" />
-                {compatibility.message}
-              </span>
-            {:else if compatibility && compatibility.compatible}
-              <span class="flex items-center gap-1 text-[var(--color-success)]">
-                <Icon icon="ph:check-circle" />
-                Compatible (server v{compatibility.server_version})
-              </span>
-            {/if}
-          </div>
-
-          <div class="flex flex-col gap-1 text-xs">
-            <span class="font-medium text-[var(--color-ink-muted)]">
-              Automatic sync
-            </span>
-            <select class={fieldClass} bind:value={syncSeconds}>
-              {#each syncOptions as option}
-                <option value={option.value}>{option.label}</option>
-              {/each}
-            </select>
-            <span class="text-[var(--color-ink-muted)]">
-              Pulls and pushes cloud-linked projects on a timer. Used as a
-              fallback when live sync (websocket) is unavailable. Conflicts
-              pause syncing until they are resolved.
-            </span>
-          </div>
+          <SettingsCard title="Server">
+            <SettingsRow label="TypstDrive server" description="The address of your TypstDrive instance." stacked>
+              <div class="flex w-full flex-col gap-1">
+                <input class={fieldClass} bind:value={serverUrl} />
+                {#if checkingCompatibility}
+                  <span class="flex items-center gap-1 text-[11px] text-[var(--color-ink-muted)]">
+                    <Icon icon="ph:circle-notch" class="animate-spin" />
+                    Checking server version...
+                  </span>
+                {:else if compatibility && !compatibility.compatible}
+                  <span class="flex items-center gap-1 text-[11px] text-[var(--color-danger)]">
+                    <Icon icon="ph:warning-circle" />
+                    {compatibility.message}
+                  </span>
+                {:else if compatibility && compatibility.compatible}
+                  <span class="flex items-center gap-1 text-[11px] text-[var(--color-success)]">
+                    <Icon icon="ph:check-circle" />
+                    Compatible (server v{compatibility.server_version})
+                  </span>
+                {/if}
+              </div>
+            </SettingsRow>
+            <SettingsRow
+              label="Automatic sync"
+              description="Pulls and pushes cloud-linked projects on a timer when live sync is unavailable. Conflicts pause syncing until resolved."
+            >
+              <select class={fieldClass} bind:value={syncSeconds}>
+                {#each syncOptions as option}
+                  <option value={option.value}>{option.label}</option>
+                {/each}
+              </select>
+            </SettingsRow>
+          </SettingsCard>
         </div>
       {:else if section === "lsp"}
-        <div class="flex flex-col gap-5">
-          <div class="flex items-center gap-3 rounded-md border border-[var(--color-line)] bg-[var(--color-surface-muted)] p-3">
-            <span
-              class="h-2.5 w-2.5 rounded-full
-                {app.lspStatus === 'on'
-                ? 'bg-[var(--color-success)]'
-                : app.lspStatus === 'starting'
-                  ? 'bg-[var(--color-accent)]'
-                  : 'bg-[var(--color-ink-muted)]'}"
-            ></span>
-            <div class="text-xs">
-              <p class="font-medium">{lspLabel[app.lspStatus]}</p>
-              <p class="text-[var(--color-ink-muted)]">
-                Reflects the file currently open in the editor.
-              </p>
+        <SettingsHeader title="Language Server" description="Autocomplete, diagnostics and hover help from tinymist." icon="ph:plugs-connected" />
+        <div class="flex flex-col gap-4">
+          <SettingsCard>
+            <div class="flex items-center gap-3 px-4 py-3">
+              <span
+                class="h-2.5 w-2.5 rounded-full
+                  {app.lspStatus === 'on'
+                  ? 'bg-[var(--color-success)]'
+                  : app.lspStatus === 'starting'
+                    ? 'bg-[var(--color-accent)]'
+                    : 'bg-[var(--color-ink-muted)]'}"
+              ></span>
+              <div class="text-xs">
+                <p class="font-semibold">{lspLabel[app.lspStatus]}</p>
+                <p class="text-[var(--color-ink-muted)]">Reflects the file currently open in the editor.</p>
+              </div>
             </div>
-          </div>
-
-          <p class="text-xs text-[var(--color-ink-muted)]">
-            Typst Desktop uses <span class="font-medium">tinymist</span>, the
-            official Typst language server, to provide autocomplete, diagnostics,
-            and hover info while editing. It must be installed and available on
-            your system PATH — Typst Desktop does not bundle or install it for
-            you.
-          </p>
+            <p class="px-4 py-3 text-xs text-[var(--color-ink-muted)]">
+              Typst Desktop uses <span class="font-medium text-[var(--color-ink)]">tinymist</span>, the official Typst
+              language server. It must be installed and available on your PATH; Typst Desktop does not bundle it.
+            </p>
+          </SettingsCard>
 
           {#if app.lspStatus === "unavailable"}
-            <div
-              class="rounded-md border border-[var(--color-danger)]/30 bg-[var(--color-danger)]/10 p-3 text-xs text-[var(--color-danger)]"
-            >
-              tinymist could not be started. Confirm it's installed and on your
-              PATH, then reopen the file.
+            <div class="rounded-md border border-[var(--color-danger)]/30 bg-[var(--color-danger)]/10 p-3 text-xs text-[var(--color-danger)]">
+              tinymist could not be started. Confirm it's installed and on your PATH, then reopen the file.
             </div>
           {/if}
         </div>
       {:else if section === "hotkeys"}
-        <div class="flex flex-col gap-5">
-          <p class="text-xs text-[var(--color-ink-muted)]">
-            Click the pencil next to a shortcut and press a new key combination.
-            Press Esc while listening to cancel.
-          </p>
-
+        <SettingsHeader title="Hotkeys" description="Click the pencil next to a shortcut and press a new key combination. Press Esc to cancel." icon="ph:keyboard" />
+        <div class="flex flex-col gap-4">
           {#each editableHotkeyGroups as group}
-            <div class="flex flex-col gap-1.5">
-              <span class="text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-muted)]">
-                {group.title}
-              </span>
-              <div class="flex flex-col divide-y divide-[var(--color-line)] rounded-md border border-[var(--color-line)]">
-                {#each group.items as item}
-                  <div class="flex items-center justify-between gap-4 px-3 py-2">
-                    <span class="text-xs">{item.label}</span>
-                    {#if editingId === item.id}
-                      <span class="text-xs text-[var(--color-accent)]">
-                        Press keys… (Esc to cancel)
-                      </span>
-                    {:else}
-                      <span class="flex shrink-0 items-center gap-1">
-                        {#each formatKeys(item.keys) as key}
-                          <kbd
-                            class="rounded border border-[var(--color-line)] bg-[var(--color-surface-muted)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-ink-muted)]"
-                          >
-                            {key}
-                          </kbd>
-                        {/each}
-                        {#if item.customized}
-                          <button
-                            class="rounded p-1 text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
-                            title="Reset to default"
-                            aria-label="Reset to default"
-                            onclick={() => {
-                              resetHotkey(item.id);
-                              hotkeyVersion++;
-                            }}
-                          >
-                            <Icon icon="ph:arrow-counter-clockwise" class="text-xs" />
-                          </button>
-                        {/if}
-                        <button
-                          class="rounded p-1 text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
-                          title="Change shortcut"
-                          aria-label="Change shortcut"
-                          onclick={() => (editingId = item.id)}
-                        >
-                          <Icon icon="ph:pencil-simple" class="text-xs" />
-                        </button>
-                      </span>
-                    {/if}
-                  </div>
-                {/each}
-              </div>
-            </div>
+            {@render hotkeyGroup(group.title, group.items, true)}
           {/each}
-
           {#each staticHotkeyGroups as group}
-            <div class="flex flex-col gap-1.5">
-              <span class="text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-muted)]">
-                {group.title}
-              </span>
-              <div class="flex flex-col divide-y divide-[var(--color-line)] rounded-md border border-[var(--color-line)]">
-                {#each group.items as item}
-                  <div class="flex items-center justify-between gap-4 px-3 py-2">
-                    <span class="text-xs">{item.label}</span>
-                    <span class="flex shrink-0 items-center gap-1">
-                      {#each item.keys as key}
-                        <kbd
-                          class="rounded border border-[var(--color-line)] bg-[var(--color-surface-muted)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-ink-muted)]"
-                        >
-                          {key}
-                        </kbd>
-                      {/each}
-                    </span>
-                  </div>
-                {/each}
-              </div>
-            </div>
+            {@render hotkeyGroup(group.title, group.items, false)}
           {/each}
         </div>
       {:else}
+        <SettingsHeader title="About" description="Version information and links." icon="ph:info" />
         <div class="flex flex-col gap-4">
-          <div class="flex items-center gap-3">
-            <span
-              class="flex h-16 w-16 items-center justify-center rounded-lg bg-[var(--color-accent)]"
-            >
-              <img src="/favicon.png" alt="Typst Desktop" class="h-11 w-11" />
-            </span>
-            <div>
-              <p class="text-sm font-semibold">Typst Desktop</p>
-              <p class="text-xs text-[var(--color-ink-muted)]">
-                A local editor for Typst documents
-              </p>
+          <SettingsCard>
+            <div class="flex items-center gap-3 px-4 py-3">
+              <span class="flex h-12 w-12 items-center justify-center rounded-md bg-[var(--color-accent)]">
+                <img src="/favicon.png" alt="Typst Desktop" class="h-9 w-9" />
+              </span>
+              <div>
+                <p class="text-sm font-semibold">Typst Desktop</p>
+                <p class="text-xs text-[var(--color-ink-muted)]">A local editor for Typst documents</p>
+              </div>
             </div>
-          </div>
-
-          {#if info}
-            <dl class="flex flex-col text-xs">
+            {#if info}
               {#each [["Version", info.version], ["Typst", info.typst_version], ["Tauri", info.tauri_version], ["Author", info.authors], ["License", info.license]] as [label, value]}
-                <div
-                  class="flex justify-between border-b border-[var(--color-line)] py-1.5 last:border-0"
-                >
-                  <dt class="text-[var(--color-ink-muted)]">{label}</dt>
-                  <dd class="font-medium">{value}</dd>
+                <div class="flex justify-between px-4 py-2 text-xs">
+                  <span class="text-[var(--color-ink-muted)]">{label}</span>
+                  <span class="font-medium">{value}</span>
                 </div>
               {/each}
-            </dl>
-          {/if}
+            {/if}
+          </SettingsCard>
 
-          <div class="flex flex-col gap-1.5">
+          <SettingsCard title="Links">
             {#each links as link}
-              <button
-                class="flex items-center gap-2 rounded-md border border-[var(--color-line)] px-3 py-2 text-xs transition hover:border-[var(--color-accent)] hover:bg-[var(--color-surface-muted)]"
-                onclick={() => openUrl(link.url)}
-              >
+              <button class="flex w-full items-center gap-2 px-4 py-2.5 text-xs transition hover:bg-[var(--color-surface-muted)]" onclick={() => openUrl(link.url)}>
                 <Icon icon={link.icon} class="text-base text-[var(--color-accent)]" />
                 <span class="flex-1 text-left">{link.label}</span>
-                <Icon
-                  icon="ph:arrow-square-out"
-                  class="text-[var(--color-ink-muted)]"
-                />
+                <Icon icon="ph:arrow-square-out" class="text-[var(--color-ink-muted)]" />
               </button>
             {/each}
-          </div>
+          </SettingsCard>
 
-          <p
-            class="rounded-md border border-[var(--color-line)] bg-[var(--color-surface-muted)] p-3 text-[11px] leading-relaxed text-[var(--color-ink-muted)]"
-          >
-            Typst Desktop is a community application and is not affiliated with,
-            endorsed by, or supported by the official Typst project. The links
-            above open the official Typst website in your browser.
+          <p class="text-[11px] leading-relaxed text-[var(--color-ink-muted)]">
+            Typst Desktop is a community application and is not affiliated with, endorsed by, or supported by the
+            official Typst project. The links above open the official Typst website in your browser.
           </p>
         </div>
       {/if}
@@ -769,14 +634,14 @@
       section === "lsp" ||
       section === "hotkeys"}
     <button
-      class="rounded-md px-3 py-1.5 text-xs text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)]"
+      class="rounded-md border border-[var(--color-line)] px-3 py-1.5 text-xs text-[var(--color-ink)] hover:bg-[var(--color-surface-sunken)]"
       onclick={onclose}
     >
       {draftless ? "Close" : "Cancel"}
     </button>
     {#if !draftless}
       <button
-        class="rounded-md bg-[var(--color-accent)] px-3 py-1.5 text-xs font-medium text-white transition hover:opacity-90 disabled:opacity-50"
+        class="rounded-md bg-[var(--color-accent)] px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
         disabled={saving}
         onclick={save}
       >
