@@ -198,7 +198,7 @@ Building on the target platform is the supported path. The Typst compiler is a p
 
 ```bash
 git clone https://github.com/typst/typst.git typst
-git -C typst checkout 9dfd3a08500b7896045f907433cf7b4b02434fad
+git -C typst checkout bd5ebec285505889e8ff1d4f68804ab147a699f3
 ```
 
 Linux builds also need the WebKit and GTK development packages:

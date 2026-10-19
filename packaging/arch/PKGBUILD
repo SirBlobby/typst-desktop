@@ -8,11 +8,12 @@ url="https://github.com/sirblobby/typst-desktop"
 license=('Apache-2.0')
 depends=('webkit2gtk-4.1' 'gtk3' 'openssl')
 makedepends=('rust' 'git' 'bun' 'webkit2gtk-4.1' 'gtk3' 'openssl')
+optdepends=('noto-fonts-emoji: emoji rendering in documents')
 options=('!lto')
 source=("$pkgname.desktop")
 sha256sums=('SKIP')
 
-_typst_commit=${TYPST_COMMIT:-9dfd3a08500b7896045f907433cf7b4b02434fad}
+_typst_commit=${TYPST_COMMIT:-bd5ebec285505889e8ff1d4f68804ab147a699f3}
 
 prepare() {
   rm -rf "$srcdir/$pkgname-src"
