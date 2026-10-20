@@ -1,13 +1,25 @@
 import { defineConfig } from "vite";
+import adapter from "@sveltejs/adapter-static";
 import { sveltekit } from "@sveltejs/kit/vite";
+import { vitePreprocess } from "@sveltejs/vite-plugin-svelte";
 import tailwindcss from "@tailwindcss/vite";
 import wasm from "vite-plugin-wasm";
 
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
 
+const svelteKitOptions = {
+  alias: {
+    $lib: "src/lib",
+  },
+  preprocess: vitePreprocess(),
+  adapter: adapter({
+    fallback: "index.html",
+  }),
+};
+
 export default defineConfig(async () => ({
-  plugins: [tailwindcss(), sveltekit(), wasm()],
+  plugins: [tailwindcss(), sveltekit(svelteKitOptions), wasm()],
 
   optimizeDeps: {
     exclude: ["codemirror-lang-typst"],
