@@ -1,10 +1,13 @@
-import { listen } from "@tauri-apps/api/event";
 import * as api from "./api";
 import {
-  openCollabSession,
-  closeCollabSession,
-  type CollabSession,
-} from "./yjs-client";
+  closeLiveSession,
+  initWsSync,
+  openLiveSession,
+  restartAutoSync,
+  syncAfterSave,
+  syncBeforeOpening,
+} from "./cloud-sync";
+import type { CollabSession } from "./yjs-client";
 import type {
   Account,
   BrowseEntry,
@@ -13,7 +16,6 @@ import type {
   CloudFolder,
   CompileResult,
   Conflict,
-  DeviceEvent,
   Diagnostic,
   DocumentLink,
   LinkedDocument,
@@ -367,38 +369,6 @@ export async function bootstrap() {
   }
 }
 
-async function initWsSync() {
-  await listen<string>("cloud://ws-status", (event) => {
-    app.wsStatus = event.payload;
-  });
-
-  await listen<DeviceEvent>("cloud://sync-event", (event) => {
-    handleDeviceEvent(event.payload);
-  });
-
-  app.wsStatus = await api.cloudWsStatus().catch(() => "offline");
-}
-
-function handleDeviceEvent(event: DeviceEvent) {
-  const linkedProject = app.target?.cloud_project_id;
-  const linkedDocument = app.documentLink?.document_id;
-
-  const matchesOpenTarget =
-    (event.kind === "project" &&
-      event.project_id &&
-      event.project_id === linkedProject) ||
-    (event.kind === "document" &&
-      event.document_id &&
-      event.document_id === linkedDocument);
-
-  if (matchesOpenTarget) {
-    if (app.collabIntent) return;
-    autoSync();
-  } else if (app.scope === "cloud") {
-    refreshCloud();
-  }
-}
-
 export async function browseTo(path: string) {
   try {
     app.entries = await api.browseWorkspace(path);
@@ -589,6 +559,8 @@ export async function openTarget(path: string) {
       ? await api.cloudDocumentLink(path).catch(() => null)
       : null;
 
+    await syncBeforeOpening();
+
     const preferred =
       target.files.find((file) => file.path === target.entrypoint) ??
       target.files.find((file) => file.path.endsWith(".typ")) ??
@@ -600,19 +572,11 @@ export async function openTarget(path: string) {
   }
 }
 
-function stopCollab() {
-  closeCollabSession(app.collab);
-  app.collab = null;
-  app.collabIntent = false;
-  app.collabStatus = null;
-  app.collabConflict = null;
-}
-
 export async function closeTarget() {
   cancelScheduledCompile();
   cancelAutosave();
   if (app.dirty) await saveActiveFile();
-  stopCollab();
+  closeLiveSession();
   app.view = "files";
   app.target = null;
   app.activePath = null;
@@ -639,7 +603,7 @@ export async function openFile(file: string) {
   cancelAutosave();
 
   if (app.dirty && app.activePath) await saveActiveFile();
-  stopCollab();
+  closeLiveSession();
 
   try {
     const payload = await api.readTargetFile(app.target.path, file);
@@ -647,98 +611,10 @@ export async function openFile(file: string) {
     app.editorContent = payload.is_text ? payload.content : "";
     app.dirty = false;
     if (payload.is_text) await compile();
-    if (payload.is_text) await tryOpenCollab(file, app.editorContent);
+    if (payload.is_text) await openLiveSession(file, app.editorContent);
   } catch (error) {
     setError(error);
   }
-}
-
-function bindCollabSession(session: CollabSession) {
-  app.collab = session;
-  app.collabStatus = session.provider.wsconnected ? "connected" : "connecting";
-  session.provider.on("status", (event: { status: string }) => {
-    app.collabStatus =
-      event.status === "connected"
-        ? "connected"
-        : event.status === "connecting"
-          ? "connecting"
-          : "offline";
-  });
-}
-
-async function tryOpenCollab(file: string, diskContent: string) {
-  if (!app.target || !app.settings?.device_token) return;
-
-  let roomId: string | null;
-  try {
-    roomId = await api.cloudRoomId(app.target.path, file);
-  } catch {
-    roomId = null;
-  }
-  if (!roomId) return;
-
-  app.collabIntent = true;
-  app.collabStatus = "connecting";
-
-  const session = openCollabSession(
-    app.settings.server_url,
-    app.settings.device_token,
-    roomId,
-  );
-
-  const synced = await new Promise<boolean>((resolve) => {
-    session.provider.once("sync", (isSynced: boolean) => resolve(isSynced));
-  }).catch(() => false);
-
-  if (app.activePath !== file) {
-    closeCollabSession(session);
-    return;
-  }
-
-  if (!synced) {
-    bindCollabSession(session);
-    return;
-  }
-
-  const remoteText = session.text.toString();
-  if (remoteText !== diskContent) {
-    app.collabConflict = {
-      path: file,
-      local_text: diskContent,
-      remote_text: remoteText,
-      merged_text: remoteText,
-      server_hash: "",
-      auto_merged: false,
-      binary: false,
-    };
-    pendingCollabSession = session;
-    return;
-  }
-
-  bindCollabSession(session);
-}
-
-let pendingCollabSession: CollabSession | null = null;
-
-export function resolveCollabConflict(content: string) {
-  const session = pendingCollabSession;
-  pendingCollabSession = null;
-  app.collabConflict = null;
-  if (!session) return;
-
-  const ytext = session.text;
-  ytext.doc?.transact(() => {
-    ytext.delete(0, ytext.length);
-    ytext.insert(0, content);
-  });
-
-  bindCollabSession(session);
-}
-
-export function cancelCollabConflict() {
-  closeCollabSession(pendingCollabSession);
-  pendingCollabSession = null;
-  app.collabConflict = null;
 }
 
 export async function saveActiveFile() {
@@ -750,6 +626,7 @@ export async function saveActiveFile() {
       app.editorContent,
     );
     app.dirty = false;
+    syncAfterSave();
   } catch (error) {
     setError(error);
   }
@@ -846,34 +723,6 @@ export function cancelAutosave() {
   }
 }
 
-let syncTimer: ReturnType<typeof setInterval> | null = null;
-
-export function restartAutoSync() {
-  if (syncTimer) {
-    clearInterval(syncTimer);
-    syncTimer = null;
-  }
-
-  const seconds = app.settings?.sync_seconds ?? 0;
-  if (seconds <= 0) return;
-
-  syncTimer = setInterval(() => {
-    if (app.wsStatus !== "connected") autoSync();
-  }, seconds * 1000);
-}
-
-async function autoSync() {
-  if (!app.account || app.syncing) return;
-  if (app.conflicts.length > 0) return;
-
-  const linked = app.target?.cloud_project_id || app.documentLink;
-  const project = linked ? app.target?.path : null;
-  if (!project) return;
-
-  if (app.dirty) await saveActiveFile();
-  await runSync("sync", project, true);
-}
-
 export async function saveAndCompile() {
   cancelScheduledCompile();
   cancelAutosave();
@@ -881,65 +730,10 @@ export async function saveAndCompile() {
   await compile();
 }
 
-export async function runSync(
-  action: "sync" | "push" | "pull",
-  project = app.target?.path,
-  quiet = false,
-) {
-  if (!project) return;
-
-  app.syncing = true;
-  if (!quiet) clearMessages();
-
-  try {
-    const report = app.documentLink
-      ? await api.cloudSyncDocument(project)
-      : action === "push"
-        ? await api.cloudPush(project)
-        : action === "pull"
-          ? await api.cloudPull(project)
-          : await api.cloudSync(project);
-
-    app.conflicts = report.conflicts;
-
-    if (report.conflicts.length > 0) {
-      setError(`${report.conflicts.length} file(s) need conflict resolution`);
-    } else if (!quiet) {
-      setStatus(summarize(report));
-    }
-
-    await refreshTarget();
-    if (app.activePath) {
-      const payload = await api.readTargetFile(project, app.activePath);
-      if (payload.is_text) {
-        app.editorContent = payload.content;
-        app.dirty = false;
-      }
-    }
-    await compile();
-  } catch (error) {
-    setError(error);
-  } finally {
-    app.syncing = false;
-  }
-}
-
-function summarize(report: {
-  pushed: string[];
-  pulled: string[];
-  merged: string[];
-  deleted_local: string[];
-  deleted_remote: string[];
-}): string {
-  const parts: string[] = [];
-  if (report.pushed.length) parts.push(`${report.pushed.length} uploaded`);
-  if (report.pulled.length) parts.push(`${report.pulled.length} downloaded`);
-  if (report.merged.length) parts.push(`${report.merged.length} merged`);
-  if (report.deleted_local.length)
-    parts.push(`${report.deleted_local.length} removed locally`);
-  if (report.deleted_remote.length)
-    parts.push(`${report.deleted_remote.length} removed in cloud`);
-  return parts.length
-    ? `Sync complete: ${parts.join(", ")}`
-    : "Already up to date";
-}
+export {
+  autoSync,
+  restartAutoSync,
+  runSync,
+  resolveCollabConflict,
+  cancelCollabConflict,
+} from "./cloud-sync";
