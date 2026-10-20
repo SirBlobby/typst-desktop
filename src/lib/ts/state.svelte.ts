@@ -518,10 +518,12 @@ export function linkedDocument(documentId: string) {
 
 export async function downloadCloudFile(fileId: string, name: string) {
   try {
-    await api.cloudDownloadFile(fileId);
+    const path = await api.cloudDownloadFile(fileId);
     setStatus(`'${name}' added to your shared assets`);
+    return path;
   } catch (error) {
     setError(error);
+    return null;
   }
 }
 

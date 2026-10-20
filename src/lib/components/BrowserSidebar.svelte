@@ -1,6 +1,7 @@
 <script lang="ts">
   import Icon from "@iconify/svelte";
   import { app, browseTo, openCloudFolder } from "$lib/ts/state.svelte";
+  import AccountAvatar from "./AccountAvatar.svelte";
 
   interface Props {
     onsettings: () => void;
@@ -40,7 +41,6 @@
   const inWorkspace = $derived(app.scope === "local");
   const inCloudHome = $derived(app.scope === "cloud" && app.cloudFolder !== "shared");
   const inShared = $derived(app.scope === "cloud" && app.cloudFolder === "shared");
-  const accountInitial = $derived(app.account?.username?.charAt(0).toUpperCase() ?? "?");
 </script>
 
 {#snippet navItem(label: string, icon: string, active: boolean, onclick: () => void)}
@@ -93,9 +93,7 @@
         class="flex items-center gap-2 py-1 {collapsed ? 'justify-center' : 'px-1'}"
         title={collapsed ? `${app.account.username} (${app.account.email})` : undefined}
       >
-        <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--color-accent-soft)] text-xs font-bold text-[var(--color-accent)]">
-          {accountInitial}
-        </span>
+        <AccountAvatar />
         {#if !collapsed}
           <span class="min-w-0">
             <span class="block truncate text-xs font-semibold">{app.account.username}</span>

@@ -1,18 +1,13 @@
 <script lang="ts">
   import Icon from "@iconify/svelte";
   import * as api from "$lib/ts/api";
-  import type { BrowseEntry, CloudFile, CloudFolder, EntryKind } from "$lib/ts/api";
+  import type { BrowseEntry, EntryKind } from "$lib/ts/api";
   import { clampMenu } from "$lib/ts/menu-position";
   import {
     app,
     breadcrumbs,
     browseTo,
-    cloudBreadcrumbs,
-    linkedDocument,
-    linkedProject,
-    openCloudFolder,
     openTarget,
-    refreshCloud,
     refreshEntries,
     setError,
   } from "$lib/ts/state.svelte";
@@ -27,21 +22,6 @@
     onlink: (entry: BrowseEntry) => void;
     onsavetocloud: (entry: BrowseEntry) => void;
     onviewimage: (paths: string[], index: number) => void;
-    ondownloaddocument: (documentId: string, title: string) => void;
-    onremovedownload: (path: string) => void;
-    ondownloadfile: (fileId: string, name: string) => void;
-    ondeletefile: (fileId: string) => void;
-    onuploadfile: () => void;
-    onrenamefile: (file: CloudFile) => void;
-    oncloneproject: (cloudProjectId: string, name: string) => void;
-    ondeleteproject: (cloudProjectId: string) => void;
-    ondeletedocument: (documentId: string) => void;
-    onnewcloudproject: () => void;
-    onnewclouddocument: () => void;
-    onnewcloudfolder: () => void;
-    onrenamecloudfolder: (folder: CloudFolder) => void;
-    ondeletecloudfolder: (folder: CloudFolder) => void;
-    onsignin: () => void;
   }
 
   let {
@@ -54,21 +34,6 @@
     onlink,
     onsavetocloud,
     onviewimage,
-    ondownloaddocument,
-    onremovedownload,
-    ondownloadfile,
-    ondeletefile,
-    onuploadfile,
-    onrenamefile,
-    oncloneproject,
-    ondeleteproject,
-    ondeletedocument,
-    onnewcloudproject,
-    onnewclouddocument,
-    onnewcloudfolder,
-    onrenamecloudfolder,
-    ondeletecloudfolder,
-    onsignin,
   }: Props = $props();
 
   let menuFor = $state<string | null>(null);
@@ -81,33 +46,10 @@
     menuFor = path;
   }
 
-  let cloudMenuFor = $state<string | null>(null);
-  let cloudMenuAt = $state({ x: 0, y: 0 });
-
-  function openCloudContextMenu(event: MouseEvent, id: string) {
-    event.preventDefault();
-    event.stopPropagation();
-    cloudMenuAt = { x: event.clientX, y: event.clientY };
-    cloudMenuFor = id;
-  }
-
   const trail = $derived(breadcrumbs());
-  const cloudTrail = $derived(cloudBreadcrumbs());
   let newMenuOpen = $state(false);
 
-  const headerTitle = $derived(
-    app.scope === "local"
-      ? (trail.at(-1)?.name ?? "Workspace")
-      : app.cloudFolder === "shared"
-        ? "Shared with me"
-        : (cloudTrail.at(-1)?.name ?? "Home"),
-  );
-
-  $effect(() => {
-    if (app.scope === "cloud" && app.account) {
-      refreshCloud();
-    }
-  });
+  const headerTitle = $derived(trail.at(-1)?.name ?? "Workspace");
 
   const containers = $derived(
     app.entries.filter(
@@ -122,34 +64,6 @@
   );
 
   let thumbs = $state<Record<string, { kind: string; data: string }>>({});
-  let cloudThumbs = $state<Record<string, { kind: string; data: string }>>({});
-
-  $effect(() => {
-    if (app.scope !== "cloud") return;
-
-    const pending = [
-      ...app.linkedDocuments.map((linked) => linked.path),
-      ...app.linkedProjects.map((linked) => linked.path),
-    ];
-    let cancelled = false;
-
-    (async () => {
-      for (const path of pending) {
-        if (cancelled) return;
-        if (cloudThumbs[path]) continue;
-        try {
-          const result = await api.thumbnail(path);
-          if (!cancelled) cloudThumbs[path] = result;
-        } catch {
-          continue;
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  });
 
   $effect(() => {
     const pending = documents.map((entry) => entry.path);
@@ -253,55 +167,6 @@
     if (source) moveTo(source, destination);
   }
 
-  type CloudDragItem = {
-    kind: "project" | "document" | "folder" | "file";
-    id: string;
-  };
-  let cloudDragging = $state<CloudDragItem | null>(null);
-  let cloudDropTarget = $state<string | null>(null);
-
-  async function moveCloudItem(item: CloudDragItem, folderId: string | null) {
-    try {
-      if (item.kind === "folder") {
-        await api.cloudMoveFolder(item.id, folderId);
-      } else if (item.kind === "project") {
-        await api.cloudMoveProject(item.id, folderId);
-      } else if (item.kind === "document") {
-        await api.cloudMoveDocument(item.id, folderId);
-      } else {
-        await api.cloudMoveFile(item.id, folderId);
-      }
-      await refreshCloud();
-    } catch (error) {
-      setError(error);
-    }
-  }
-
-  function startCloudDrag(event: DragEvent, item: CloudDragItem) {
-    cloudDragging = item;
-    event.dataTransfer?.setData("text/plain", item.id);
-  }
-
-  function endCloudDrag() {
-    cloudDragging = null;
-    cloudDropTarget = null;
-  }
-
-  function allowCloudDrop(event: DragEvent, folderId: string) {
-    if (!cloudDragging) return;
-    if (cloudDragging.kind === "folder" && cloudDragging.id === folderId) return;
-    event.preventDefault();
-    cloudDropTarget = folderId;
-  }
-
-  function handleCloudDrop(event: DragEvent, folderId: string) {
-    event.preventDefault();
-    const item = cloudDragging;
-    cloudDragging = null;
-    cloudDropTarget = null;
-    if (item) moveCloudItem(item, folderId === "" ? null : folderId);
-  }
-
   function activate(entry: BrowseEntry) {
     if (entry.kind === "folder") {
       browseTo(entry.path);
@@ -324,190 +189,6 @@
     return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString();
   }
 </script>
-
-{#snippet cloudMenu(
-  id: string,
-  onopen: (() => void) | null,
-  ondownload: () => void,
-  onremove: (() => void) | null,
-  onrename: (() => void) | null,
-  ondelete: (() => void) | null,
-)}
-  {#if cloudMenuFor === id}
-    <div
-      use:clampMenu
-      class="fixed z-50 flex w-44 flex-col rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] py-1 text-xs shadow-lg"
-      style="left: {cloudMenuAt.x}px; top: {cloudMenuAt.y}px"
-    >
-      {#if onopen}
-        <button
-          class="px-3 py-1.5 text-left hover:bg-[var(--color-surface-sunken)]"
-          onclick={() => {
-            onopen();
-            cloudMenuFor = null;
-          }}
-        >
-          Open
-        </button>
-      {:else}
-        <button
-          class="px-3 py-1.5 text-left hover:bg-[var(--color-surface-sunken)]"
-          onclick={() => {
-            ondownload();
-            cloudMenuFor = null;
-          }}
-        >
-          Download
-        </button>
-      {/if}
-      {#if onremove}
-        <button
-          class="px-3 py-1.5 text-left hover:bg-[var(--color-surface-sunken)]"
-          onclick={() => {
-            onremove();
-            cloudMenuFor = null;
-          }}
-        >
-          Remove from this device
-        </button>
-      {/if}
-      {#if onrename}
-        <button
-          class="px-3 py-1.5 text-left hover:bg-[var(--color-surface-sunken)]"
-          onclick={() => {
-            onrename();
-            cloudMenuFor = null;
-          }}
-        >
-          Rename
-        </button>
-      {/if}
-      {#if ondelete}
-        <button
-          class="px-3 py-1.5 text-left text-[var(--color-danger)] hover:bg-[var(--color-surface-sunken)]"
-          onclick={() => {
-            ondelete();
-            cloudMenuFor = null;
-          }}
-        >
-          Delete from cloud
-        </button>
-      {/if}
-    </div>
-  {/if}
-{/snippet}
-
-{#snippet cloudCard(
-  id: string,
-  icon: string,
-  title: string,
-  meta: string,
-  link: { sync_state: string | null; path: string } | undefined,
-  onopen: (() => void) | null,
-  ondownload: () => void,
-  onremove: (() => void) | null,
-  ondelete: (() => void) | null,
-)}
-  {@const [dragKind, dragId] = id.split(":") as [
-    "project" | "document",
-    string,
-  ]}
-  <div
-    class="group flex flex-col overflow-hidden rounded-lg border border-[var(--color-line)] bg-[var(--color-surface)] transition hover:border-[var(--color-accent)] hover:shadow-sm"
-    role="group"
-    oncontextmenu={(event) => openCloudContextMenu(event, id)}
-    draggable="true"
-    ondragstart={(event) => startCloudDrag(event, { kind: dragKind, id: dragId })}
-    ondragend={endCloudDrag}
-  >
-    {@render cloudMenu(id, onopen, ondownload, onremove, null, ondelete)}
-    <div
-      class="flex h-24 items-center justify-center overflow-hidden border-b border-[var(--color-line)] bg-[var(--color-surface-muted)]"
-    >
-      {#if link && cloudThumbs[link.path]}
-        {#if cloudThumbs[link.path].kind === "svg"}
-          <span
-            class="flex w-full items-start justify-center bg-white p-1 [&_svg]:h-auto [&_svg]:w-full"
-          >
-            {@html cloudThumbs[link.path].data}
-          </span>
-        {:else}
-          <img
-            src={cloudThumbs[link.path].data}
-            alt={title}
-            class="h-full w-full object-contain"
-          />
-        {/if}
-      {:else}
-        <Icon
-          {icon}
-          class="text-3xl {link
-            ? 'text-[var(--color-accent)]'
-            : 'text-[var(--color-ink-muted)]'}"
-        />
-      {/if}
-    </div>
-
-    <div class="flex flex-col gap-2.5 p-3">
-    <div class="flex items-start gap-2">
-      <div class="min-w-0 flex-1">
-        <p class="truncate text-xs font-medium" {title}>{title}</p>
-        <p class="truncate text-[10px] text-[var(--color-ink-muted)]">{meta}</p>
-      </div>
-
-      {#if link}
-        <span
-          class="flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-medium
-            {link.sync_state === 'pending'
-            ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent)]'
-            : 'bg-[var(--color-success)]/10 text-[var(--color-success)]'}"
-          title={link.sync_state === "pending"
-            ? "Local changes not yet synced"
-            : "On this device and up to date"}
-        >
-          <Icon
-            icon={link.sync_state === "pending"
-              ? "ph:cloud-arrow-up"
-              : "ph:cloud-check"}
-            class="text-[11px]"
-          />
-          {link.sync_state === "pending" ? "Unsynced" : "Synced"}
-        </span>
-      {/if}
-    </div>
-
-    <div class="flex gap-1">
-      {#if link && onopen}
-        <button
-          class="flex flex-1 items-center justify-center gap-1 rounded-md bg-[var(--color-accent)] px-2 py-1.5 text-[10px] font-medium text-white transition hover:opacity-90"
-          onclick={onopen}
-        >
-          <Icon icon="ph:pencil-simple" />
-          Open
-        </button>
-      {:else}
-        <button
-          class="flex flex-1 items-center justify-center gap-1 rounded-md border border-[var(--color-line)] px-2 py-1.5 text-[10px] transition hover:bg-[var(--color-surface-muted)]"
-          onclick={ondownload}
-        >
-          <Icon icon="ph:download-simple" />
-          Download
-        </button>
-      {/if}
-
-      {#if onremove || ondelete}
-        <button
-          class="rounded-md border border-[var(--color-line)] px-2 py-1.5 text-[10px] text-[var(--color-ink-muted)] transition hover:border-[var(--color-danger)] hover:text-[var(--color-danger)]"
-          onclick={onremove ?? ondelete}
-          aria-label={onremove ? "Remove" : "Delete"}
-        >
-          <Icon icon="ph:trash" />
-        </button>
-      {/if}
-    </div>
-    </div>
-  </div>
-{/snippet}
 
 {#snippet sectionTitle(label: string)}
   <div class="mb-2 flex items-center gap-2">
@@ -629,7 +310,6 @@
     if (!(event.target as HTMLElement).closest("[data-card-menu]")) {
       menuFor = null;
     }
-    cloudMenuFor = null;
     if (!(event.target as HTMLElement).closest("[data-new-menu]")) {
       newMenuOpen = false;
     }
@@ -643,488 +323,254 @@
 >
   <header class="shrink-0 border-b border-[var(--color-line)] bg-[var(--color-surface)] px-5 pb-3 pt-3">
     <nav class="mb-1 flex flex-wrap items-center gap-0.5 text-[11px] text-[var(--color-ink-muted)]" aria-label="Location">
-      {#if app.scope === "local"}
+      <button
+        class="flex items-center gap-1 rounded px-1.5 py-0.5 transition hover:text-[var(--color-ink)]
+          {dropTarget === '' ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent)]' : ''}"
+        onclick={() => browseTo("")}
+        ondragover={(event) => allowDrop(event, "")}
+        ondragleave={() => {
+          if (dropTarget === "") dropTarget = null;
+        }}
+        ondrop={(event) => handleDrop(event, "")}
+      >
+        <Icon icon="ph:hard-drives" />
+        Workspace
+      </button>
+      {#each trail as crumb}
+        <span class="opacity-50">/</span>
         <button
-          class="flex items-center gap-1 rounded px-1.5 py-0.5 transition hover:text-[var(--color-ink)]
-            {dropTarget === '' ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent)]' : ''}"
-          onclick={() => browseTo("")}
-          ondragover={(event) => allowDrop(event, "")}
+          class="max-w-48 truncate rounded px-1.5 py-0.5 transition hover:text-[var(--color-ink)]
+            {dropTarget === crumb.path ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent)]' : ''}"
+          onclick={() => browseTo(crumb.path)}
+          ondragover={(event) => allowDrop(event, crumb.path)}
           ondragleave={() => {
-            if (dropTarget === "") dropTarget = null;
+            if (dropTarget === crumb.path) dropTarget = null;
           }}
-          ondrop={(event) => handleDrop(event, "")}
+          ondrop={(event) => handleDrop(event, crumb.path)}
         >
-          <Icon icon="ph:hard-drives" />
-          Workspace
+          {crumb.name}
         </button>
-        {#each trail as crumb}
-          <span class="opacity-50">/</span>
-          <button
-            class="max-w-48 truncate rounded px-1.5 py-0.5 transition hover:text-[var(--color-ink)]
-              {dropTarget === crumb.path ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent)]' : ''}"
-            onclick={() => browseTo(crumb.path)}
-            ondragover={(event) => allowDrop(event, crumb.path)}
-            ondragleave={() => {
-              if (dropTarget === crumb.path) dropTarget = null;
-            }}
-            ondrop={(event) => handleDrop(event, crumb.path)}
-          >
-            {crumb.name}
-          </button>
-        {/each}
-      {:else if app.cloudFolder === "shared"}
-        <span class="flex items-center gap-1 px-1.5 py-0.5"><Icon icon="ph:users-three" /> TypstDrive</span>
-      {:else}
-        <button
-          class="flex items-center gap-1 rounded px-1.5 py-0.5 transition hover:text-[var(--color-ink)]
-            {cloudDropTarget === '' ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent)]' : ''}"
-          onclick={() => openCloudFolder(null)}
-          ondragover={(event) => allowCloudDrop(event, "")}
-          ondragleave={() => {
-            if (cloudDropTarget === "") cloudDropTarget = null;
-          }}
-          ondrop={(event) => handleCloudDrop(event, "")}
-        >
-          <Icon icon="ph:cloud" />
-          Home
-        </button>
-        {#each cloudTrail as folder}
-          <span class="opacity-50">/</span>
-          <button
-            class="max-w-48 truncate rounded px-1.5 py-0.5 transition hover:text-[var(--color-ink)]
-              {cloudDropTarget === folder.id ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent)]' : ''}"
-            onclick={() => openCloudFolder(folder.id)}
-            ondragover={(event) => allowCloudDrop(event, folder.id)}
-            ondragleave={() => {
-              if (cloudDropTarget === folder.id) cloudDropTarget = null;
-            }}
-            ondrop={(event) => handleCloudDrop(event, folder.id)}
-          >
-            {folder.name}
-          </button>
-        {/each}
-      {/if}
+      {/each}
     </nav>
 
     <div class="flex items-center gap-3">
       <h1 class="min-w-0 flex-1 truncate text-lg font-semibold">{headerTitle}</h1>
 
-      {#if app.scope === "cloud" && app.cloudLoading}
-        <Icon icon="ph:circle-notch" class="animate-spin text-base text-[var(--color-accent)]" />
-      {/if}
+      <button
+        class="flex items-center gap-1.5 rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] px-2.5 py-1.5 text-xs font-medium transition hover:bg-[var(--color-surface-sunken)]"
+        onclick={onupload}
+      >
+        <Icon icon="ph:upload-simple" />
+        Import
+      </button>
 
-      {#if app.scope === "local" || (app.account && app.cloudFolder !== "shared")}
+      <div class="relative flex" data-new-menu>
         <button
-          class="flex items-center gap-1.5 rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] px-2.5 py-1.5 text-xs font-medium transition hover:bg-[var(--color-surface-sunken)]"
-          onclick={app.scope === "local" ? onupload : onuploadfile}
+          class="flex items-center gap-1.5 rounded-l-md bg-[var(--color-accent)] py-1.5 pl-2.5 pr-2 text-xs font-semibold text-white transition hover:opacity-90"
+          onclick={onnewdocument}
         >
-          <Icon icon="ph:upload-simple" />
-          {app.scope === "local" ? "Import" : "Upload"}
+          <Icon icon="ph:file-plus" />
+          New document
         </button>
-
-        <div class="relative flex" data-new-menu>
-          <button
-            class="flex items-center gap-1.5 rounded-l-md bg-[var(--color-accent)] py-1.5 pl-2.5 pr-2 text-xs font-semibold text-white transition hover:opacity-90"
-            onclick={app.scope === "local" ? onnewdocument : onnewclouddocument}
-          >
-            <Icon icon="ph:file-plus" />
-            New document
-          </button>
-          <button
-            class="rounded-r-md border-l border-white/25 bg-[var(--color-accent)] px-1.5 py-1.5 text-xs text-white transition hover:opacity-90"
-            aria-label="More create options"
-            aria-haspopup="menu"
-            aria-expanded={newMenuOpen}
-            onclick={() => (newMenuOpen = !newMenuOpen)}
-          >
-            <Icon icon="ph:caret-down" />
-          </button>
-          {#if newMenuOpen}
-            <div role="menu" class="absolute right-0 top-full z-30 mt-1 w-52 rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] p-1 shadow-xl">
-              {#each [
-                { label: "Project", description: "Multi-file workspace", icon: "ph:folder-star", action: app.scope === "local" ? onnewproject : onnewcloudproject },
-                { label: "Folder", description: "Organize your files", icon: "ph:folder-plus", action: app.scope === "local" ? onnewfolder : onnewcloudfolder },
-              ] as item}
-                <button
-                  role="menuitem"
-                  class="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left hover:bg-[var(--color-surface-sunken)]"
-                  onclick={() => {
-                    newMenuOpen = false;
-                    item.action();
-                  }}
-                >
-                  <Icon icon={item.icon} class="text-lg text-[var(--color-accent)]" />
-                  <span>
-                    <span class="block text-xs font-medium">{item.label}</span>
-                    <span class="block text-[10px] text-[var(--color-ink-muted)]">{item.description}</span>
-                  </span>
-                </button>
-              {/each}
-            </div>
-          {/if}
-        </div>
-      {/if}
+        <button
+          class="rounded-r-md border-l border-white/25 bg-[var(--color-accent)] px-1.5 py-1.5 text-xs text-white transition hover:opacity-90"
+          aria-label="More create options"
+          aria-haspopup="menu"
+          aria-expanded={newMenuOpen}
+          onclick={() => (newMenuOpen = !newMenuOpen)}
+        >
+          <Icon icon="ph:caret-down" />
+        </button>
+        {#if newMenuOpen}
+          <div role="menu" class="absolute right-0 top-full z-30 mt-1 w-52 rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] p-1 shadow-xl">
+            {#each [
+              { label: "Project", description: "Multi-file workspace", icon: "ph:folder-star", action: onnewproject },
+              { label: "Folder", description: "Organize your files", icon: "ph:folder-plus", action: onnewfolder },
+            ] as item}
+              <button
+                role="menuitem"
+                class="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left hover:bg-[var(--color-surface-sunken)]"
+                onclick={() => {
+                  newMenuOpen = false;
+                  item.action();
+                }}
+              >
+                <Icon icon={item.icon} class="text-lg text-[var(--color-accent)]" />
+                <span>
+                  <span class="block text-xs font-medium">{item.label}</span>
+                  <span class="block text-[10px] text-[var(--color-ink-muted)]">{item.description}</span>
+                </span>
+              </button>
+            {/each}
+          </div>
+        {/if}
+      </div>
     </div>
   </header>
 
-  {#if app.scope === "local"}
-    <div class="scroll-thin flex-1 overflow-y-auto p-4">
-      {#if app.entries.length === 0}
-        <div
-          class="flex h-full flex-col items-center justify-center gap-3 text-[var(--color-ink-muted)]"
-        >
-          <Icon icon="ph:folder-open" class="text-5xl" />
-          <p class="text-sm">This folder is empty.</p>
-          <div class="flex gap-2">
-            <button
-              class="rounded-md bg-[var(--color-accent)] px-3 py-1.5 text-xs font-medium text-white hover:opacity-90"
-              onclick={onnewdocument}
-            >
-              New document
-            </button>
-            <button
-              class="rounded-md border border-[var(--color-line)] px-3 py-1.5 text-xs hover:bg-[var(--color-surface)]"
-              onclick={onnewproject}
-            >
-              New project
-            </button>
-          </div>
+  <div class="scroll-thin flex-1 overflow-y-auto p-4">
+    {#if app.entries.length === 0}
+      <div
+        class="flex h-full flex-col items-center justify-center gap-3 text-[var(--color-ink-muted)]"
+      >
+        <Icon icon="ph:folder-open" class="text-5xl" />
+        <p class="text-sm">This folder is empty.</p>
+        <div class="flex gap-2">
+          <button
+            class="rounded-md bg-[var(--color-accent)] px-3 py-1.5 text-xs font-medium text-white hover:opacity-90"
+            onclick={onnewdocument}
+          >
+            New document
+          </button>
+          <button
+            class="rounded-md border border-[var(--color-line)] px-3 py-1.5 text-xs hover:bg-[var(--color-surface)]"
+            onclick={onnewproject}
+          >
+            New project
+          </button>
         </div>
-      {:else}
-        <div class="flex flex-col gap-5">
-          {#if containers.length > 0}
-            <section class="flex flex-col gap-2">
-              {@render sectionTitle("Folders")}
-              <div class="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-2">
-                {#each containers as entry (entry.path)}
-                  <div
-                    class="group relative flex items-center gap-2.5 rounded-lg border px-3 py-2.5 transition hover:border-[var(--color-accent)] hover:bg-[var(--color-surface)]
-                      {dropTarget === entry.path
-                      ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)]'
-                      : 'border-[var(--color-line)] bg-[var(--color-surface-sunken)]'}"
-                    role="group"
-                    draggable="true"
-                    ondragstart={(event) => startDrag(event, entry.path)}
-                    ondragend={endDrag}
-                    ondragover={(event) => allowDrop(event, entry.path)}
-                    ondragleave={() => {
-                      if (dropTarget === entry.path) dropTarget = null;
-                    }}
-                    ondrop={(event) => handleDrop(event, entry.path)}
-                    oncontextmenu={(event) => openContextMenu(event, entry.path)}
+      </div>
+    {:else}
+      <div class="flex flex-col gap-5">
+        {#if containers.length > 0}
+          <section class="flex flex-col gap-2">
+            {@render sectionTitle("Folders")}
+            <div class="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-2">
+              {#each containers as entry (entry.path)}
+                <div
+                  class="group relative flex items-center gap-2.5 rounded-lg border px-3 py-2.5 transition hover:border-[var(--color-accent)] hover:bg-[var(--color-surface)]
+                    {dropTarget === entry.path
+                    ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)]'
+                    : 'border-[var(--color-line)] bg-[var(--color-surface-sunken)]'}"
+                  role="group"
+                  draggable="true"
+                  ondragstart={(event) => startDrag(event, entry.path)}
+                  ondragend={endDrag}
+                  ondragover={(event) => allowDrop(event, entry.path)}
+                  ondragleave={() => {
+                    if (dropTarget === entry.path) dropTarget = null;
+                  }}
+                  ondrop={(event) => handleDrop(event, entry.path)}
+                  oncontextmenu={(event) => openContextMenu(event, entry.path)}
+                >
+                  <button
+                    class="flex min-w-0 flex-1 items-center gap-2.5 text-left"
+                    ondblclick={() => activate(entry)}
+                    onclick={() => activate(entry)}
                   >
+                    <Icon
+                      icon={entry.kind === "project"
+                        ? "ph:folder-star-fill"
+                        : "ph:folder-fill"}
+                      class="shrink-0 text-2xl {entry.kind === 'project'
+                        ? 'text-[var(--color-accent)]'
+                        : 'text-[var(--color-ink-muted)]'}"
+                    />
+                    <span class="min-w-0 flex-1">
+                      <span class="flex items-center gap-1.5">
+                        <span
+                          class="truncate text-xs font-medium"
+                          title={entry.name}
+                        >
+                          {entry.name}
+                        </span>
+                        {@render syncBadge(entry)}
+                      </span>
+                      <span
+                        class="block truncate text-[10px] text-[var(--color-ink-muted)]"
+                      >
+                        {entry.kind === "project" ? "Project · " : ""}{entry.child_count}
+                        items
+                      </span>
+                    </span>
+                  </button>
+
+                  {@render actions(entry)}
+                </div>
+              {/each}
+            </div>
+          </section>
+        {/if}
+
+        {#if documents.length > 0}
+          <section class="flex flex-col gap-2">
+            {@render sectionTitle("Documents")}
+            <div class="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-3">
+              {#each documents as entry (entry.path)}
+                <div
+                  class="group relative flex flex-col overflow-hidden rounded-lg border border-[var(--color-line)] bg-[var(--color-surface)] transition hover:border-[var(--color-accent)] hover:shadow-md"
+                  role="group"
+                  draggable="true"
+                  ondragstart={(event) => startDrag(event, entry.path)}
+                  ondragend={endDrag}
+                  oncontextmenu={(event) => openContextMenu(event, entry.path)}
+                >
+                  <button
+                    class="flex flex-col text-left"
+                    ondblclick={() => activate(entry)}
+                    onclick={() => activate(entry)}
+                  >
+                    <span
+                      class="flex h-24 items-center justify-center overflow-hidden border-b border-[var(--color-line)] bg-[var(--color-surface-muted)]"
+                    >
+                      {#if thumbs[entry.path]?.kind === "svg"}
+                        <span
+                          class="flex w-full origin-top scale-100 items-start justify-center bg-white p-1 [&_svg]:h-auto [&_svg]:w-full"
+                        >
+                          {@html thumbs[entry.path].data}
+                        </span>
+                      {:else if thumbs[entry.path]?.kind === "image"}
+                        <img
+                          src={thumbs[entry.path].data}
+                          alt={entry.name}
+                          class="h-full w-full object-contain"
+                        />
+                      {:else}
+                        <Icon
+                          icon={iconFor[entry.kind]}
+                          class="text-3xl {colorFor[entry.kind]}"
+                        />
+                      {/if}
+                    </span>
+
+                  </button>
+
+                  <div class="flex items-center gap-1 px-2.5 py-2">
                     <button
-                      class="flex min-w-0 flex-1 items-center gap-2.5 text-left"
-                      ondblclick={() => activate(entry)}
+                      class="flex min-w-0 flex-1 flex-col gap-0.5 text-left"
                       onclick={() => activate(entry)}
                     >
-                      <Icon
-                        icon={entry.kind === "project"
-                          ? "ph:folder-star-fill"
-                          : "ph:folder-fill"}
-                        class="shrink-0 text-2xl {entry.kind === 'project'
-                          ? 'text-[var(--color-accent)]'
-                          : 'text-[var(--color-ink-muted)]'}"
-                      />
-                      <span class="min-w-0 flex-1">
-                        <span class="flex items-center gap-1.5">
-                          <span
-                            class="truncate text-xs font-medium"
-                            title={entry.name}
-                          >
-                            {entry.name}
-                          </span>
-                          {@render syncBadge(entry)}
-                        </span>
+                      <span class="flex items-center gap-1.5">
                         <span
-                          class="block truncate text-[10px] text-[var(--color-ink-muted)]"
+                          class="min-w-0 flex-1 truncate text-xs font-medium"
+                          title={entry.name}
                         >
-                          {entry.kind === "project" ? "Project · " : ""}{entry.child_count}
-                          items
+                          {entry.name}
                         </span>
+                        {@render syncBadge(entry)}
+                      </span>
+                      <span class="text-[10px] text-[var(--color-ink-muted)]">
+                        {#if entry.cloud_linked && entry.sync_state === "pending"}
+                          Not synced
+                        {:else if entry.cloud_linked}
+                          Synced {relativeTime(entry.last_synced_at)}
+                        {:else}
+                          {formatSize(entry.size)}
+                          {#if entry.modified}
+                            · {formatDate(entry.modified)}
+                          {/if}
+                        {/if}
                       </span>
                     </button>
 
                     {@render actions(entry)}
                   </div>
-                {/each}
-              </div>
-            </section>
-          {/if}
-
-          {#if documents.length > 0}
-            <section class="flex flex-col gap-2">
-              {@render sectionTitle("Documents")}
-              <div class="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-3">
-                {#each documents as entry (entry.path)}
-                  <div
-                    class="group relative flex flex-col overflow-hidden rounded-lg border border-[var(--color-line)] bg-[var(--color-surface)] transition hover:border-[var(--color-accent)] hover:shadow-md"
-                    role="group"
-                    draggable="true"
-                    ondragstart={(event) => startDrag(event, entry.path)}
-                    ondragend={endDrag}
-                    oncontextmenu={(event) => openContextMenu(event, entry.path)}
-                  >
-                    <button
-                      class="flex flex-col text-left"
-                      ondblclick={() => activate(entry)}
-                      onclick={() => activate(entry)}
-                    >
-                      <span
-                        class="flex h-24 items-center justify-center overflow-hidden border-b border-[var(--color-line)] bg-[var(--color-surface-muted)]"
-                      >
-                        {#if thumbs[entry.path]?.kind === "svg"}
-                          <span
-                            class="flex w-full origin-top scale-100 items-start justify-center bg-white p-1 [&_svg]:h-auto [&_svg]:w-full"
-                          >
-                            {@html thumbs[entry.path].data}
-                          </span>
-                        {:else if thumbs[entry.path]?.kind === "image"}
-                          <img
-                            src={thumbs[entry.path].data}
-                            alt={entry.name}
-                            class="h-full w-full object-contain"
-                          />
-                        {:else}
-                          <Icon
-                            icon={iconFor[entry.kind]}
-                            class="text-3xl {colorFor[entry.kind]}"
-                          />
-                        {/if}
-                      </span>
-
-                    </button>
-
-                    <div class="flex items-center gap-1 px-2.5 py-2">
-                      <button
-                        class="flex min-w-0 flex-1 flex-col gap-0.5 text-left"
-                        onclick={() => activate(entry)}
-                      >
-                        <span class="flex items-center gap-1.5">
-                          <span
-                            class="min-w-0 flex-1 truncate text-xs font-medium"
-                            title={entry.name}
-                          >
-                            {entry.name}
-                          </span>
-                          {@render syncBadge(entry)}
-                        </span>
-                        <span class="text-[10px] text-[var(--color-ink-muted)]">
-                          {#if entry.cloud_linked && entry.sync_state === "pending"}
-                            Not synced
-                          {:else if entry.cloud_linked}
-                            Synced {relativeTime(entry.last_synced_at)}
-                          {:else}
-                            {formatSize(entry.size)}
-                            {#if entry.modified}
-                              · {formatDate(entry.modified)}
-                            {/if}
-                          {/if}
-                        </span>
-                      </button>
-
-                      {@render actions(entry)}
-                    </div>
-                  </div>
-                {/each}
-              </div>
-            </section>
-          {/if}
-        </div>
-      {/if}
-    </div>
-  {:else}
-    <div class="scroll-thin flex-1 overflow-y-auto p-4">
-      {#if !app.account}
-        <div
-          class="flex h-full flex-col items-center justify-center gap-3 text-[var(--color-ink-muted)]"
-        >
-          <Icon icon="ph:cloud-slash" class="text-5xl" />
-          <p class="max-w-xs text-center text-sm">
-            Connect a TypstDrive account to sync your projects across devices.
-          </p>
-          <button
-            class="rounded-md bg-[var(--color-accent)] px-3 py-2 text-xs font-medium text-white hover:opacity-90"
-            onclick={onsignin}
-          >
-            Sign in
-          </button>
-        </div>
-      {:else}
-        {#if app.cloudOffline}
-          <div class="mb-3 flex items-center gap-2 rounded-lg border border-[var(--color-line)] bg-[var(--color-surface-muted)] px-3 py-2 text-xs text-[var(--color-ink-muted)]">
-            <Icon icon="ph:wifi-slash" class="text-base" />
-            Offline — showing last synced data
-          </div>
-        {/if}
-
-        {#if app.cloudFolders.length > 0}
-          <div
-            class="mb-4 grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-2"
-          >
-            {#each app.cloudFolders as folder (folder.id)}
-              <div class="relative">
-                <button
-                  class="flex w-full items-center gap-2.5 rounded-lg border px-3 py-2.5 text-left transition hover:border-[var(--color-accent)] hover:bg-[var(--color-surface)]
-                    {cloudDropTarget === folder.id
-                    ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)]'
-                    : 'border-[var(--color-line)] bg-[var(--color-surface-sunken)]'}"
-                  onclick={() => openCloudFolder(folder.id)}
-                  oncontextmenu={(event) =>
-                    openCloudContextMenu(event, `folder:${folder.id}`)}
-                  draggable="true"
-                  ondragstart={(event) =>
-                    startCloudDrag(event, { kind: "folder", id: folder.id })}
-                  ondragend={endCloudDrag}
-                  ondragover={(event) => allowCloudDrop(event, folder.id)}
-                  ondragleave={() => {
-                    if (cloudDropTarget === folder.id) cloudDropTarget = null;
-                  }}
-                  ondrop={(event) => handleCloudDrop(event, folder.id)}
-                >
-                  <Icon
-                    icon="ph:folder-fill"
-                    class="shrink-0 text-2xl text-[var(--color-ink-muted)]"
-                  />
-                  <span class="truncate text-xs font-medium">{folder.name}</span>
-                </button>
-                {@render cloudMenu(
-                  `folder:${folder.id}`,
-                  () => openCloudFolder(folder.id),
-                  () => {},
-                  null,
-                  () => onrenamecloudfolder(folder),
-                  () => ondeletecloudfolder(folder),
-                )}
-              </div>
-            {/each}
-          </div>
-        {/if}
-
-        {#if app.cloudDocuments.length > 0}
-          {@render sectionTitle("Documents")}
-          <div
-            class="mb-4 grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3"
-          >
-            {#each app.cloudDocuments as entry (entry.id)}
-              {@const linked = linkedDocument(entry.id)}
-              {@render cloudCard(
-                `document:${entry.id}`,
-                "ph:file-text",
-                entry.title,
-                linked
-                  ? `Document · ${entry.role}`
-                  : `${entry.role} · ${formatDate(entry.updated_at)}`,
-                linked,
-                linked ? () => openTarget(linked.path) : null,
-                () => ondownloaddocument(entry.id, entry.title),
-                linked ? () => onremovedownload(linked.path) : null,
-                () => ondeletedocument(entry.id),
-              )}
-            {/each}
-          </div>
-        {/if}
-
-        {#if app.cloudFiles.length > 0}
-          {@render sectionTitle("Images and fonts")}
-          <div
-            class="mb-4 grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3"
-          >
-            {#each app.cloudFiles as file (file.id)}
-              <div
-                class="flex items-center gap-2.5 rounded-lg border border-[var(--color-line)] bg-[var(--color-surface)] p-3 transition hover:border-[var(--color-accent)]"
-                role="group"
-                oncontextmenu={(event) =>
-                  openCloudContextMenu(event, `file:${file.id}`)}
-                draggable="true"
-                ondragstart={(event) =>
-                  startCloudDrag(event, { kind: "file", id: file.id })}
-                ondragend={endCloudDrag}
-              >
-                {@render cloudMenu(
-                  `file:${file.id}`,
-                  null,
-                  () => ondownloadfile(file.id, file.name),
-                  null,
-                  () => onrenamefile(file),
-                  () => ondeletefile(file.id),
-                )}
-                <Icon
-                  icon={api.isImagePath(file.name)
-                    ? "ph:image"
-                    : /\.(ttf|otf|ttc|otc)$/i.test(file.name)
-                      ? "ph:text-aa"
-                      : "ph:file"}
-                  class="shrink-0 text-xl text-[var(--color-accent)]"
-                />
-                <div class="min-w-0 flex-1">
-                  <p class="truncate text-xs font-medium" title={file.name}>
-                    {file.name}
-                  </p>
-                  <p class="truncate text-[10px] text-[var(--color-ink-muted)]">
-                    {formatDate(file.created_at)}
-                  </p>
                 </div>
-                <button
-                  class="shrink-0 rounded-md border border-[var(--color-line)] p-1.5 text-[var(--color-ink-muted)] transition hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]"
-                  onclick={() => ondownloadfile(file.id, file.name)}
-                  title="Add to shared assets on this device"
-                  aria-label="Download"
-                >
-                  <Icon icon="ph:download-simple" />
-                </button>
-              </div>
-            {/each}
-          </div>
+              {/each}
+            </div>
+          </section>
         {/if}
-
-        {#if app.cloudProjects.length === 0 && app.cloudDocuments.length === 0 && app.cloudFolders.length === 0 && app.cloudFiles.length === 0}
-          <div
-            class="flex flex-col items-center justify-center gap-3 py-16 text-[var(--color-ink-muted)]"
-          >
-            <Icon icon="ph:cloud" class="text-5xl" />
-            <p class="text-sm">Nothing here yet.</p>
-            {#if app.cloudFolder !== "shared"}
-              <div class="flex gap-2">
-                <button
-                  class="rounded-md bg-[var(--color-accent)] px-3 py-1.5 text-xs font-medium text-white hover:opacity-90"
-                  onclick={onnewclouddocument}
-                >
-                  New document
-                </button>
-                <button
-                  class="rounded-md border border-[var(--color-line)] px-3 py-1.5 text-xs hover:bg-[var(--color-surface)]"
-                  onclick={onnewcloudproject}
-                >
-                  New project
-                </button>
-              </div>
-            {/if}
-          </div>
-        {/if}
-
-        {#if app.cloudProjects.length > 0}
-          {@render sectionTitle("Cloud projects")}
-        {/if}
-        <div class="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3">
-          {#each app.cloudProjects as project (project.id)}
-            {@const linked = linkedProject(project.id)}
-            {@render cloudCard(
-              `project:${project.id}`,
-              "ph:folder-star",
-              project.name,
-              linked
-                ? `Project · ${project.role}`
-                : `${project.role} · ${formatDate(project.updated_at)}`,
-              linked,
-              linked ? () => openTarget(linked.path) : null,
-              () => oncloneproject(project.id, project.name),
-              null,
-              project.role === "owner" ? () => ondeleteproject(project.id) : null,
-            )}
-          {/each}
-        </div>
-      {/if}
-    </div>
-  {/if}
+      </div>
+    {/if}
+  </div>
 </div>

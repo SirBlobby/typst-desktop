@@ -846,6 +846,17 @@ fn cloud_move_folder(
 }
 
 #[tauri::command(async)]
+fn cloud_set_folder_color(
+    app: AppHandle,
+    store: State<'_, Store>,
+    folder_id: String,
+    color: Option<String>,
+) -> Result<Option<String>, String> {
+    let (server_url, token) = cloud_credentials(&app, &store)?;
+    sync::set_folder_color(&server_url, &token, &folder_id, color.as_deref())
+}
+
+#[tauri::command(async)]
 fn cloud_delete_folder(
     app: AppHandle,
     store: State<'_, Store>,
@@ -916,7 +927,7 @@ fn cloud_download_file(
     let destination = assets::assets_dir(&app, &store)?.join(&file.name);
     std::fs::write(&destination, bytes).map_err(|e| e.to_string())?;
 
-    Ok(file.name)
+    Ok(format!("{}/{}", assets::ASSETS_DIR, file.name))
 }
 
 #[tauri::command(async)]
@@ -1462,6 +1473,7 @@ pub fn run() {
             cloud_rename_folder,
             cloud_move_folder,
             cloud_delete_folder,
+            cloud_set_folder_color,
             cloud_move_project,
             cloud_move_document,
             cloud_list_documents,

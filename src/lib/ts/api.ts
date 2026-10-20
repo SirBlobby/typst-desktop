@@ -302,6 +302,7 @@ export interface CloudFolder {
   id: string;
   name: string;
   parent_id: string | null;
+  color: string | null;
 }
 
 export interface CloudDocument {
@@ -341,6 +342,9 @@ export const cloudMoveFolder = (folderId: string, parentId: string | null) =>
 
 export const cloudDeleteFolder = (folderId: string) =>
   invoke<void>("cloud_delete_folder", { folderId });
+
+export const cloudSetFolderColor = (folderId: string, color: string | null) =>
+  invoke<string | null>("cloud_set_folder_color", { folderId, color });
 
 export const cloudListDocuments = (folderId?: string | null) =>
   invoke<CloudDocument[]>("cloud_list_documents", {

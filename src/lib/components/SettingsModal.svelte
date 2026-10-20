@@ -9,6 +9,7 @@
   import SettingsRow from "./settings/SettingsRow.svelte";
   import ToggleSwitch from "./settings/ToggleSwitch.svelte";
   import EditorSection from "./settings/EditorSection.svelte";
+  import AccountAvatar from "./AccountAvatar.svelte";
   import * as api from "$lib/ts/api";
   import type { AppInfo, CompatibilityStatus } from "$lib/ts/api";
   import {
@@ -491,9 +492,7 @@
         <div class="flex flex-col gap-4">
           <SettingsCard>
             <div class="flex items-center gap-3 px-4 py-3">
-              <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--color-accent-soft)] text-sm font-bold text-[var(--color-accent)]">
-                {app.account ? app.account.username.charAt(0).toUpperCase() : "?"}
-              </span>
+              <AccountAvatar sizeClass="h-9 w-9 text-sm" />
               <div class="min-w-0 flex-1 text-xs">
                 {#if app.account}
                   <p class="truncate font-semibold">{app.account.username}</p>

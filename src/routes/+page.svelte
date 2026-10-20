@@ -10,6 +10,7 @@
   import { listen } from "@tauri-apps/api/event";
 
   import FileViewer from "$lib/components/FileViewer.svelte";
+  import CloudView from "$lib/components/cloud/CloudView.svelte";
   import FileTree from "$lib/components/FileTree.svelte";
   import BrowserSidebar from "$lib/components/BrowserSidebar.svelte";
   import Editor from "$lib/components/Editor.svelte";
@@ -269,6 +270,16 @@
       await api.cloudRenameFile(file.id, name);
       await refreshCloud();
     });
+
+  async function openCloudFile(fileId: string, name: string) {
+    const path = await downloadCloudFile(fileId, name);
+    if (!path) return;
+    if (api.isImagePath(name)) {
+      imageViewer = { paths: [path], index: 0 };
+    } else {
+      setStatus(`'${name}' is in your shared assets. Insert it from the Assets panel in the editor`);
+    }
+  }
 
   const cloneCloudProject = (id: string, name: string) =>
     guard(async () => {
@@ -872,37 +883,43 @@
     {#if app.view === "files"}
       <BrowserSidebar onsettings={() => (dialog = { kind: "settings" })} />
       <div class="min-w-0 flex-1">
-        <FileViewer
-          onnewproject={() => (dialog = { kind: "new-project" })}
-          onnewfolder={() => (dialog = { kind: "new-folder" })}
-          onnewdocument={() => (dialog = { kind: "new-document" })}
-          onupload={importFiles}
-          onrename={(entry) => (dialog = { kind: "rename-entry", entry })}
-          ondelete={(entry) => (dialog = { kind: "delete-entry", entry })}
-          onlink={(entry) => (dialog = { kind: "link-entry", entry })}
-          onsavetocloud={(entry) =>
-            (dialog = { kind: "save-document-to-cloud", entry })}
-          onviewimage={(paths, index) => (imageViewer = { paths, index })}
-          ondownloaddocument={(documentId, title) =>
-            downloadDocument(documentId, title)}
-          onremovedownload={removeDownloadedDocument}
-          ondownloadfile={downloadCloudFile}
-          ondeletefile={(id) => (dialog = { kind: "delete-cloud-file", id })}
-          onuploadfile={uploadCloudFiles}
-          onrenamefile={(file) => (dialog = { kind: "rename-cloud-file", file })}
-          onnewcloudproject={() => (dialog = { kind: "new-cloud-project" })}
-          onnewclouddocument={() => (dialog = { kind: "new-cloud-document" })}
-          onnewcloudfolder={() => (dialog = { kind: "new-cloud-folder" })}
-          onrenamecloudfolder={(folder) =>
-            (dialog = { kind: "rename-cloud-folder", folder })}
-          ondeletecloudfolder={(folder) =>
-            (dialog = { kind: "delete-cloud-folder", folder })}
-          oncloneproject={(id, name) =>
-            (dialog = { kind: "clone-cloud-project", id, name })}
-          ondeleteproject={(id) => (dialog = { kind: "delete-cloud-project", id })}
-          ondeletedocument={(id) => (dialog = { kind: "delete-cloud-document", id })}
-          onsignin={() => (dialog = { kind: "login" })}
-        />
+        {#if app.scope === "local"}
+          <FileViewer
+            onnewproject={() => (dialog = { kind: "new-project" })}
+            onnewfolder={() => (dialog = { kind: "new-folder" })}
+            onnewdocument={() => (dialog = { kind: "new-document" })}
+            onupload={importFiles}
+            onrename={(entry) => (dialog = { kind: "rename-entry", entry })}
+            ondelete={(entry) => (dialog = { kind: "delete-entry", entry })}
+            onlink={(entry) => (dialog = { kind: "link-entry", entry })}
+            onsavetocloud={(entry) =>
+              (dialog = { kind: "save-document-to-cloud", entry })}
+            onviewimage={(paths, index) => (imageViewer = { paths, index })}
+          />
+        {:else}
+          <CloudView
+            ondownloaddocument={(documentId, title) =>
+              downloadDocument(documentId, title)}
+            onremovedownload={removeDownloadedDocument}
+            ondownloadfile={downloadCloudFile}
+            onopenfile={openCloudFile}
+            ondeletefile={(id) => (dialog = { kind: "delete-cloud-file", id })}
+            onuploadfile={uploadCloudFiles}
+            onrenamefile={(file) => (dialog = { kind: "rename-cloud-file", file })}
+            onnewcloudproject={() => (dialog = { kind: "new-cloud-project" })}
+            onnewclouddocument={() => (dialog = { kind: "new-cloud-document" })}
+            onnewcloudfolder={() => (dialog = { kind: "new-cloud-folder" })}
+            onrenamecloudfolder={(folder) =>
+              (dialog = { kind: "rename-cloud-folder", folder })}
+            ondeletecloudfolder={(folder) =>
+              (dialog = { kind: "delete-cloud-folder", folder })}
+            oncloneproject={(id, name) =>
+              (dialog = { kind: "clone-cloud-project", id, name })}
+            ondeleteproject={(id) => (dialog = { kind: "delete-cloud-project", id })}
+            ondeletedocument={(id) => (dialog = { kind: "delete-cloud-document", id })}
+            onsignin={() => (dialog = { kind: "login" })}
+          />
+        {/if}
       </div>
     {:else}
       {#if !app.target?.standalone && sidebarCollapsed}

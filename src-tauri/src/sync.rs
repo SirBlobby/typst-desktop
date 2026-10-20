@@ -741,6 +741,8 @@ pub struct CloudFolder {
     pub id: String,
     pub name: String,
     pub parent_id: Option<String>,
+    #[serde(default)]
+    pub color: Option<String>,
 }
 
 #[derive(Deserialize, Serialize, Clone)]
@@ -816,6 +818,27 @@ pub fn move_folder(
         .send_json(ureq::json!({ "parent_id": parent_id }))
         .map_err(describe)?
         .into_json::<CloudFolder>()
+        .map_err(|e| e.to_string())
+}
+
+#[derive(Deserialize)]
+struct FolderColorResponse {
+    color: Option<String>,
+}
+
+pub fn set_folder_color(
+    server_url: &str,
+    token: &str,
+    folder_id: &str,
+    color: Option<&str>,
+) -> Result<Option<String>, String> {
+    agent()
+        .patch(&endpoint(server_url, &format!("/folders/{}/color", folder_id)))
+        .set("Authorization", &format!("Bearer {}", token))
+        .send_json(ureq::json!({ "color": color }))
+        .map_err(describe)?
+        .into_json::<FolderColorResponse>()
+        .map(|response| response.color)
         .map_err(|e| e.to_string())
 }
 
