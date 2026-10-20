@@ -68,7 +68,7 @@ The AppImage runs on any distribution, so it also works as a fallback on Debian 
 - **Editor settings**: Font, font size, spell checking, line numbers and a minimap with three sizes.
 - **Review**: For cloud documents open live, see who else is editing with their profile pictures, comment on text, reply and resolve threads, suggest edits that others accept or reject, save versions and browse, compare and restore version history.
 - **File explorer**: Folder selection, a right-click menu, drag and drop, rename, duplicate, move, and reveal in your file manager.
-- **Cloud workspace**: Browse your TypstDrive folders, documents, spaces, and everything shared with you. Download what you want on this device and open it straight from the cloud view.
+- **Cloud workspace**: Browse your TypstDrive folders, documents, projects, and everything shared with you in a layout that matches the TypstDrive web drive, with search, sorting and grid or list view. Download what you want on this device and open it straight from the cloud view.
 - **Sync**: Three-way merge with a conflict resolver, plus optional automatic sync on a timer.
 - **Autosave**: Off by default, or every 5, 10, or 15 seconds.
 - **Images and fonts**: Import from anywhere on disk, drag and drop, or pull from your TypstDrive assets. A searchable asset browser with previews sits in the editor toolbar.
@@ -132,7 +132,7 @@ Cloud features are optional. Without an account the app is entirely local.
 1. Open **Settings**, go to **Account**, enter your TypstDrive server URL, and click **Open sign-in page**. Sign in to TypstDrive in your browser, copy the one-time key it shows, paste it into the app and click **Connect**.
 2. Switch the file viewer to **Cloud**.
 
-The cloud view has two places to look. **My Drive** shows your folders, documents, spaces, and uploaded images and fonts. **Shared with me** shows everything other people have shared with you, along with the role you were given.
+The cloud view has two places to look. **Home** shows your folders, documents, projects, and uploaded images and fonts. **Shared with me** shows everything other people have shared with you, along with the role you were given.
 
 | Item | Action |
 |---|---|
@@ -238,6 +238,8 @@ On Arch, `packaging/arch/PKGBUILD` builds and installs a native package via `mak
 ## License
 
 Apache License 2.0. See [LICENSE](LICENSE).
+
+Typst Desktop is a community application and is not affiliated with, endorsed by, or supported by the official Typst project. Links to Typst documentation and Typst Universe open the official Typst website in your browser.
 
 
 <img src="images/preview1.png" alt="Typst Desktop editor preview" />
