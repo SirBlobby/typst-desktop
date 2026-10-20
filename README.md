@@ -63,7 +63,10 @@ The AppImage runs on any distribution, so it also works as a fallback on Debian 
 - **Two views**: A file viewer for browsing local and cloud files, and an editor view for writing.
 - **Single files or projects**: Open a lone `.typ` file, or a project folder with its own `typst.toml`, chapters, bibliography, and assets.
 - **Live preview**: The preview recompiles as you type, and follows whichever file you are editing rather than only the entrypoint. Saving is not required to see changes.
-- **Editor**: Typst syntax highlighting, snippet autocompletion, a formatting toolbar, page settings, inline diagnostics, and optional `tinymist` language server support.
+- **Editor**: Typst syntax highlighting, snippet autocompletion, a formatting toolbar with heading sizes and quotes, page settings, inline diagnostics, and optional `tinymist` language server support.
+- **Editor tools**: Find and search and replace, `Ctrl+/` to comment out lines, and quick insert for images, tables, project files, symbols and emoji.
+- **Editor settings**: Font, font size, spell checking, line numbers and a minimap with three sizes.
+- **Review**: For cloud documents open live, see who else is editing with their profile pictures, comment on text, reply and resolve threads, suggest edits that others accept or reject, save versions and browse, compare and restore version history.
 - **File explorer**: Folder selection, a right-click menu, drag and drop, rename, duplicate, move, and reveal in your file manager.
 - **Cloud workspace**: Browse your TypstDrive folders, documents, spaces, and everything shared with you. Download what you want on this device and open it straight from the cloud view.
 - **Sync**: Three-way merge with a conflict resolver, plus optional automatic sync on a timer.
@@ -87,13 +90,15 @@ Application data — settings, sync state, and the thumbnail cache — is kept i
 
 ## Settings
 
-Settings are grouped into four sections.
-
 | Section | Contents |
 |---|---|
 | Files | Workspace folder and autosave delay. |
-| Appearance | Light or dark theme. |
+| Appearance | Light, dark or system mode, color theme and accent color. |
+| Editor | Font, font size, spell checking, line numbers, minimap and minimap size. |
+| Accessibility | Text size, reduced motion and high contrast. |
 | Account | TypstDrive server, sign in and out, automatic sync interval. |
+| Language Server | The `tinymist` language server. |
+| Hotkeys | View and change keyboard shortcuts. |
 | About | Version, Typst version, license, and links to the official Typst site. |
 
 ## Fonts and Images
@@ -124,7 +129,7 @@ Images in the shared asset library are available to every project. Images inside
 
 Cloud features are optional. Without an account the app is entirely local.
 
-1. Open **Settings**, go to **Account**, enter your TypstDrive server URL, and sign in.
+1. Open **Settings**, go to **Account**, enter your TypstDrive server URL, and click **Open sign-in page**. Sign in to TypstDrive in your browser, copy the one-time key it shows, paste it into the app and click **Connect**.
 2. Switch the file viewer to **Cloud**.
 
 The cloud view has two places to look. **My Drive** shows your folders, documents, spaces, and uploaded images and fonts. **Shared with me** shows everything other people have shared with you, along with the role you were given.
@@ -141,9 +146,24 @@ To publish a local project, choose **Upload to cloud** on it in the Local view. 
 
 ### Sync
 
-Sync pulls before it pushes. Use **Sync** in the editor, or turn on automatic sync in **Settings** to run it on a timer.
+Cloud files sync in two ways:
+
+- **Live**: When you open a cloud document or project file while online, the editor joins the same live session as the web editor. Changes appear on both sides as you type and are saved to your drive in the background.
+- **Background**: When a live session is not available, the app syncs the whole document or project. It syncs when you open it, a few seconds after each save, whenever the server reports a change, and on the timer set in **Settings**. Sync pulls before it pushes.
+
+Use **Sync** in the editor to run a sync by hand.
 
 Viewer access is read-only: a document shared with the viewer role can be downloaded and read, but pushing changes back is refused.
+
+### Comments, suggestions and history
+
+When a cloud document is open with live collaboration, the bar above the editor shows who is editing, the **Editing** or **Suggesting** mode, and buttons for comments, saving a version and version history.
+
+- Select text and press `Ctrl+Alt+M`, or use the comment button, to comment on it. Hover over highlighted text to preview a comment, and click it to open the thread, reply or resolve it.
+- In **Suggesting** mode your edits become suggestions. Owners and editors accept or reject them from the **Suggestions** tab. People shared a document with the suggester role are always in suggesting mode.
+- **Version history** lists every version with who edited and when. Compare a version with the one before it or with the current document, name it, or restore it.
+
+These features need a TypstDrive server that supports them. Versions are also saved automatically when you leave a document after editing it.
 
 ### Conflicts
 
