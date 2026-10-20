@@ -123,7 +123,7 @@
     {#if current}
       {#if current.binary}
         <div
-          class="rounded-md border border-[var(--color-line)] bg-[var(--color-surface-muted)] p-4 text-xs"
+          class="rounded-lg border border-[var(--color-line)] bg-[var(--color-surface)] p-4 text-xs"
         >
           <p class="font-medium">{current.path}</p>
           <p class="mt-1 text-[var(--color-ink-muted)]">
@@ -167,7 +167,7 @@
         </div>
 
         <textarea
-          class="scroll-thin h-80 w-full resize-none rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] p-3 font-mono text-xs leading-relaxed focus:border-[var(--color-accent)] focus:outline-none"
+          class="field scroll-thin h-80 resize-none p-3 font-mono text-xs leading-relaxed"
           bind:value={choices[index]}
           spellcheck="false"
         ></textarea>
@@ -177,13 +177,13 @@
 
   {#snippet footer()}
     <button
-      class="rounded-md px-3 py-1.5 text-xs text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)]"
+      class="btn btn-ghost"
       onclick={onclose}
     >
       Cancel
     </button>
     <button
-      class="rounded-md bg-[var(--color-accent)] px-3 py-1.5 text-xs font-medium text-white transition hover:opacity-90 disabled:opacity-50"
+      class="btn btn-primary"
       disabled={anyUnresolved}
       onclick={submit}
     >

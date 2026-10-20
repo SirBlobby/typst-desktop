@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 use tauri::{AppHandle, Manager};
 
+use crate::shortcuts::Shortcut;
 use crate::workspace::{ProjectMeta, Settings};
 
 pub struct Store {
@@ -19,7 +20,7 @@ pub struct DocumentLink {
     pub synced_at: Option<String>,
 }
 
-const SCHEMA: [&str; 6] = [
+const SCHEMA: [&str; 8] = [
     "CREATE TABLE IF NOT EXISTS settings (
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL
@@ -55,6 +56,16 @@ const SCHEMA: [&str; 6] = [
         key TEXT PRIMARY KEY,
         payload TEXT NOT NULL,
         cached_at TEXT NOT NULL
+    )",
+    "CREATE TABLE IF NOT EXISTS folder_colors (
+        path TEXT PRIMARY KEY,
+        color TEXT NOT NULL
+    )",
+    "CREATE TABLE IF NOT EXISTS shortcuts (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        path TEXT NOT NULL,
+        created_at TEXT NOT NULL
     )",
 ];
 
@@ -418,6 +429,95 @@ impl Store {
     pub fn clear_thumbnails(&self) -> Result<(), String> {
         self.with(|connection| {
             connection.execute("DELETE FROM thumbnails", [])?;
+            Ok(())
+        })
+    }
+
+    pub fn shortcuts(&self) -> Result<Vec<Shortcut>, String> {
+        self.with(|connection| {
+            let mut statement =
+                connection.prepare("SELECT id, name, path FROM shortcuts ORDER BY created_at")?;
+            let rows = statement.query_map([], |row| {
+                Ok(Shortcut::new(row.get(0)?, row.get(1)?, row.get(2)?))
+            })?;
+            rows.collect()
+        })
+    }
+
+    pub fn shortcut(&self, id: &str) -> Result<Option<Shortcut>, String> {
+        self.with(|connection| {
+            connection
+                .query_row(
+                    "SELECT id, name, path FROM shortcuts WHERE id = ?1",
+                    params![id],
+                    |row| Ok(Shortcut::new(row.get(0)?, row.get(1)?, row.get(2)?)),
+                )
+                .optional()
+        })
+    }
+
+    pub fn add_shortcut(&self, id: &str, name: &str, path: &str) -> Result<(), String> {
+        self.with(|connection| {
+            connection.execute(
+                "INSERT INTO shortcuts (id, name, path, created_at) VALUES (?1, ?2, ?3, ?4)",
+                params![id, name, path, chrono::Utc::now().to_rfc3339()],
+            )?;
+            Ok(())
+        })
+    }
+
+    pub fn remove_shortcut(&self, id: &str) -> Result<(), String> {
+        self.with(|connection| {
+            connection.execute("DELETE FROM shortcuts WHERE id = ?1", params![id])?;
+            Ok(())
+        })
+    }
+
+    pub fn folder_color(&self, path: &str) -> Result<Option<String>, String> {
+        self.with(|connection| {
+            connection
+                .query_row(
+                    "SELECT color FROM folder_colors WHERE path = ?1",
+                    params![path],
+                    |row| row.get(0),
+                )
+                .optional()
+        })
+    }
+
+    pub fn set_folder_color(&self, path: &str, color: Option<&str>) -> Result<(), String> {
+        self.with(|connection| {
+            match color {
+                Some(color) => connection.execute(
+                    "INSERT INTO folder_colors (path, color) VALUES (?1, ?2)
+                     ON CONFLICT(path) DO UPDATE SET color = excluded.color",
+                    params![path, color],
+                )?,
+                None => connection.execute("DELETE FROM folder_colors WHERE path = ?1", params![path])?,
+            };
+            Ok(())
+        })
+    }
+
+    pub fn move_folder_colors(&self, from: &str, to: &str) -> Result<(), String> {
+        self.with(|connection| {
+            connection.execute(
+                "UPDATE folder_colors
+                 SET path = ?2 || substr(path, length(?1) + 1)
+                 WHERE path = ?1 OR substr(path, 1, length(?1) + 1) = ?1 || '/'",
+                params![from, to],
+            )?;
+            Ok(())
+        })
+    }
+
+    pub fn forget_folder_colors(&self, path: &str) -> Result<(), String> {
+        self.with(|connection| {
+            connection.execute(
+                "DELETE FROM folder_colors
+                 WHERE path = ?1 OR substr(path, 1, length(?1) + 1) = ?1 || '/'",
+                params![path],
+            )?;
             Ok(())
         })
     }

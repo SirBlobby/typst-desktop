@@ -104,6 +104,7 @@
     if (node.name.endsWith(".typ")) return "ph:file-text";
     if (node.name.endsWith(".toml")) return "ph:gear-six";
     if (node.file?.is_text) return "ph:file";
+    if (node.name.toLowerCase().endsWith(".pdf")) return "ph:file-pdf";
     return "ph:image";
   }
 
@@ -231,16 +232,16 @@
         tabindex="0"
         aria-selected={selected.has(node.path)}
         draggable="true"
-        class="group flex items-center gap-1.5 rounded px-2 py-1 text-xs transition
+        class="group mx-1.5 flex h-7 items-center gap-1.5 rounded-md pr-1 text-[13px] transition-colors
           {node.path === activePath
-          ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent)]'
+          ? 'bg-[var(--color-accent-soft)] font-medium text-[var(--color-accent)]'
           : selected.has(node.path)
             ? 'bg-[var(--color-surface-sunken)]'
-            : 'text-[var(--color-ink)] hover:bg-[var(--color-surface-sunken)]'}
+            : 'text-[var(--color-ink)] hover:bg-[var(--color-surface-sunken)]/70'}
           {dropTarget === node.path
           ? 'ring-1 ring-inset ring-[var(--color-accent)]'
           : ''}"
-        style="padding-left: {depth * 12 + 8}px"
+        style="padding-left: {depth * 14 + 6}px"
         onclick={(event) => handleRowClick(event, node)}
         oncontextmenu={(event) => openMenu(event, node)}
         onkeydown={(event) => handleKey(event, node)}
@@ -268,7 +269,7 @@
         {#if node.isDir}
           <Icon
             icon={collapsed[node.path] ? "ph:caret-right" : "ph:caret-down"}
-            class="shrink-0 text-[10px] text-[var(--color-ink-muted)]"
+            class="shrink-0 text-[10px] text-[var(--color-ink-subtle)]"
           />
         {:else}
           <span class="w-2.5 shrink-0"></span>
@@ -279,21 +280,21 @@
 
         {#if node.path === entrypoint}
           <span
-            class="shrink-0 rounded bg-[var(--color-accent)] px-1 py-px text-[9px] font-medium text-white"
+            class="chip h-4 shrink-0 bg-[var(--color-accent-soft)] px-1.5 text-[9px] text-[var(--color-accent)]"
           >
             main
           </span>
         {/if}
 
         <button
-          class="shrink-0 rounded p-0.5 text-[var(--color-ink-muted)] opacity-0 transition group-hover:opacity-100 hover:bg-[var(--color-surface)]"
+          class="icon-btn h-5 w-5 rounded opacity-0 group-hover:opacity-100 hover:bg-[var(--color-surface-raised)]"
           onclick={(event) => {
             event.stopPropagation();
             openMenu(event, node);
           }}
           aria-label="Actions"
         >
-          <Icon icon="ph:dots-three-vertical" />
+          <Icon icon="ph:dots-three" />
         </button>
       </div>
 
@@ -306,10 +307,10 @@
 
 <div class="flex min-h-0 flex-1 flex-col">
   <div
-    class="flex items-center justify-end gap-0.5 border-b border-[var(--color-line)] px-2 py-1"
+    class="flex items-center justify-end gap-0.5 px-2 pt-1.5"
   >
     <button
-      class="rounded p-1 text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
+      class="icon-btn icon-btn-sm"
       onclick={() => onnewfile(anchorPath ?? "")}
       title="New file"
       aria-label="New file"
@@ -317,7 +318,7 @@
       <Icon icon="ph:file-plus" />
     </button>
     <button
-      class="rounded p-1 text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
+      class="icon-btn icon-btn-sm"
       onclick={() => onnewfolder(anchorPath ?? "")}
       title="New folder"
       aria-label="New folder"
@@ -325,7 +326,7 @@
       <Icon icon="ph:folder-plus" />
     </button>
     <button
-      class="rounded p-1 text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
+      class="icon-btn icon-btn-sm"
       onclick={() => onimport(anchorPath ?? "")}
       title="Import files"
       aria-label="Import files"
@@ -333,7 +334,7 @@
       <Icon icon="ph:upload-simple" />
     </button>
     <button
-      class="rounded p-1 text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
+      class="icon-btn icon-btn-sm"
       onclick={collapseAll}
       title="Collapse all"
       aria-label="Collapse all"
@@ -371,7 +372,7 @@
     }}
   >
     {#if files.length === 0}
-      <p class="px-3 py-4 text-xs text-[var(--color-ink-muted)]">No files yet</p>
+      <p class="px-4 py-4 text-xs text-[var(--color-ink-subtle)]">No files yet</p>
     {:else}
       {@render branch(tree, 0)}
     {/if}
@@ -385,69 +386,69 @@
   {@const single = menuPaths.length === 1}
   <div
     use:clampMenu
-    class="fixed z-50 flex w-48 flex-col rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] py-1 text-xs shadow-lg"
+    class="menu fixed z-50 w-48"
     style="left: {target.x}px; top: {target.y}px"
   >
     {#if single && target.isDir}
       <button
-        class="px-3 py-1.5 text-left hover:bg-[var(--color-surface-sunken)]"
+        class="menu-item"
         onclick={() => onnewfile(target.path)}
       >
         New file
       </button>
       <button
-        class="px-3 py-1.5 text-left hover:bg-[var(--color-surface-sunken)]"
+        class="menu-item"
         onclick={() => onnewfolder(target.path)}
       >
         New folder
       </button>
       <button
-        class="px-3 py-1.5 text-left hover:bg-[var(--color-surface-sunken)]"
+        class="menu-item"
         onclick={() => onimport(target.path)}
       >
         Import files here
       </button>
-      <div class="my-1 h-px bg-[var(--color-line)]"></div>
+      <div class="menu-separator"></div>
     {:else if single && target.path.endsWith(".typ")}
       <button
-        class="px-3 py-1.5 text-left hover:bg-[var(--color-surface-sunken)]"
+        class="menu-item"
         onclick={() => onsetentry(target.path)}
       >
         Set as entrypoint
       </button>
-      <div class="my-1 h-px bg-[var(--color-line)]"></div>
+      <div class="menu-separator"></div>
     {/if}
 
     {#if single}
       <button
-        class="px-3 py-1.5 text-left hover:bg-[var(--color-surface-sunken)]"
+        class="menu-item"
         onclick={() => onrename(target.path)}
       >
         Rename
       </button>
       <button
-        class="px-3 py-1.5 text-left hover:bg-[var(--color-surface-sunken)]"
+        class="menu-item"
         onclick={() => onduplicate(target.path)}
       >
         Duplicate
       </button>
       <button
-        class="px-3 py-1.5 text-left hover:bg-[var(--color-surface-sunken)]"
+        class="menu-item"
         onclick={() => navigator.clipboard.writeText(target.path)}
       >
         Copy path
       </button>
       <button
-        class="px-3 py-1.5 text-left hover:bg-[var(--color-surface-sunken)]"
+        class="menu-item"
         onclick={() => onreveal(target.path)}
       >
         Reveal in file manager
       </button>
-      <div class="my-1 h-px bg-[var(--color-line)]"></div>
+      <div class="menu-separator"></div>
     {/if}
 
     <button
-      class="px-3 py-1.5 text-left text-[var(--color-danger)] hover:bg-[var(--color-surface-sunken)]"
+      class="menu-item menu-item-danger"
       onclick={() => ondelete(menuPaths)}
     >
       {single ? "Delete" : `Delete ${menuPaths.length} items`}

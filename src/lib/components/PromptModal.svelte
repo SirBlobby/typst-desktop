@@ -43,10 +43,10 @@
 
 <Modal {title} {icon} {onclose}>
   <form id="prompt-form" onsubmit={submit}>
-    <label class="flex flex-col gap-1 text-xs">
+    <label class="flex flex-col gap-1.5 text-xs">
       <span class="font-medium text-[var(--color-ink-muted)]">{label}</span>
       <div
-        class="flex items-center rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] focus-within:border-[var(--color-accent)]"
+        class="field flex items-center p-0"
       >
         <!-- svelte-ignore a11y_autofocus -->
         <input
@@ -64,7 +64,7 @@
 
   {#snippet footer()}
     <button
-      class="rounded-md px-3 py-1.5 text-xs text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)]"
+      class="btn btn-ghost"
       onclick={onclose}
     >
       Cancel
@@ -72,8 +72,7 @@
     <button
       type="submit"
       form="prompt-form"
-      class="rounded-md px-3 py-1.5 text-xs font-medium text-white transition hover:opacity-90
-        {danger ? 'bg-[var(--color-danger)]' : 'bg-[var(--color-accent)]'}"
+      class="btn {danger ? 'btn-danger' : 'btn-primary'}"
     >
       {confirmLabel}
     </button>

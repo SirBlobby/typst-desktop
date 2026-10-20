@@ -121,42 +121,42 @@
 </script>
 
 <div class="flex h-full w-80 shrink-0 flex-col border-l border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink)]">
-  <div class="flex items-center justify-between border-b border-[var(--color-line)] px-4 py-3">
+  <div class="bar justify-between pl-4 pr-1.5">
     <div class="flex items-center gap-2">
-      <Icon icon="mdi:comment-text-multiple-outline" class="text-lg" />
-      <h2 class="text-sm font-semibold">Comments and suggestions</h2>
+      <Icon icon="ph:chats" class="text-sm text-[var(--color-ink-subtle)]" />
+      <h2 class="text-xs font-semibold">Comments and suggestions</h2>
     </div>
-    <button onclick={onClose} class="rounded-md p-1.5 hover:bg-[var(--color-surface-sunken)]" title="Close comments" aria-label="Close comments">
-      <Icon icon="mdi:close" class="text-lg" />
+    <button onclick={onClose} class="icon-btn" title="Close comments" aria-label="Close comments">
+      <Icon icon="ph:x" class="text-sm" />
     </button>
   </div>
 
-  <div class="flex gap-1 border-b border-[var(--color-line)] px-4 py-2">
+  <div class="m-3 mb-0 flex gap-0.5 rounded-lg border border-[var(--color-line)] bg-[var(--color-surface-sunken)] p-0.5">
     {#each tabs as tab (tab.value)}
       <button
         type="button"
         onclick={() => (filter = tab.value)}
-        class="flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition {filter === tab.value ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent)]' : 'text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)]'}"
+        class="flex h-6 flex-1 items-center justify-center gap-1 rounded-md text-xs font-medium transition {filter === tab.value ? 'bg-[var(--color-surface-raised)] text-[var(--color-ink)] shadow-sm' : 'text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]'}"
       >
         {tab.label}
         {#if tab.count > 0}
-          <span class="rounded bg-[var(--color-surface-sunken)] px-1 text-[10px] font-bold">{tab.count}</span>
+          <span class="rounded-full bg-[var(--color-accent-soft)] px-1.5 text-[10px] font-semibold text-[var(--color-accent)]">{tab.count}</span>
         {/if}
       </button>
     {/each}
   </div>
 
-  <div class="flex-1 space-y-3 overflow-y-auto p-4">
+  <div class="scroll-thin flex-1 space-y-2.5 overflow-y-auto p-3">
     {#if loading}
-      <div class="flex h-full items-center justify-center"><Icon icon="mdi:loading" class="animate-spin text-2xl" /></div>
+      <div class="flex h-full items-center justify-center"><Icon icon="ph:circle-notch" class="animate-spin text-2xl" /></div>
     {:else if filter === 'suggestions'}
       <SuggestionsList {docId} {canReview} />
     {:else if loadError}
-      <p class="rounded-md border border-[var(--color-danger)]/20 bg-[var(--color-danger)]/10 p-3 text-center text-sm text-[var(--color-danger)]">{loadError}</p>
+      <p class="rounded-lg border border-[var(--color-danger)]/20 bg-[var(--color-danger)]/8 p-3 text-center text-xs text-[var(--color-danger)]">{loadError}</p>
     {:else if visibleThreads.length === 0}
-      <div class="flex h-full flex-col items-center justify-center gap-2 text-center text-[var(--color-ink-muted)]">
-        <Icon icon={filter === 'open' ? 'mdi:comment-outline' : 'mdi:check-all'} class="text-4xl opacity-50" />
-        <p class="text-sm">{filter === 'open' ? 'No open comments' : 'No resolved comments'}</p>
+      <div class="empty-state h-full">
+        <Icon icon={filter === 'open' ? 'ph:chat-circle' : 'ph:checks'} class="text-3xl" />
+        <p class="text-[13px] text-[var(--color-ink-muted)]">{filter === 'open' ? 'No open comments' : 'No resolved comments'}</p>
         {#if filter === 'open' && canComment}
           <p class="max-w-[16rem] text-xs">Select text in the editor and press Ctrl+Alt+M to comment on it.</p>
         {/if}
@@ -177,14 +177,14 @@
   </div>
 
   {#if canComment && filter !== 'suggestions'}
-    <div class="border-t border-[var(--color-line)] p-4">
+    <div class="border-t border-[var(--color-line)] p-3">
       {#if $pendingCommentStore}
         <div class="mb-2 flex items-start gap-2 rounded-md bg-amber-500/10 px-2.5 py-2">
           <p class="min-w-0 flex-1 truncate border-l-2 border-amber-400 pl-2 text-xs italic text-[var(--color-ink-muted)]" title={$pendingCommentStore.quoted_text}>
             {$pendingCommentStore.quoted_text}
           </p>
           <button type="button" onclick={() => pendingCommentStore.set(null)} title="Comment on the whole document instead" aria-label="Remove selected text" class="text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">
-            <Icon icon="mdi:close" class="text-sm" />
+            <Icon icon="ph:x" class="text-sm" />
           </button>
         </div>
       {/if}

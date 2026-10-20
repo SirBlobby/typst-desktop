@@ -3,9 +3,13 @@ mod compiler;
 mod db;
 mod fonts;
 mod lsp;
+mod pandoc;
 mod review;
+mod shortcuts;
+mod spaces;
 mod sync;
 mod thumbnails;
+mod viewer;
 mod workspace;
 mod world;
 mod ws;
@@ -207,6 +211,7 @@ fn rename_entry(app: AppHandle, store: State<'_, Store>, path: String, new_name:
     if new_name.is_empty() || new_name.contains('/') || new_name.contains('\\') {
         return Err("Invalid name".to_string());
     }
+    shortcuts::ensure_not_root(&path)?;
 
     let from = workspace_path(&app, &store, &path)?;
     let target_path = join_path(&parent_of(&path), new_name);
@@ -217,15 +222,26 @@ fn rename_entry(app: AppHandle, store: State<'_, Store>, path: String, new_name:
     }
     std::fs::rename(&from, &to).map_err(|e| e.to_string())?;
     store.rename_project(&path, &target_path)?;
+    store.move_folder_colors(&path, &target_path)?;
     Ok(target_path)
 }
 
 #[tauri::command]
+fn set_folder_color(store: State<'_, Store>, path: String, color: Option<String>) -> Result<(), String> {
+    let color = color.filter(|value| {
+        value.len() == 7 && value.starts_with('#') && value[1..].chars().all(|c| c.is_ascii_hexdigit())
+    });
+    store.set_folder_color(&path, color.as_deref())
+}
+
+#[tauri::command]
 fn delete_entry(app: AppHandle, store: State<'_, Store>, path: String) -> Result<(), String> {
+    shortcuts::ensure_not_root(&path)?;
     let full = workspace_path(&app, &store, &path)?;
     if full.is_dir() {
         std::fs::remove_dir_all(&full).map_err(|e| e.to_string())?;
         store.forget_project(&path)?;
+        store.forget_folder_colors(&path)?;
         Ok(())
     } else {
         std::fs::remove_file(&full).map_err(|e| e.to_string())
@@ -252,6 +268,7 @@ fn move_entry(
     if destination == path || destination.starts_with(&format!("{}/", path)) {
         return Err("A folder cannot be moved into itself".to_string());
     }
+    shortcuts::ensure_not_root(&path)?;
 
     let from = workspace_path(&app, &store, &path)?;
     let to = workspace_path(&app, &store, &target_path)?;
@@ -265,6 +282,7 @@ fn move_entry(
 
     std::fs::rename(&from, &to).map_err(|e| e.to_string())?;
     store.rename_project(&path, &target_path)?;
+    store.move_folder_colors(&path, &target_path)?;
     Ok(target_path)
 }
 
@@ -473,20 +491,34 @@ fn compile_target(
         .map_err(|diagnostics| CompileFailure { diagnostics })
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn export_target(
     app: AppHandle,
     store: State<'_, Store>,
     path: String,
     format: String,
     destination: String,
+    source_file: Option<String>,
 ) -> Result<String, String> {
     let target = resolve_target(&app, &store, &path)?;
+
+    if format == "typ" {
+        let source = source_file.unwrap_or_else(|| target.entrypoint.clone());
+        std::fs::copy(target.root.join(&source), &destination).map_err(|e| e.to_string())?;
+        return Ok(destination);
+    }
+
+    if let Some(pandoc_format) = format.strip_prefix("pandoc-") {
+        pandoc::export(&target.root, &target.entrypoint, pandoc_format, &destination)?;
+        return Ok(destination);
+    }
+
     let files = read_target_files(&app, &store, &target)?;
 
     let bytes = match format.as_str() {
         "pdf" => compiler::export_pdf(target.entrypoint, files),
         "png" => compiler::export_png(target.entrypoint, files),
+        "svg" => compiler::export_svg(target.entrypoint, files),
         "html" => compiler::export_html(target.entrypoint, files),
         other => return Err(format!("Unsupported export format '{}'", other)),
     }
@@ -671,6 +703,27 @@ fn import_into_target(
 }
 
 #[tauri::command]
+fn pandoc_version() -> Option<String> {
+    pandoc::version()
+}
+
+#[tauri::command(async)]
+fn pandoc_import(
+    app: AppHandle,
+    store: State<'_, Store>,
+    parent: String,
+    source: String,
+) -> Result<String, String> {
+    let folder = workspace_path(&app, &store, &parent)?;
+    let name = pandoc::import(&source, &folder)?;
+    Ok(if parent.is_empty() {
+        name
+    } else {
+        format!("{}/{}", parent.trim_end_matches('/'), name)
+    })
+}
+
+#[tauri::command]
 fn import_into_folder(
     app: AppHandle,
     store: State<'_, Store>,
@@ -763,6 +816,7 @@ fn cloud_logout(
     save_settings(&store, &settings)?;
 
     ws_state.stop(&app);
+    spaces::set_active_space(None);
 
     Ok(())
 }
@@ -1443,6 +1497,15 @@ pub fn run() {
             set_target_entrypoint,
             compile_target,
             export_target,
+            set_folder_color,
+            shortcuts::list_shortcuts,
+            shortcuts::add_shortcut,
+            shortcuts::remove_shortcut,
+            viewer::read_pdf,
+            spaces::cloud_list_spaces,
+            spaces::cloud_set_space,
+            pandoc_version,
+            pandoc_import,
             render_target_png,
             thumbnail,
             read_image,

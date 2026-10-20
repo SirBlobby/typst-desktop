@@ -67,7 +67,11 @@ The AppImage runs on any distribution, so it also works as a fallback on Debian 
 - **Editor tools**: Find and search and replace, `Ctrl+/` to comment out lines, and quick insert for images, tables, project files, symbols and emoji.
 - **Editor settings**: Font, font size, spell checking, line numbers and a minimap with three sizes.
 - **Review**: For cloud documents open live, see who else is editing with their profile pictures, comment on text, reply and resolve threads, suggest edits that others accept or reject, save versions and browse, compare and restore version history.
-- **File explorer**: Folder selection, a right-click menu, drag and drop, rename, duplicate, move, and reveal in your file manager.
+- **Export**: PDF, PNG, SVG, HTML and Typst source, plus Word, LaTeX, Markdown and HTML through `pandoc`. Word, LaTeX, Markdown and HTML files can also be converted into Typst documents.
+- **Team spaces**: Browse and work in the TypstDrive team spaces you belong to from the sidebar.
+- **Viewer**: Open PDFs and images from the file browser, the project file tree, or TypstDrive.
+- **Local folders**: Add shortcuts to folders anywhere on your computer to browse and edit them alongside the workspace, and give folders colors.
+- **File explorer**: Folder selection, a right-click menu, drag and drop, rename, duplicate, move, reveal in your file manager, search, sorting by name, date or size, and grid or list views.
 - **Cloud workspace**: Browse your TypstDrive folders, documents, projects, and everything shared with you in a layout that matches the TypstDrive web drive, with search, sorting and grid or list view. Download what you want on this device and open it straight from the cloud view.
 - **Sync**: Three-way merge with a conflict resolver, plus optional automatic sync on a timer.
 - **Autosave**: Off by default, or every 5, 10, or 15 seconds.
@@ -181,12 +185,32 @@ curl -L -o ~/.cargo/bin/tinymist \
 
 The editor header shows the language server status. Without `tinymist` the editor still has syntax highlighting, autocompletion, and compiler diagnostics.
 
+## Pandoc
+
+Exporting to Word, LaTeX, Markdown and HTML, and converting those formats into Typst, uses [`pandoc`](https://pandoc.org), which ships with the app. Pandoc is licensed under the GPL, version 2 or later, and its license is installed alongside the app.
+
+When building from source, `bun run tauri dev` and `bun run tauri build` download the pinned pandoc release for your platform into `src-tauri/binaries/` first. To fetch it on its own, for example before running `cargo` directly:
+
+```bash
+bun run fetch:pandoc
+```
+
+The pandoc version is set by `PANDOC_VERSION` in `scripts/fetch-pandoc.mjs`.
+
 ## Development
 
-The app compiles Typst from source, so clone the compiler into this repo's `typst/` folder first:
+The app compiles Typst from source, so clone the compiler into this repo's `typst/` folder and check out the pinned commit first:
 
 ```bash
 git clone https://github.com/typst/typst.git typst
+git -C typst checkout bd5ebec285505889e8ff1d4f68804ab147a699f3
+```
+
+If `typst/` already exists, update it to the pinned commit instead:
+
+```bash
+git -C typst fetch
+git -C typst checkout bd5ebec285505889e8ff1d4f68804ab147a699f3
 ```
 
 Then:

@@ -143,7 +143,7 @@
   <div class="flex flex-col gap-3">
     <div class="flex items-center gap-2">
       <div
-        class="flex flex-1 items-center gap-2 rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2 focus-within:border-[var(--color-accent)]"
+        class="field flex flex-1 items-center gap-2"
       >
         <Icon icon="ph:magnifying-glass" class="text-[var(--color-ink-muted)]" />
         <input
@@ -256,13 +256,13 @@
 
   {#snippet footer()}
     <button
-      class="rounded-md px-3 py-1.5 text-xs text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)]"
+      class="btn btn-ghost"
       onclick={onclose}
     >
       Close
     </button>
     <button
-      class="flex items-center gap-1.5 rounded-md border border-[var(--color-line)] px-3 py-1.5 text-xs transition hover:bg-[var(--color-surface-muted)] disabled:opacity-50"
+      class="btn btn-secondary"
       disabled={busy}
       onclick={() => importInto("shared")}
     >
@@ -270,7 +270,7 @@
       Add to shared
     </button>
     <button
-      class="flex items-center gap-1.5 rounded-md bg-[var(--color-accent)] px-3 py-1.5 text-xs font-medium text-white transition hover:opacity-90 disabled:opacity-50"
+      class="btn btn-primary"
       disabled={busy}
       onclick={() => importInto("project")}
     >

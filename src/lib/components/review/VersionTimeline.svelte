@@ -30,7 +30,7 @@
 
   let groups = $derived(groupByDay(visibleVersions));
 
-  const kindIcons = { manual: "mdi:content-save-outline", auto: "mdi:clock-outline", restore: "mdi:restore" };
+  const kindIcons = { manual: "ph:floppy-disk", auto: "ph:clock", restore: "ph:arrow-counter-clockwise" };
 
   function editorNames(version: DocumentVersion) {
     const names = version.editors.map((editor) => editor.name);
@@ -48,7 +48,7 @@
         Named versions only
       </label>
       {#if people.length > 1}
-        <select bind:value={personFilter} aria-label="Filter by person" class="ml-auto rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] px-2 py-1 text-xs text-[var(--color-ink)]">
+        <select bind:value={personFilter} aria-label="Filter by person" class="field field-sm ml-auto w-auto">
           <option value="">Everyone</option>
           {#each people as person (person.id)}
             <option value={person.id}>{person.name}</option>
@@ -60,7 +60,7 @@
 
   <div class="flex-1 overflow-y-auto p-2">
     {#each groups as group (group.day)}
-      <p class="px-2 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">{group.day}</p>
+      <p class="section-label px-2 pb-1 pt-3">{group.day}</p>
       {#each group.versions as version (version.id)}
         <button
           type="button"
@@ -68,7 +68,7 @@
           class="mb-1 flex w-full flex-col gap-1.5 rounded-lg border px-3 py-2.5 text-left transition {selectedId === version.id ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)]' : 'border-transparent hover:bg-[var(--color-surface-sunken)]'}"
         >
           <div class="flex items-center gap-2">
-            <Icon icon={kindIcons[version.kind] ?? 'mdi:history'} class="text-sm flex-shrink-0 text-[var(--color-ink-muted)]" />
+            <Icon icon={kindIcons[version.kind] ?? 'ph:clock-counter-clockwise'} class="text-sm flex-shrink-0 text-[var(--color-ink-muted)]" />
             <span class="text-sm font-semibold text-[var(--color-ink)]">{versionTime(version)}</span>
             <span class="ml-auto rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase text-[var(--color-ink-muted)] bg-[var(--color-surface-sunken)]">{versionKindLabels[version.kind] ?? version.kind}</span>
           </div>

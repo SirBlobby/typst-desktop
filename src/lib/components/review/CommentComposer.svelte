@@ -43,7 +43,7 @@
     {placeholder}
     rows="2"
     onkeydown={handleKeydown}
-    class="w-full resize-none rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-ink)] focus:border-[var(--color-accent)] focus:outline-none"
+    class="field resize-none text-[13px]"
   ></textarea>
   {#if errorMessage}
     <p class="text-xs text-[var(--color-danger)]">{errorMessage}</p>
@@ -52,8 +52,8 @@
     {#if onCancel}
       <button type="button" onclick={onCancel} class="rounded-md px-2.5 py-1 text-xs font-medium text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)]">Cancel</button>
     {/if}
-    <button type="button" onclick={submit} disabled={!content.trim() || sending} class="flex items-center gap-1 rounded-md bg-[var(--color-accent)] px-2.5 py-1 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50">
-      <Icon icon={sending ? 'mdi:loading' : 'mdi:send'} class="text-sm {sending ? 'animate-spin' : ''}" />
+    <button type="button" onclick={submit} disabled={!content.trim() || sending} class="btn btn-primary">
+      <Icon icon={sending ? 'ph:circle-notch' : 'ph:paper-plane-right'} class="text-sm {sending ? 'animate-spin' : ''}" />
       {submitLabel}
     </button>
   </div>

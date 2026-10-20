@@ -51,17 +51,17 @@
   });
 </script>
 
-<Modal title="Insert image" icon="mdi:image-outline" width="max-w-2xl" onclose={onClose}>
+<Modal title="Insert image" icon="ph:image" width="max-w-2xl" onclose={onClose}>
   <div class="flex flex-col gap-3">
     <div class="flex gap-2">
       <div class="relative flex-1">
-        <Icon icon="mdi:magnify" class="absolute left-3 top-1/2 -translate-y-1/2 text-lg text-[var(--color-ink-muted)]" />
+        <Icon icon="ph:magnifying-glass" class="absolute left-3 top-1/2 -translate-y-1/2 text-lg text-[var(--color-ink-muted)]" />
         <input
           type="search"
           bind:value={searchQuery}
           placeholder="Search images in this project and your shared assets"
           use:focusOnMount
-          class="w-full rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] py-2 pl-9 pr-3 text-sm focus:border-[var(--color-accent)] focus:outline-none"
+          class="field pl-9"
         />
       </div>
       <label class="flex items-center gap-2 text-xs text-[var(--color-ink-muted)]">
@@ -69,13 +69,13 @@
         <input
           bind:value={width}
           placeholder="auto"
-          class="w-20 rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] px-2 py-2 text-sm focus:border-[var(--color-accent)] focus:outline-none"
+          class="field w-20 px-2"
         />
       </label>
     </div>
 
     {#if loading}
-      <p class="flex items-center gap-2 text-sm text-[var(--color-ink-muted)]"><Icon icon="mdi:loading" class="animate-spin" /> Loading images...</p>
+      <p class="flex items-center gap-2 text-sm text-[var(--color-ink-muted)]"><Icon icon="ph:circle-notch" class="animate-spin" /> Loading images...</p>
     {:else if loadError}
       <p class="text-sm text-[var(--color-danger)]">{loadError}</p>
     {:else if visibleImages.length === 0}

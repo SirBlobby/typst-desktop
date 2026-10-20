@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
-  import { EditorView, keymap, highlightActiveLine } from "@codemirror/view";
+  import { EditorView, keymap, highlightActiveLine, drawSelection } from "@codemirror/view";
   import { EditorState, Compartment, StateField, type Extension } from "@codemirror/state";
   import { searchKeymap } from "@codemirror/search";
   import { defaultKeymap, history, indentWithTab } from "@codemirror/commands";
@@ -170,6 +170,7 @@
           bracketMatching(),
           ...bracketExtensions(isToml),
           indentOnInput(),
+          drawSelection(),
           highlightActiveLine(),
           languageSlot.of(isToml ? StreamLanguage.define(toml) : []),
           lspSlot.of([]),

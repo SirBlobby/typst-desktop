@@ -2,7 +2,7 @@ use serde::Serialize;
 use std::collections::HashMap;
 use typst::diag::Warned;
 use typst::format::Complete;
-use typst::layout::{Frame, FrameItem};
+use typst::layout::{Abs, Frame, FrameItem};
 use typst::model::Document;
 use typst::WorldExt;
 use typst_html::{HtmlDocument, HtmlOptions};
@@ -12,6 +12,8 @@ use typst_render::{render, PngFormat, RenderOptions};
 use typst_svg::{SvgFormat, SvgOptions};
 
 use crate::world::ProjectWorld;
+
+const PAGE_GAP_PT: f64 = 10.0;
 
 #[derive(Serialize, Clone)]
 pub struct DocumentStats {
@@ -191,6 +193,26 @@ pub fn export_png(
                 None => Ok(Vec::new()),
             }
         }
+        Warned {
+            output: Err(errors),
+            warnings: _,
+        } => Err(collect_diagnostics(&world, &source_text, errors)),
+    }
+}
+
+pub fn export_svg(
+    entrypoint: String,
+    files: HashMap<String, Vec<u8>>,
+) -> Result<Vec<u8>, Vec<Diagnostic>> {
+    let source_text = entrypoint_text(&files, &entrypoint);
+    let world = ProjectWorld::new(entrypoint, files, false);
+
+    match typst::compile::<PagedDocument>(&world) {
+        Warned {
+            output: Ok(document),
+            warnings: _,
+        } => Ok(typst_svg::svg_merged(&document, &SvgOptions::default(), Abs::pt(PAGE_GAP_PT))
+            .into_bytes()),
         Warned {
             output: Err(errors),
             warnings: _,

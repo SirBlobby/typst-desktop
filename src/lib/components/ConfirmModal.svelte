@@ -19,17 +19,17 @@
 </script>
 
 <Modal {title} icon="ph:warning-circle" {onclose}>
-  <p class="text-sm text-[var(--color-ink-muted)]">{message}</p>
+  <p class="text-[13px] leading-relaxed text-[var(--color-ink-muted)]">{message}</p>
 
   {#snippet footer()}
     <button
-      class="rounded-md px-3 py-1.5 text-xs text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)]"
+      class="btn btn-ghost"
       onclick={onclose}
     >
       Cancel
     </button>
     <button
-      class="rounded-md bg-[var(--color-danger)] px-3 py-1.5 text-xs font-medium text-white transition hover:opacity-90"
+      class="btn btn-danger"
       onclick={onconfirm}
     >
       {confirmLabel}

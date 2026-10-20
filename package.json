@@ -10,6 +10,7 @@
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
     "tauri": "tauri",
+    "fetch:pandoc": "bun scripts/fetch-pandoc.mjs",
     "build:linux": "NO_STRIP=1 tauri build"
   },
   "license": "Apache-2.0",
@@ -33,6 +34,7 @@
     "codemirror": "^6.0.2",
     "codemirror-lang-typst": "^0.4.0",
     "hotkeys-js": "^4.0.8",
+    "pdfjs-dist": "^5.4.296",
     "y-codemirror.next": "^0.3.6",
     "y-websocket": "^3.1.0",
     "yjs": "^13.6.33"

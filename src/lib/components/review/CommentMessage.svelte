@@ -36,11 +36,11 @@
         <div class="ml-auto flex flex-shrink-0 gap-0.5">
           {#if isAuthor}
             <button type="button" onclick={(event) => { event.stopPropagation(); editing = true; }} title="Edit" aria-label="Edit comment" class="rounded p-0.5 text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]">
-              <Icon icon="mdi:pencil-outline" class="text-xs" />
+              <Icon icon="ph:pencil-simple" class="text-xs" />
             </button>
           {/if}
           <button type="button" onclick={(event) => { event.stopPropagation(); onDelete(); }} title="Delete" aria-label="Delete comment" class="rounded p-0.5 text-[var(--color-ink-muted)] hover:bg-[var(--color-danger)]/10 hover:text-[var(--color-danger)]">
-            <Icon icon="mdi:trash-can-outline" class="text-xs" />
+            <Icon icon="ph:trash" class="text-xs" />
           </button>
         </div>
       {/if}

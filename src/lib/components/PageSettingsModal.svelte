@@ -48,7 +48,7 @@
     <label class="flex flex-col gap-1 text-xs">
       <span class="font-medium text-[var(--color-ink-muted)]">Paper</span>
       <select
-        class="rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2 text-sm focus:border-[var(--color-accent)] focus:outline-none"
+        class="field"
         bind:value={paper}
       >
         {#each papers as option}
@@ -60,7 +60,7 @@
     <label class="flex flex-col gap-1 text-xs">
       <span class="font-medium text-[var(--color-ink-muted)]">Margin</span>
       <input
-        class="rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2 text-sm focus:border-[var(--color-accent)] focus:outline-none"
+        class="field"
         bind:value={margin}
         placeholder="2.5cm"
       />
@@ -72,7 +72,7 @@
         type="number"
         min="1"
         max="6"
-        class="rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2 text-sm focus:border-[var(--color-accent)] focus:outline-none"
+        class="field"
         bind:value={columns}
       />
     </label>
@@ -80,7 +80,7 @@
     <label class="flex flex-col gap-1 text-xs">
       <span class="font-medium text-[var(--color-ink-muted)]">Page numbers</span>
       <select
-        class="rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2 text-sm focus:border-[var(--color-accent)] focus:outline-none"
+        class="field"
         bind:value={numbering}
       >
         <option value="none">None</option>
@@ -98,13 +98,13 @@
 
   {#snippet footer()}
     <button
-      class="rounded-md px-3 py-1.5 text-xs text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)]"
+      class="btn btn-ghost"
       onclick={onclose}
     >
       Cancel
     </button>
     <button
-      class="rounded-md bg-[var(--color-accent)] px-3 py-1.5 text-xs font-medium text-white transition hover:opacity-90"
+      class="btn btn-primary"
       onclick={apply}
     >
       Apply

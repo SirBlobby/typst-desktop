@@ -100,7 +100,25 @@ export interface BrowseEntry {
   child_count: number;
   cloud_linked: boolean;
   sync_state: "synced" | "pending" | null;
+  color: string | null;
 }
+
+export const setFolderColor = (path: string, color: string | null) =>
+  invoke<void>("set_folder_color", { path, color });
+
+export interface Shortcut {
+  id: string;
+  name: string;
+  path: string;
+  browse_path: string;
+  available: boolean;
+}
+
+export const listShortcuts = () => invoke<Shortcut[]>("list_shortcuts");
+
+export const addShortcut = (path: string) => invoke<Shortcut>("add_shortcut", { path });
+
+export const removeShortcut = (id: string) => invoke<void>("remove_shortcut", { id });
 
 export interface TargetInfo {
   path: string;
@@ -166,7 +184,13 @@ export const exportTarget = (
   path: string,
   format: string,
   destination: string,
-) => invoke<string>("export_target", { path, format, destination });
+  sourceFile?: string | null,
+) => invoke<string>("export_target", { path, format, destination, sourceFile: sourceFile ?? null });
+
+export const pandocVersion = () => invoke<string | null>("pandoc_version");
+
+export const pandocImport = (parent: string, source: string) =>
+  invoke<string>("pandoc_import", { parent, source });
 
 export const renderTargetPng = (path: string) =>
   invoke<number[]>("render_target_png", { path });
@@ -220,6 +244,17 @@ export function isImagePath(path: string): boolean {
   const extension = path.split(".").pop()?.toLowerCase() ?? "";
   return IMAGE_EXTENSIONS.includes(extension);
 }
+
+export function isPdfPath(path: string): boolean {
+  return path.toLowerCase().endsWith(".pdf");
+}
+
+export function isViewablePath(path: string): boolean {
+  return isImagePath(path) || isPdfPath(path);
+}
+
+export const readPdf = (path: string) =>
+  invoke<ArrayBuffer>("read_pdf", { path });
 
 export const listFontFamilies = (path?: string) =>
   invoke<string[]>("list_font_families", { path: path ?? null });
@@ -311,6 +346,7 @@ export interface CloudDocument {
   folder_id: string | null;
   role: string;
   updated_at: string;
+  thumbnail_svg?: string | null;
 }
 
 export interface SharedItems {
@@ -352,6 +388,18 @@ export const cloudListDocuments = (folderId?: string | null) =>
   });
 
 export const cloudListShared = () => invoke<SharedItems>("cloud_list_shared");
+
+export interface CloudSpace {
+  id: string;
+  name: string;
+  role: string;
+  member_count: number;
+}
+
+export const cloudListSpaces = () => invoke<CloudSpace[]>("cloud_list_spaces");
+
+export const cloudSetSpace = (teamId: string | null) =>
+  invoke<void>("cloud_set_space", { teamId });
 
 export interface CloudFile {
   id: string;

@@ -1,4 +1,12 @@
 import * as api from "./api";
+import {
+  allSortOptions,
+  defaultViewFilters,
+  matchesQuery,
+  parseTimestamp,
+  sortByFilters,
+  type ViewFilters,
+} from "./view-filters";
 import type {
   CloudDocument,
   CloudFile,
@@ -9,24 +17,12 @@ import type {
 } from "./api";
 
 export type CloudKind = "folder" | "project" | "document" | "file";
-export type SortField = "name" | "modified";
-export type SortDirection = "asc" | "desc";
-export type ViewMode = "grid" | "list";
+export type { ViewMode } from "./view-filters";
+export type CloudFilters = ViewFilters;
 
-export interface CloudFilters {
-  sortField: SortField;
-  sortDirection: SortDirection;
-}
+export const defaultCloudFilters: CloudFilters = defaultViewFilters;
 
-export const defaultCloudFilters: CloudFilters = {
-  sortField: "name",
-  sortDirection: "asc",
-};
-
-export const sortOptions: { value: SortField; label: string }[] = [
-  { value: "name", label: "Name" },
-  { value: "modified", label: "Last modified" },
-];
+export const cloudSortOptions = allSortOptions.filter((option) => option.value !== "size");
 
 export interface CloudAction {
   label: string;
@@ -44,6 +40,7 @@ export interface CloudEntry {
   detail: string;
   modified: string | null;
   localPath: string | null;
+  thumbnailSvg: string | null;
   syncState: "synced" | "pending" | null;
   color: string | null;
   setColor: ((color: string | null) => void) | null;
@@ -66,14 +63,6 @@ export interface CloudHandlers {
   openFile: (fileId: string, name: string) => void;
   renameFile: (file: CloudFile) => void;
   deleteFile: (fileId: string) => void;
-}
-
-function parseTimestamp(value: string | null) {
-  if (!value) return 0;
-  const normalized =
-    value.includes("T") || value.endsWith("Z") ? value : value.replace(" ", "T") + "Z";
-  const time = Date.parse(normalized);
-  return Number.isNaN(time) ? 0 : time;
 }
 
 export function formatShortDate(value: string | null) {
@@ -99,14 +88,15 @@ export function folderEntry(folder: CloudFolder, handlers: CloudHandlers): Cloud
     detail: "Folder",
     modified: null,
     localPath: null,
+    thumbnailSvg: null,
     syncState: null,
     color: folder.color ?? null,
     setColor: (color) => handlers.setFolderColor(folder, color),
     open: () => handlers.openFolder(folder),
     actions: [
-      { label: "Open", icon: "mdi:folder-open-outline", color: "text-green-500", run: () => handlers.openFolder(folder) },
-      { label: "Rename", icon: "mdi:pencil-outline", color: "text-yellow-500", run: () => handlers.renameFolder(folder) },
-      { label: "Delete", icon: "mdi:trash-can-outline", danger: true, run: () => handlers.deleteFolder(folder) },
+      { label: "Open", icon: "ph:folder-open", run: () => handlers.openFolder(folder) },
+      { label: "Rename", icon: "ph:pencil-simple", run: () => handlers.renameFolder(folder) },
+      { label: "Delete", icon: "ph:trash", danger: true, run: () => handlers.deleteFolder(folder) },
     ],
   };
 }
@@ -121,11 +111,11 @@ export function projectEntry(
     : () => handlers.cloneProject(project.id, project.name);
   const actions: CloudAction[] = [
     linked
-      ? { label: "Open", icon: "mdi:open-in-new", color: "text-green-500", run: open }
-      : { label: "Download to this device", icon: "mdi:download", color: "text-teal-500", run: open },
+      ? { label: "Open", icon: "ph:arrow-square-out", run: open }
+      : { label: "Download to this device", icon: "ph:download-simple", run: open },
   ];
   if (project.role === "owner") {
-    actions.push({ label: "Delete", icon: "mdi:trash-can-outline", danger: true, run: () => handlers.deleteProject(project.id) });
+    actions.push({ label: "Delete", icon: "ph:trash", danger: true, run: () => handlers.deleteProject(project.id) });
   }
 
   return {
@@ -136,6 +126,7 @@ export function projectEntry(
     detail: project.role === "owner" ? "Project" : capitalize(project.role),
     modified: project.updated_at,
     localPath: linked?.path ?? null,
+    thumbnailSvg: null,
     syncState: linked ? (linked.sync_state ?? "synced") : null,
     color: null,
     setColor: null,
@@ -154,14 +145,14 @@ export function documentEntry(
     : () => handlers.downloadDocument(document.id, document.title);
   const actions: CloudAction[] = [
     linked
-      ? { label: "Open", icon: "mdi:open-in-new", color: "text-green-500", run: open }
-      : { label: "Download to this device", icon: "mdi:download", color: "text-teal-500", run: open },
+      ? { label: "Open", icon: "ph:arrow-square-out", run: open }
+      : { label: "Download to this device", icon: "ph:download-simple", run: open },
   ];
   if (linked) {
-    actions.push({ label: "Remove from this device", icon: "mdi:laptop-off", color: "text-yellow-500", run: () => handlers.removeDownload(linked.path) });
+    actions.push({ label: "Remove from this device", icon: "ph:minus-circle", run: () => handlers.removeDownload(linked.path) });
   }
   if (document.role === "owner") {
-    actions.push({ label: "Delete", icon: "mdi:trash-can-outline", danger: true, run: () => handlers.deleteDocument(document.id) });
+    actions.push({ label: "Delete", icon: "ph:trash", danger: true, run: () => handlers.deleteDocument(document.id) });
   }
 
   return {
@@ -172,6 +163,7 @@ export function documentEntry(
     detail: document.role === "owner" ? "Document" : capitalize(document.role),
     modified: document.updated_at,
     localPath: linked?.path ?? null,
+    thumbnailSvg: document.thumbnail_svg ?? null,
     syncState: linked ? (linked.sync_state ?? "synced") : null,
     color: null,
     setColor: null,
@@ -190,15 +182,16 @@ export function fileEntry(file: CloudFile, handlers: CloudHandlers): CloudEntry 
     detail: fileKindLabel(file.name),
     modified: file.created_at,
     localPath: null,
+    thumbnailSvg: null,
     syncState: null,
     color: null,
     setColor: null,
     open: () => handlers.openFile(file.id, file.name),
     actions: [
-      { label: "Open", icon: "mdi:open-in-new", color: "text-green-500", run: () => handlers.openFile(file.id, file.name) },
-      { label: "Add to assets", icon: "mdi:download", color: "text-teal-500", run: addToAssets },
-      { label: "Rename", icon: "mdi:pencil-outline", color: "text-yellow-500", run: () => handlers.renameFile(file) },
-      { label: "Delete", icon: "mdi:trash-can-outline", danger: true, run: () => handlers.deleteFile(file.id) },
+      { label: "Open", icon: "ph:arrow-square-out", run: () => handlers.openFile(file.id, file.name) },
+      { label: "Add to assets", icon: "ph:download-simple", run: addToAssets },
+      { label: "Rename", icon: "ph:pencil-simple", run: () => handlers.renameFile(file) },
+      { label: "Delete", icon: "ph:trash", danger: true, run: () => handlers.deleteFile(file.id) },
     ],
   };
 }
@@ -215,30 +208,16 @@ function fileKindLabel(name: string) {
 }
 
 export function fileIcon(name: string) {
-  if (api.isImagePath(name)) return "mdi:image-outline";
-  if (isFontName(name)) return "mdi:format-font";
-  if (/\.pdf$/i.test(name)) return "mdi:file-pdf-box";
-  return "mdi:file-outline";
+  if (api.isImagePath(name)) return "ph:image";
+  if (isFontName(name)) return "ph:text-aa";
+  if (/\.pdf$/i.test(name)) return "ph:file-pdf";
+  return "ph:file";
 }
 
 export function matchesSearch(entry: CloudEntry, query: string) {
-  const normalized = query.trim().toLowerCase();
-  return !normalized || entry.name.toLowerCase().includes(normalized);
+  return matchesQuery(entry.name, query);
 }
 
 export function sortEntries(entries: CloudEntry[], filters: CloudFilters) {
-  const direction = filters.sortDirection === "asc" ? 1 : -1;
-  return [...entries].sort((first, second) => {
-    let difference = 0;
-    if (filters.sortField === "modified") {
-      difference = parseTimestamp(first.modified) - parseTimestamp(second.modified);
-    }
-    if (difference === 0) {
-      difference = first.name.localeCompare(second.name, undefined, {
-        numeric: true,
-        sensitivity: "base",
-      });
-    }
-    return difference * direction;
-  });
+  return sortByFilters(entries, filters, (entry) => entry);
 }

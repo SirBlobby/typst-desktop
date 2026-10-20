@@ -5,8 +5,8 @@
   let { canEdit }: { canEdit: boolean } = $props();
 
   const modes = [
-    { suggesting: false, label: "Editing", icon: "mdi:pencil-outline", description: "Edit the document directly" },
-    { suggesting: true, label: "Suggesting", icon: "mdi:file-document-edit-outline", description: "Edits become suggestions others can accept or reject" }
+    { suggesting: false, label: "Editing", icon: "ph:pencil-simple", description: "Edit the document directly" },
+    { suggesting: true, label: "Suggesting", icon: "ph:note-pencil", description: "Edits become suggestions others can accept or reject" }
   ];
 
   let menuOpen = $state(false);
@@ -19,27 +19,27 @@
   <div class="relative">
     <button
       onclick={(event) => { event.stopPropagation(); menuOpen = !menuOpen; }}
-      class="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-sm font-medium transition-colors {$suggestingModeStore ? 'text-emerald-700 dark:text-emerald-300 bg-emerald-500/10' : 'text-[var(--color-ink-muted)] bg-[var(--color-surface-muted)] hover:bg-[var(--color-surface-sunken)]'}"
+      class="btn {$suggestingModeStore ? 'bg-[var(--color-success)]/12 text-[var(--color-success)]' : 'btn-ghost'}"
       title="Change editing mode"
     >
-      <Icon icon={currentMode.icon} class="text-base" />
+      <Icon icon={currentMode.icon} class="text-sm" />
       {currentMode.label}
-      <Icon icon="mdi:chevron-down" class="text-sm opacity-70" />
+      <Icon icon="ph:caret-down" class="text-[10px] opacity-70" />
     </button>
     {#if menuOpen}
-      <div class="absolute right-0 top-full z-[100] mt-1 w-64 rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] py-1 shadow-xl">
+      <div class="menu absolute right-0 top-full z-[100] mt-1 w-64">
         {#each modes as mode (mode.label)}
           <button
             onclick={() => { suggestingModeStore.set(mode.suggesting); menuOpen = false; }}
-            class="flex w-full items-start gap-2.5 px-3 py-2 text-left hover:bg-[var(--color-line)]"
+            class="menu-item items-start gap-2.5 py-2"
           >
-            <Icon icon={mode.icon} class="mt-0.5 text-base" />
+            <Icon icon={mode.icon} class="mt-0.5 text-sm text-[var(--color-ink-muted)]" />
             <span class="min-w-0 flex-1">
-              <span class="block text-sm font-medium text-[var(--color-ink)]">{mode.label}</span>
-              <span class="block text-xs text-[var(--color-ink-muted)]">{mode.description}</span>
+              <span class="block text-xs font-medium text-[var(--color-ink)]">{mode.label}</span>
+              <span class="block text-[11px] text-[var(--color-ink-muted)]">{mode.description}</span>
             </span>
             {#if mode.suggesting === $suggestingModeStore}
-              <Icon icon="mdi:check" class="mt-0.5 text-base text-[var(--color-accent)]" />
+              <Icon icon="ph:check" class="mt-0.5 text-sm text-[var(--color-accent)]" />
             {/if}
           </button>
         {/each}
@@ -47,8 +47,8 @@
     {/if}
   </div>
 {:else}
-  <span class="flex items-center gap-1.5 rounded-md bg-emerald-500/10 px-2.5 py-1 text-sm font-medium text-emerald-700 dark:text-emerald-300" title="You can suggest changes to this document">
-    <Icon icon="mdi:file-document-edit-outline" class="text-base" />
+  <span class="chip h-7 rounded-md bg-[var(--color-success)]/12 text-xs text-[var(--color-success)]" title="You can suggest changes to this document">
+    <Icon icon="ph:note-pencil" class="text-sm" />
     Suggesting
   </span>
 {/if}

@@ -26,7 +26,7 @@
 
 <div class="flex items-center">
   <button
-    class="flex h-11 w-11 items-center justify-center text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
+    class="flex h-11 w-11 items-center justify-center text-[var(--color-ink-muted)] transition-colors hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
     onclick={() => appWindow.minimize()}
     aria-label="Minimize"
   >
@@ -34,18 +34,18 @@
   </button>
 
   <button
-    class="flex h-11 w-11 items-center justify-center text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
+    class="flex h-11 w-11 items-center justify-center text-[var(--color-ink-muted)] transition-colors hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
     onclick={async () => {
       await appWindow.toggleMaximize();
       sync();
     }}
     aria-label={maximized ? "Restore" : "Maximize"}
   >
-    <Icon icon={maximized ? "ph:corners-in" : "ph:square"} class="text-sm" />
+    <Icon icon={maximized ? "ph:copy-simple" : "ph:square"} class="text-[13px]" />
   </button>
 
   <button
-    class="flex h-11 w-11 items-center justify-center text-[var(--color-ink-muted)] transition hover:bg-[var(--color-danger)] hover:text-white"
+    class="flex h-11 w-11 items-center justify-center text-[var(--color-ink-muted)] transition-colors hover:bg-[#e81123] hover:text-white"
     onclick={() => appWindow.close()}
     aria-label="Close"
   >

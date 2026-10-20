@@ -20,7 +20,7 @@
   let signInPageOpened = $state(false);
 
   const inputClass =
-    "rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2 text-sm focus:border-[var(--color-accent)] focus:outline-none";
+    "field";
 
   async function openSignInPage() {
     if (!url.trim()) {
@@ -67,13 +67,13 @@
       <input class={inputClass} bind:value={url} placeholder="https://drive.example.com" />
     </label>
 
-    <div class="flex flex-col gap-2 rounded-lg border border-[var(--color-line)] bg-[var(--color-surface-muted)] p-3">
+    <div class="flex flex-col gap-2 rounded-lg border border-[var(--color-line)] bg-[var(--color-surface)] p-3">
       <p class="text-xs text-[var(--color-ink-muted)]">
         Sign in to TypstDrive in your browser. It will show a one-time key you can paste below.
       </p>
       <button
         type="button"
-        class="flex items-center justify-center gap-2 rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2 text-xs font-medium transition hover:bg-[var(--color-surface-sunken)]"
+        class="btn btn-secondary h-8 w-full"
         onclick={openSignInPage}
       >
         <Icon icon="ph:arrow-square-out" class="text-sm" />
@@ -99,7 +99,7 @@
 
   {#snippet footer()}
     <button
-      class="rounded-md px-3 py-1.5 text-xs text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)]"
+      class="btn btn-ghost"
       onclick={onclose}
     >
       Cancel
@@ -107,7 +107,7 @@
     <button
       type="submit"
       form="login-form"
-      class="rounded-md bg-[var(--color-accent)] px-3 py-1.5 text-xs font-medium text-white transition hover:opacity-90 disabled:opacity-50"
+      class="btn btn-primary"
       disabled={busy}
     >
       {busy ? "Connecting..." : "Connect"}

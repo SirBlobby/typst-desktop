@@ -41,42 +41,38 @@
 
 {#snippet barButton(icon: string, label: string, run: () => void, active = false)}
   <button
-    class="flex items-center gap-1.5 rounded-md px-2 py-1 text-sm transition {active
-      ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent)]'
-      : 'text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]'}"
+    class="icon-btn {active ? 'icon-btn-active' : ''}"
     title={label}
     aria-label={label}
     onclick={run}
   >
-    <Icon {icon} class="text-base" />
+    <Icon {icon} class="text-sm" />
   </button>
 {/snippet}
 
 {#if $reviewSessionStore}
-  <div class="ml-auto flex items-center gap-2.5">
+  <div class="ml-auto flex items-center gap-1">
     {#if app.collab}
       <CollaboratorAvatars awareness={app.collab.provider.awareness} />
     {/if}
     {#if canComment}
       <EditingModeSwitch {canEdit} />
-      {@render barButton("mdi:comment-plus-outline", "Comment on selection (Ctrl+Alt+M)", () =>
+      {@render barButton("ph:chat-circle-text", "Comment on selection (Ctrl+Alt+M)", () =>
         startCommentOnSelection($editorViewStore, $reviewSessionStore?.text ?? null),
       )}
     {/if}
     {#if canEdit}
       <button
-        class="flex items-center gap-1.5 rounded-md px-2 py-1 text-sm transition {saveStatus === 'error'
-          ? 'text-[var(--color-danger)]'
-          : 'text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]'}"
+        class="btn btn-ghost {saveStatus === 'error' ? 'text-[var(--color-danger)]' : ''}"
         title="Save a version of this document"
         disabled={saveStatus === "saving"}
         onclick={handleSaveVersion}
       >
-        <Icon icon={saveStatus === "saving" ? "mdi:loading" : "mdi:content-save-outline"} class="text-base {saveStatus === 'saving' ? 'animate-spin' : ''}" />
+        <Icon icon={saveStatus === "saving" ? "ph:circle-notch" : "ph:floppy-disk"} class="text-sm {saveStatus === 'saving' ? 'animate-spin' : ''}" />
         {saveStatusLabels[saveStatus]}
       </button>
     {/if}
-    {@render barButton("mdi:history", "Version history", () => historyOpenStore.set(true))}
-    {@render barButton("mdi:comment-text-multiple-outline", "Comments and suggestions", () => reviewPanelOpenStore.update((open) => !open), $reviewPanelOpenStore)}
+    {@render barButton("ph:clock-counter-clockwise", "Version history", () => historyOpenStore.set(true))}
+    {@render barButton("ph:chats", "Comments and suggestions", () => reviewPanelOpenStore.update((open) => !open), $reviewPanelOpenStore)}
   </div>
 {/if}

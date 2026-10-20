@@ -26,13 +26,13 @@
 <Modal {title} {icon} width="max-w-xl" onclose={onClose}>
   <div class="flex flex-col gap-3">
     <div class="relative">
-      <Icon icon="mdi:magnify" class="absolute left-3 top-1/2 -translate-y-1/2 text-lg text-[var(--color-ink-muted)]" />
+      <Icon icon="ph:magnifying-glass" class="absolute left-3 top-1/2 -translate-y-1/2 text-lg text-[var(--color-ink-muted)]" />
       <input
         type="search"
         bind:value={searchQuery}
         placeholder="Search by name"
         use:focusOnMount
-        class="w-full rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] py-2 pl-9 pr-3 text-sm text-[var(--color-ink)] focus:border-[var(--color-accent)] focus:outline-none"
+        class="field pl-9"
       />
     </div>
 

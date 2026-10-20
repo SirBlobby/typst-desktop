@@ -43,8 +43,8 @@
   let newMenuOpen = $state(false);
 
   const secondaryNewItems = [
-    { label: "Project", description: "Multi-file workspace", icon: "mdi:folder-star", color: "text-indigo-500", action: () => onnewproject() },
-    { label: "Folder", description: "Organize your files", icon: "mdi:folder-plus", color: "text-yellow-500", action: () => onnewfolder() },
+    { label: "Project", description: "Multi-file workspace", icon: "ph:folder-star", action: () => onnewproject() },
+    { label: "Folder", description: "Organize your files", icon: "ph:folder-plus", action: () => onnewfolder() },
   ];
 
   function runNewItem(action: () => void) {
@@ -67,91 +67,83 @@
 
 <svelte:window onclick={handleWindowClick} />
 
-<header class="mb-6">
-  <nav class="mb-2 flex flex-wrap items-center gap-1 text-xs text-[var(--color-ink-muted)]" aria-label="Folder path">
-    <button
-      class="flex items-center gap-1 rounded px-1.5 py-0.5 transition-colors hover:text-[var(--color-ink)] {crumbClass('')}"
-      onclick={() => onnavigate(null)}
-      ondragover={(event) => ondragovercrumb(event, "")}
-      ondragleave={() => ondragleavecrumb("")}
-      ondrop={(event) => ondropcrumb(event, "")}
-    >
-      <Icon icon={rootIcon} class="text-sm" />
-      {rootLabel}
-    </button>
-    {#each folderPath as folder (folder.id)}
-      <span class="opacity-50">/</span>
-      <button
-        class="max-w-48 truncate rounded px-1.5 py-0.5 transition-colors hover:text-[var(--color-ink)] {crumbClass(folder.id)}"
-        onclick={() => onnavigate(folder.id)}
-        ondragover={(event) => ondragovercrumb(event, folder.id)}
-        ondragleave={() => ondragleavecrumb(folder.id)}
-        ondrop={(event) => ondropcrumb(event, folder.id)}
-      >
-        {folder.name}
-      </button>
-    {/each}
-  </nav>
+{#snippet crumb(folderId: string, label: string, icon?: string)}
+  <button
+    class="flex max-w-48 items-center gap-1 truncate rounded-md px-1.5 py-0.5 transition-colors hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] {crumbClass(folderId)}"
+    onclick={() => onnavigate(folderId || null)}
+    ondragover={(event) => ondragovercrumb(event, folderId)}
+    ondragleave={() => ondragleavecrumb(folderId)}
+    ondrop={(event) => ondropcrumb(event, folderId)}
+  >
+    {#if icon}<Icon {icon} class="shrink-0" />{/if}
+    {label}
+  </button>
+{/snippet}
 
-  <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-    <div class="flex min-w-0 items-center gap-3">
-      <h1 class="min-w-0 truncate text-2xl font-bold text-[var(--color-ink)]">{title}</h1>
+<header class="mb-5">
+  {#if folderPath.length > 0}
+    <nav class="mb-1.5 flex flex-wrap items-center gap-0.5 text-xs text-[var(--color-ink-muted)]" aria-label="Folder path">
+      {@render crumb("", rootLabel, rootIcon)}
+      {#each folderPath.slice(0, -1) as folder (folder.id)}
+        <Icon icon="ph:caret-right" class="text-[10px] text-[var(--color-ink-subtle)]" />
+        {@render crumb(folder.id, folder.name)}
+      {/each}
+    </nav>
+  {/if}
+
+  <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+    <div class="flex min-w-0 items-center gap-2.5">
+      <h1 class="min-w-0 truncate text-xl font-semibold tracking-tight">{title}</h1>
       {#if loading}
-        <Icon icon="mdi:loading" class="shrink-0 animate-spin text-xl text-[var(--color-accent)]" />
+        <Icon icon="ph:circle-notch" class="shrink-0 animate-spin text-base text-[var(--color-accent)]" />
       {/if}
     </div>
 
     <div class="flex flex-wrap items-center gap-2">
       <div class="relative">
-        <Icon icon="mdi:magnify" class="absolute left-3 top-1/2 -translate-y-1/2 text-lg text-[var(--color-ink-muted)]" />
+        <Icon icon="ph:magnifying-glass" class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-[var(--color-ink-subtle)]" />
         <input
           type="search"
           bind:value={searchQuery}
           placeholder="Filter this view"
           aria-label="Filter items"
-          class="w-56 rounded-lg border border-[var(--color-line)] bg-[var(--color-surface)] py-2 pl-9 pr-3 text-sm text-[var(--color-ink)] transition-colors focus:border-[var(--color-accent)] focus:outline-none"
+          class="field field-sm h-7 w-56 pl-8"
         />
       </div>
 
       {#if showActions}
-        <button
-          class="flex items-center gap-1.5 rounded-lg border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2 text-sm font-medium text-[var(--color-ink)] transition-colors hover:bg-[var(--color-surface-sunken)]"
-          onclick={onupload}
-        >
-          <Icon icon="mdi:tray-arrow-up" class="text-lg" />
+        <button class="btn btn-secondary" onclick={onupload}>
+          <Icon icon="ph:upload-simple" />
           Upload
         </button>
 
         <div class="relative flex" data-new-menu>
-          <button
-            class="flex items-center gap-1.5 rounded-l-lg bg-[var(--color-accent)] py-2 pl-3 pr-2.5 text-sm font-semibold text-white transition hover:opacity-90"
-            onclick={onnewdocument}
-          >
-            <Icon icon="mdi:file-document-plus-outline" class="text-lg" />
+          <button class="btn btn-primary rounded-r-none pr-2" onclick={onnewdocument}>
+            <Icon icon="ph:file-plus" />
             New document
           </button>
           <button
-            class="rounded-r-lg border-l border-white/25 bg-[var(--color-accent)] px-2 py-2 text-white transition hover:opacity-90"
+            class="btn btn-primary rounded-l-none border-l border-l-black/10 px-1.5"
             aria-label="More create options"
             aria-haspopup="menu"
             aria-expanded={newMenuOpen}
             onclick={() => (newMenuOpen = !newMenuOpen)}
           >
-            <Icon icon="mdi:chevron-down" class="text-lg" />
+            <Icon icon="ph:caret-down" />
           </button>
 
           {#if newMenuOpen}
-            <div role="menu" class="absolute right-0 top-full z-30 mt-1 w-60 rounded-lg border border-[var(--color-line)] bg-[var(--color-surface)] p-1 shadow-xl">
+            <div role="menu" class="menu absolute right-0 top-full z-30 mt-1.5 w-56">
               {#each secondaryNewItems as item (item.label)}
                 <button
                   role="menuitem"
-                  class="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left hover:bg-[var(--color-surface-sunken)]"
+                  class="menu-item gap-2.5 py-2"
                   onclick={() => runNewItem(item.action)}
                 >
-                  <Icon icon={item.icon} class="text-xl {item.color}" />
+                  <Icon icon={item.icon} class="text-base text-[var(--color-accent)]" />
                   <span>
-                    <span class="block text-sm font-medium text-[var(--color-ink)]">{item.label}</span>
-                    <span class="block text-xs text-[var(--color-ink-muted)]">{item.description}</span>
+                    <span class="block font-medium">{item.label}</span>
+                    <span class="block text-[11px] text-[var(--color-ink-muted)]">{item.description}</span>
                   </span>
                 </button>
               {/each}

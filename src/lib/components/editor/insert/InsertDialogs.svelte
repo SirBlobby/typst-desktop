@@ -41,5 +41,5 @@
 {:else if $insertDialogStore === "symbol"}
   <CharacterPickerModal title="Insert symbol" icon="mdi:omega" categories={symbolCategories} onPick={pickCharacter} onClose={close} />
 {:else if $insertDialogStore === "emoji"}
-  <CharacterPickerModal title="Insert emoji" icon="mdi:emoticon-happy-outline" categories={emojiCategories} onPick={pickCharacter} onClose={close} />
+  <CharacterPickerModal title="Insert emoji" icon="ph:smiley" categories={emojiCategories} onPick={pickCharacter} onClose={close} />
 {/if}

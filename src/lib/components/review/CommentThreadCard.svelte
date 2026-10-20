@@ -42,7 +42,7 @@
 
 <div
   bind:this={cardElement}
-  class="rounded-xl border bg-[var(--color-surface)] shadow-sm transition {expanded ? 'border-[var(--color-accent)] shadow-md' : 'border-[var(--color-line)] hover:shadow-md'} {thread.root.resolved ? 'opacity-70' : ''}"
+  class="card {expanded ? 'border-[var(--color-accent)] shadow-md' : 'card-interactive'} {thread.root.resolved ? 'opacity-70' : ''}"
 >
   <div
     role="button"
@@ -65,7 +65,7 @@
     />
     {#if !expanded && thread.replies.length > 0}
       <p class="mt-2 flex items-center gap-1 pl-9 text-xs font-medium text-[var(--color-accent)]">
-        <Icon icon="mdi:reply-outline" class="text-sm" />
+        <Icon icon="ph:arrow-bend-up-left" class="text-sm" />
         {thread.replies.length} {thread.replies.length === 1 ? 'reply' : 'replies'}
       </p>
     {/if}
@@ -85,8 +85,8 @@
       {#if canComment}
         <CommentComposer placeholder="Reply..." submitLabel="Reply" onSubmit={reply} />
         <div class="flex justify-end">
-          <button type="button" onclick={toggleResolved} disabled={busy} class="flex items-center gap-1 rounded-md border border-[var(--color-line)] px-2.5 py-1 text-xs font-medium text-[var(--color-ink)] hover:bg-[var(--color-surface-sunken)] disabled:opacity-50">
-            <Icon icon={thread.root.resolved ? 'mdi:refresh' : 'mdi:check'} class="text-sm" />
+          <button type="button" onclick={toggleResolved} disabled={busy} class="btn btn-secondary gap-1">
+            <Icon icon={thread.root.resolved ? 'ph:arrows-clockwise' : 'ph:check'} class="text-sm" />
             {thread.root.resolved ? 'Reopen' : 'Resolve'}
           </button>
         </div>

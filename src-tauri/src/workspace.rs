@@ -132,6 +132,9 @@ impl Default for ProjectMeta {
 }
 
 pub fn workspace_path(app: &AppHandle, store: &Store, relative: &str) -> Result<PathBuf, String> {
+    if let Some(resolved) = crate::shortcuts::resolve(store, relative) {
+        return resolved;
+    }
     let root = workspace_root(app, store)?;
     if relative.is_empty() {
         return Ok(root);
@@ -159,6 +162,7 @@ pub struct BrowseEntry {
     pub child_count: usize,
     pub cloud_linked: bool,
     pub sync_state: Option<String>,
+    pub color: Option<String>,
 }
 
 fn modified_time(path: &Path) -> Option<chrono::DateTime<chrono::Utc>> {
@@ -266,6 +270,7 @@ pub fn browse(app: &AppHandle, store: &Store, relative: &str) -> Result<Vec<Brow
             } else {
                 None
             };
+            let color = if project { None } else { store.folder_color(&path)? };
 
             entries.push(BrowseEntry {
                 name,
@@ -278,6 +283,7 @@ pub fn browse(app: &AppHandle, store: &Store, relative: &str) -> Result<Vec<Brow
                 last_synced_at,
                 sync_state,
                 child_count,
+                color,
             });
         } else {
             let kind = if is_typst_file(&name) { "document" } else { "file" };
@@ -304,6 +310,7 @@ pub fn browse(app: &AppHandle, store: &Store, relative: &str) -> Result<Vec<Brow
                 child_count: 0,
                 cloud_linked: link.is_some(),
                 sync_state,
+                color: None,
             });
         }
     }

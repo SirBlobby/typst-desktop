@@ -7,6 +7,7 @@ import {
   syncAfterSave,
   syncBeforeOpening,
 } from "./cloud-sync";
+import { clearCloudSpaces, refreshCloudSpaces } from "./cloud-spaces";
 import type { CollabSession } from "./yjs-client";
 import type {
   Account,
@@ -47,7 +48,10 @@ interface AppState {
 
   currentDir: string;
   entries: BrowseEntry[];
+  shortcuts: api.Shortcut[];
   cloudProjects: ProjectSummary[];
+  cloudSpaces: api.CloudSpace[];
+  cloudSpace: string | null;
   cloudFolder: string | null | "shared";
   cloudFolders: CloudFolder[];
   cloudFolderTree: CloudFolder[];
@@ -95,7 +99,10 @@ export const app = $state<AppState>({
 
   currentDir: "",
   entries: [],
+  shortcuts: [],
   cloudProjects: [],
+  cloudSpaces: [],
+  cloudSpace: null,
   cloudFolder: null,
   cloudFolders: [],
   cloudFolderTree: [],
@@ -276,6 +283,12 @@ function accentSoft(hex: string, dark: boolean): string {
     : hslToHex(h, Math.min(s, 70), 92);
 }
 
+function readableTextOn(hex: string): string {
+  const [r, g, b] = hexToRgb(hex);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.6 ? "#111111" : "#ffffff";
+}
+
 export function applyAccent(color: string | null) {
   app.accent = color;
   const root = document.documentElement.style;
@@ -283,10 +296,12 @@ export function applyAccent(color: string | null) {
   if (color) {
     root.setProperty("--color-accent", color);
     root.setProperty("--color-accent-soft", accentSoft(color, app.theme === "dark"));
+    root.setProperty("--color-on-accent", readableTextOn(color));
     localStorage.setItem(ACCENT_KEY, color);
   } else {
     root.removeProperty("--color-accent");
     root.removeProperty("--color-accent-soft");
+    root.removeProperty("--color-on-accent");
     localStorage.removeItem(ACCENT_KEY);
   }
 }
@@ -320,10 +335,24 @@ export function applyContrast(level: ContrastLevel) {
 export function breadcrumbs(): { name: string; path: string }[] {
   if (!app.currentDir) return [];
   const segments = app.currentDir.split("/");
+  const shortcut = shortcutForPath(app.currentDir);
   return segments.map((name, index) => ({
-    name,
+    name: index === 0 && shortcut ? shortcut.name : name,
     path: segments.slice(0, index + 1).join("/"),
   }));
+}
+
+export function shortcutForPath(path: string): api.Shortcut | null {
+  const root = path.split("/")[0];
+  return app.shortcuts.find((shortcut) => shortcut.browse_path === root) ?? null;
+}
+
+export async function refreshShortcuts() {
+  try {
+    app.shortcuts = await api.listShortcuts();
+  } catch (error) {
+    setError(error);
+  }
 }
 
 export async function bootstrap() {
@@ -362,6 +391,7 @@ export async function bootstrap() {
     if (app.settings?.device_token) {
       api.cloudWsStart().catch(() => {});
     }
+    await refreshShortcuts();
     await browseTo("");
     await refreshAccount();
   } catch (error) {
@@ -387,9 +417,11 @@ export async function refreshAccount() {
   try {
     app.account = await api.cloudAccount();
     if (app.account) {
+      await refreshCloudSpaces();
       await refreshCloudProjects();
     } else {
       app.cloudProjects = [];
+      await clearCloudSpaces();
       app.scope = "local";
     }
   } catch {
@@ -414,7 +446,7 @@ interface CloudSnapshot {
 }
 
 function cloudCacheKey() {
-  return `cloud:${app.cloudFolder ?? "root"}`;
+  return `cloud:${app.cloudSpace ?? "personal"}:${app.cloudFolder ?? "root"}`;
 }
 
 function applyCloudSnapshot(snapshot: CloudSnapshot) {

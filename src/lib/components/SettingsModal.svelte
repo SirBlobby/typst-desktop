@@ -35,6 +35,7 @@
     type ThemePreference,
     type TextScale,
   } from "$lib/ts/state.svelte";
+  import { clearCloudSpaces } from "$lib/ts/cloud-spaces";
 
   interface Props {
     onclose: () => void;
@@ -302,6 +303,7 @@
       await api.cloudLogout();
       app.account = null;
       app.cloudProjects = [];
+      await clearCloudSpaces();
       app.scope = "local";
       app.settings = await api.getSettings();
     } catch (error) {
@@ -309,15 +311,14 @@
     }
   }
 
-  const fieldClass =
-    "rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2 text-sm focus:border-[var(--color-accent)] focus:outline-none";
+  const fieldClass = "field field-sm h-8 w-auto";
 </script>
 
 {#snippet choiceButton(active: boolean, onclick: () => void, label: string, icon?: string, swatch?: string)}
   <button
-    class="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs transition
+    class="flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs transition
       {active
-      ? 'bg-[var(--color-surface)] font-medium text-[var(--color-accent)] shadow-sm'
+      ? 'bg-[var(--color-surface-raised)] font-medium text-[var(--color-ink)] shadow-sm'
       : 'text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]'}"
     {onclick}
   >
@@ -341,13 +342,13 @@
         {:else}
           <span class="flex shrink-0 items-center gap-1">
             {#each typeof item.keys === "string" ? formatKeys(item.keys) : item.keys as key}
-              <kbd class="rounded border border-[var(--color-line)] bg-[var(--color-surface-muted)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-ink-muted)]">
+              <kbd class="rounded-md border border-b-2 border-[var(--color-line)] bg-[var(--color-surface-muted)] px-1.5 py-0.5 font-sans text-[10px] font-medium text-[var(--color-ink-muted)]">
                 {key}
               </kbd>
             {/each}
             {#if editable && item.customized}
               <button
-                class="rounded p-1 text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
+                class="icon-btn icon-btn-sm"
                 title="Reset to default"
                 aria-label="Reset to default"
                 onclick={() => {
@@ -360,7 +361,7 @@
             {/if}
             {#if editable}
               <button
-                class="rounded p-1 text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
+                class="icon-btn icon-btn-sm"
                 title="Change shortcut"
                 aria-label="Change shortcut"
                 onclick={() => (editingId = item.id!)}
@@ -376,14 +377,14 @@
 {/snippet}
 
 <Modal title="Settings" icon="ph:gear-six" width="max-w-4xl" {onclose}>
-  <div class="-mx-5 -my-4 flex h-[520px] max-h-[70vh]">
-    <nav class="flex w-44 shrink-0 flex-col gap-0.5 border-r border-[var(--color-line)] bg-[var(--color-surface-muted)] p-2">
+  <div class="-mx-5 -mb-5 -mt-3 flex h-[560px] max-h-[72vh] border-t border-[var(--color-line)]">
+    <nav class="flex w-48 shrink-0 flex-col gap-0.5 border-r border-[var(--color-line)] bg-[var(--color-surface-raised)] p-2">
       {#each sections as item}
         <button
-          class="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs transition
+          class="flex h-8 items-center gap-2 rounded-md px-2.5 text-[13px] transition
             {section === item.id
-            ? 'bg-[var(--color-surface-sunken)] font-semibold text-[var(--color-ink)]'
-            : 'text-[var(--color-ink-muted)] hover:bg-[var(--color-surface)] hover:text-[var(--color-ink)]'}"
+            ? 'bg-[var(--color-accent-soft)] font-medium text-[var(--color-ink)]'
+            : 'text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]'}"
           onclick={() => (section = item.id)}
         >
           <Icon icon={item.icon} class="text-base {section === item.id ? 'text-[var(--color-accent)]' : ''}" />
@@ -392,15 +393,15 @@
       {/each}
     </nav>
 
-    <div class="scroll-thin min-w-0 flex-1 overflow-y-auto p-5">
+    <div class="scroll-thin min-w-0 flex-1 overflow-y-auto bg-[var(--color-surface-muted)] px-6 py-5">
       {#if section === "files"}
         <SettingsHeader title="Files" description="Where Typst Desktop keeps your work and when it saves." icon="ph:folder" />
         <div class="flex flex-col gap-4">
           <SettingsCard>
             <SettingsRow label="Workspace folder" description="Projects and documents are stored as plain files here." stacked>
-              <input class="flex-1 {fieldClass}" bind:value={workspaceRoot} />
+              <input class="{fieldClass} flex-1" bind:value={workspaceRoot} />
               <button
-                class="flex items-center gap-1 rounded-md border border-[var(--color-line)] px-3 py-1.5 text-xs hover:bg-[var(--color-surface-muted)]"
+                class="btn btn-secondary h-8"
                 onclick={browse}
               >
                 <Icon icon="ph:folder-open" />
@@ -424,14 +425,14 @@
         <div class="flex flex-col gap-4">
           <SettingsCard title="Theme">
             <SettingsRow label="Mode" description="System follows your operating system and updates live.">
-              <div class="flex rounded-md border border-[var(--color-line)] bg-[var(--color-surface-muted)] p-0.5">
+              <div class="flex rounded-lg border border-[var(--color-line)] bg-[var(--color-surface-sunken)] p-0.5">
                 {#each [["light", "Light", "ph:sun"], ["dark", "Dark", "ph:moon"], ["system", "System", "ph:desktop"]] as [value, label, icon]}
                   {@render choiceButton(app.themePreference === value, () => applyTheme(value as ThemePreference), label, icon)}
                 {/each}
               </div>
             </SettingsRow>
             <SettingsRow label="Color theme" description="Sets the surfaces, editor colors and default accent.">
-              <div class="flex rounded-md border border-[var(--color-line)] bg-[var(--color-surface-muted)] p-0.5">
+              <div class="flex rounded-lg border border-[var(--color-line)] bg-[var(--color-surface-sunken)] p-0.5">
                 {#each colorThemes as entry}
                   {@render choiceButton(app.colorTheme === entry.id, () => applyColorTheme(entry.id), entry.label, entry.icon)}
                 {/each}
@@ -442,7 +443,7 @@
                 class="flex h-6 w-6 items-center justify-center rounded-full border transition
                   {app.accent === null
                   ? 'border-[var(--color-accent)] text-[var(--color-accent)]'
-                  : 'border-[var(--color-line)] text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-muted)]'}"
+                  : 'border-[var(--color-line)] text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)]'}"
                 title="Use the theme accent"
                 aria-label="Use the theme accent"
                 onclick={() => applyAccent(null)}
@@ -474,7 +475,7 @@
         <SettingsHeader title="Accessibility" description="Make the app easier to read and calmer to use." icon="ph:wheelchair" />
         <SettingsCard>
           <SettingsRow label="Text size" description="Scales text and controls throughout the app.">
-            <div class="flex rounded-md border border-[var(--color-line)] bg-[var(--color-surface-muted)] p-0.5">
+            <div class="flex rounded-lg border border-[var(--color-line)] bg-[var(--color-surface-sunken)] p-0.5">
               {#each textScaleOptions as option}
                 {@render choiceButton(app.textScale === option.value, () => applyTextScale(option.value), option.label)}
               {/each}
@@ -503,11 +504,11 @@
                 {/if}
               </div>
               {#if app.account}
-                <button class="rounded-md border border-[var(--color-line)] px-3 py-1.5 text-xs hover:bg-[var(--color-surface-muted)]" onclick={signOut}>
+                <button class="btn btn-secondary" onclick={signOut}>
                   Sign out
                 </button>
               {:else}
-                <button class="rounded-md bg-[var(--color-accent)] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90" onclick={onsignin}>
+                <button class="btn btn-primary" onclick={onsignin}>
                   Sign in
                 </button>
               {/if}
@@ -517,7 +518,7 @@
           <SettingsCard title="Server">
             <SettingsRow label="TypstDrive server" description="The address of your TypstDrive instance." stacked>
               <div class="flex w-full flex-col gap-1">
-                <input class={fieldClass} bind:value={serverUrl} />
+                <input class="{fieldClass} w-full" bind:value={serverUrl} />
                 {#if checkingCompatibility}
                   <span class="flex items-center gap-1 text-[11px] text-[var(--color-ink-muted)]">
                     <Icon icon="ph:circle-notch" class="animate-spin" />
@@ -573,7 +574,7 @@
           </SettingsCard>
 
           {#if app.lspStatus === "unavailable"}
-            <div class="rounded-md border border-[var(--color-danger)]/30 bg-[var(--color-danger)]/10 p-3 text-xs text-[var(--color-danger)]">
+            <div class="rounded-lg border border-[var(--color-danger)]/25 bg-[var(--color-danger)]/8 p-3 text-xs text-[var(--color-danger)]">
               tinymist could not be started. Confirm it's installed and on your PATH, then reopen the file.
             </div>
           {/if}
@@ -593,9 +594,7 @@
         <div class="flex flex-col gap-4">
           <SettingsCard>
             <div class="flex items-center gap-3 px-4 py-3">
-              <span class="flex h-12 w-12 items-center justify-center rounded-md bg-[var(--color-accent)]">
-                <img src="/favicon.png" alt="Typst Desktop" class="h-9 w-9" />
-              </span>
+              <img src="/favicon.png" alt="Typst Desktop" class="h-11 w-11 rounded-xl" />
               <div>
                 <p class="text-sm font-semibold">Typst Desktop</p>
                 <p class="text-xs text-[var(--color-ink-muted)]">A local editor for Typst documents</p>
@@ -613,7 +612,7 @@
 
           <SettingsCard title="Links">
             {#each links as link}
-              <button class="flex w-full items-center gap-2 px-4 py-2.5 text-xs transition hover:bg-[var(--color-surface-muted)]" onclick={() => openUrl(link.url)}>
+              <button class="flex w-full items-center gap-2 px-4 py-2.5 text-xs transition hover:bg-[var(--color-surface-sunken)]/60" onclick={() => openUrl(link.url)}>
                 <Icon icon={link.icon} class="text-base text-[var(--color-accent)]" />
                 <span class="flex-1 text-left">{link.label}</span>
                 <Icon icon="ph:arrow-square-out" class="text-[var(--color-ink-muted)]" />
@@ -639,14 +638,14 @@
       section === "lsp" ||
       section === "hotkeys"}
     <button
-      class="rounded-md border border-[var(--color-line)] px-3 py-1.5 text-xs text-[var(--color-ink)] hover:bg-[var(--color-surface-sunken)]"
+      class="btn btn-secondary"
       onclick={onclose}
     >
       {draftless ? "Close" : "Cancel"}
     </button>
     {#if !draftless}
       <button
-        class="rounded-md bg-[var(--color-accent)] px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
+        class="btn btn-primary"
         disabled={saving}
         onclick={save}
       >

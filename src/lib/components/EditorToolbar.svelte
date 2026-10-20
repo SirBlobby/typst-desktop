@@ -2,20 +2,14 @@
   import Icon from "@iconify/svelte";
   import type { EditorView } from "@codemirror/view";
   import * as api from "$lib/ts/api";
+  import { setTypstConfig } from "$lib/ts/editor-actions";
+  import { currentHeadingLevel, setHeadingLevel } from "$lib/ts/editor/insert";
   import {
-    insertText,
-    prefixLines,
-    setTypstConfig,
-    wrapSelection,
-  } from "$lib/ts/editor-actions";
-  import {
-    currentHeadingLevel,
-    insertQuote,
-    openFind,
-    openReplace,
-    setHeadingLevel,
-  } from "$lib/ts/editor/insert";
-  import { insertDialogStore, insertOptions } from "$lib/ts/editor/insert-dialog";
+    allGroupItems,
+    buildToolbarGroups,
+    collapsedGroupIds,
+    type ToolbarItem,
+  } from "$lib/ts/editor/toolbar-groups";
   import { clampMenu } from "$lib/ts/menu-position";
   import { app } from "$lib/ts/state.svelte";
 
@@ -31,12 +25,26 @@
   let fonts = $state<string[]>([]);
   let selectedFont = $state("");
   let headingLevel = $state(0);
-  let insertMenuPosition = $state<{ top: number; left: number } | null>(null);
+  let toolbarWidth = $state(0);
+  let openMenu = $state<{ id: string; top: number; left: number } | null>(null);
 
   const headingOptions = [
     { level: 0, label: "Normal text" },
     ...[1, 2, 3, 4, 5, 6].map((level) => ({ level, label: `Heading ${level}` })),
   ];
+
+  const groups = $derived(buildToolbarGroups(view, onassets, onpagesettings));
+  const collapsed = $derived(collapsedGroupIds(groups, toolbarWidth));
+
+  const openMenuItems = $derived.by((): ToolbarItem[] => {
+    if (!openMenu) return [];
+    const [groupId, kind] = openMenu.id.split(":");
+    const group = groups.find((candidate) => candidate.id === groupId);
+    if (!group) return [];
+    return kind === "menu" ? (group.menu?.items ?? []) : allGroupItems(group);
+  });
+
+  const showFontInMenu = $derived(openMenu?.id === "document:group");
 
   function syncHeadingLevel() {
     headingLevel = currentHeadingLevel(view);
@@ -48,14 +56,24 @@
     headingLevel = level;
   }
 
-  function toggleInsertMenu(event: MouseEvent) {
+  function applyFont(family: string) {
+    selectedFont = family;
+    if (family) setTypstConfig(view, "text", "font", `"${family}"`);
+  }
+
+  function toggleMenu(event: MouseEvent, id: string) {
     event.stopPropagation();
-    if (insertMenuPosition) {
-      insertMenuPosition = null;
+    if (openMenu?.id === id) {
+      openMenu = null;
       return;
     }
     const bounds = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    insertMenuPosition = { top: bounds.bottom + 4, left: bounds.left };
+    openMenu = { id, top: bounds.bottom + 4, left: bounds.left };
+  }
+
+  function runItem(item: ToolbarItem) {
+    openMenu = null;
+    item.run();
   }
 
   $effect(() => {
@@ -67,34 +85,41 @@
   });
 </script>
 
-{#snippet action(
-  icon: string,
-  label: string,
-  run: () => void,
-  size = "text-base",
-)}
+<svelte:window onclick={() => (openMenu = null)} onkeyup={syncHeadingLevel} onmouseup={syncHeadingLevel} />
+
+{#snippet fontSelect(extraClass: string)}
+  <select
+    class="field field-sm h-7 py-0 shadow-none {extraClass}"
+    aria-label="Document font"
+    {disabled}
+    value={selectedFont}
+    onchange={(event) => applyFont(event.currentTarget.value)}
+  >
+    <option value="">Font</option>
+    {#each fonts as family}
+      <option value={family}>{family}</option>
+    {/each}
+  </select>
+{/snippet}
+
+{#snippet dropdownButton(id: string, icon: string, label: string)}
   <button
-    class="rounded-md p-1.5 text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] disabled:opacity-40 disabled:hover:bg-transparent"
+    class="icon-btn w-auto gap-0.5 px-1.5 {openMenu?.id === id ? 'icon-btn-active' : ''}"
     title={label}
     aria-label={label}
+    aria-haspopup="menu"
+    aria-expanded={openMenu?.id === id}
     {disabled}
-    onclick={run}
+    onclick={(event) => toggleMenu(event, id)}
   >
-    <Icon {icon} class={size} />
+    <Icon {icon} class="text-base" />
+    <Icon icon="ph:caret-down" class="text-[10px]" />
   </button>
 {/snippet}
 
-<svelte:window onclick={() => (insertMenuPosition = null)} onkeyup={syncHeadingLevel} onmouseup={syncHeadingLevel} />
-
-{#snippet divider()}
-  <div class="mx-1.5 h-5 w-px shrink-0 bg-[var(--color-line)]"></div>
-{/snippet}
-
-<div
-  class="scroll-thin flex shrink-0 items-center gap-1 overflow-x-auto border-b border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-1.5"
->
+<div class="bar gap-0.5 overflow-hidden px-2" bind:clientWidth={toolbarWidth}>
   <select
-    class="rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] px-2 py-1 text-sm text-[var(--color-ink)] focus:border-[var(--color-accent)] focus:outline-none disabled:opacity-40"
+    class="field field-sm h-7 w-auto shrink-0 py-0 shadow-none"
     aria-label="Text style"
     {disabled}
     value={headingLevel}
@@ -105,98 +130,45 @@
     {/each}
   </select>
 
-  {@render divider()}
-
-  {@render action("ph:text-b", "Bold", () => wrapSelection(view, "*", "*", "bold"))}
-  {@render action("ph:text-italic", "Italic", () =>
-    wrapSelection(view, "_", "_", "italic"),
-  )}
-  {@render action("ph:code", "Raw", () => wrapSelection(view, "`", "`", "code"))}
-  {@render action("ph:quotes", "Quote", () => view && insertQuote(view))}
-
-  {@render divider()}
-
-  {@render action("ph:sigma", "Inline math", () =>
-    wrapSelection(view, "$", "$", "x = y"),
-  )}
-  {@render action("ph:function", "Block math", () =>
-    wrapSelection(view, "$ \n  ", "\n$", "x = y"),
-  )}
-
-  {@render divider()}
-
-  {@render action("ph:list-bullets", "Bullet list", () =>
-    prefixLines(view, "- ", "List item"),
-  )}
-  {@render action("ph:list-numbers", "Numbered list", () =>
-    prefixLines(view, "+ ", "Numbered item"),
-  )}
-
-  {@render divider()}
-
-  {@render action("ph:link", "Link", () =>
-    insertText(view, '#link("https://")[text]'),
-  )}
-  {@render action("ph:image-square", "Figure", () =>
-    insertText(view, '#figure(\n  image("file.png"),\n  caption: [Caption],\n)'),
-  )}
-  <button
-    class="flex items-center gap-0.5 rounded-md p-1.5 text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] disabled:opacity-40 disabled:hover:bg-transparent"
-    title="Insert"
-    aria-label="Insert"
-    {disabled}
-    onclick={toggleInsertMenu}
-  >
-    <Icon icon="ph:plus-square" class="text-base" />
-    <Icon icon="ph:caret-down" class="text-xs" />
-  </button>
-  {@render action("ph:images", "Images and fonts", onassets)}
-
-  {@render divider()}
-
-  {@render action("ph:magnifying-glass", "Find", () => view && openFind(view))}
-  {@render action("ph:swap", "Search and replace", () => view && openReplace(view))}
-
-  {@render divider()}
-
-  <select
-    class="max-w-32 rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] px-2 py-1 text-sm text-[var(--color-ink)] focus:border-[var(--color-accent)] focus:outline-none disabled:opacity-40"
-    aria-label="Document font"
-    {disabled}
-    bind:value={selectedFont}
-    onchange={(event) => {
-      const family = event.currentTarget.value;
-      if (family) setTypstConfig(view, "text", "font", `"${family}"`);
-    }}
-  >
-    <option value="">Font</option>
-    {#each fonts as family}
-      <option value={family}>{family}</option>
-    {/each}
-  </select>
-
-  {@render action("ph:file-text", "Page settings", onpagesettings)}
-
-  <div class="flex-1"></div>
+  {#each groups as group (group.id)}
+    <div class="divider-v"></div>
+    {#if collapsed.has(group.id)}
+      {@render dropdownButton(`${group.id}:group`, group.icon, group.label)}
+    {:else}
+      {#each group.items as item (item.label)}
+        <button class="icon-btn" title={item.label} aria-label={item.label} {disabled} onclick={item.run}>
+          <Icon icon={item.icon} class="text-base" />
+        </button>
+      {/each}
+      {#if group.menu}
+        {@render dropdownButton(`${group.id}:menu`, group.menu.icon, group.menu.label)}
+      {/if}
+      {#if group.id === "document"}
+        {@render fontSelect("w-auto max-w-36 shrink-0")}
+      {/if}
+    {/if}
+  {/each}
 </div>
 
-{#if insertMenuPosition}
+{#if openMenu}
   <div
     use:clampMenu
-    class="fixed z-50 w-52 rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] py-1 shadow-xl"
-    style="top: {insertMenuPosition.top}px; left: {insertMenuPosition.left}px;"
+    role="menu"
+    tabindex="-1"
+    class="menu fixed z-50 w-56"
+    style="top: {openMenu.top}px; left: {openMenu.left}px;"
+    onclick={(event) => event.stopPropagation()}
+    onkeydown={(event) => event.key === "Escape" && (openMenu = null)}
   >
-    {#each insertOptions as option (option.dialog)}
-      <button
-        class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-[var(--color-surface-sunken)]"
-        onclick={() => {
-          insertMenuPosition = null;
-          insertDialogStore.set(option.dialog);
-        }}
-      >
-        <Icon icon={option.icon} class="text-base text-[var(--color-ink-muted)]" />
-        {option.label}
+    {#each openMenuItems as item (item.label)}
+      <button role="menuitem" class="menu-item" onclick={() => runItem(item)}>
+        <Icon icon={item.icon} class="text-sm text-[var(--color-ink-muted)]" />
+        {item.label}
       </button>
     {/each}
+    {#if showFontInMenu}
+      <div class="menu-separator"></div>
+      <div class="px-1.5 pb-1">{@render fontSelect("w-full")}</div>
+    {/if}
   </div>
 {/if}

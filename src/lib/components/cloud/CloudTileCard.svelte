@@ -2,6 +2,7 @@
   import Icon from "@iconify/svelte";
   import { fileIcon, formatShortDate, isFontName, type CloudEntry } from "$lib/ts/cloud-entries";
   import CloudSyncBadge from "./CloudSyncBadge.svelte";
+  import PageThumbnail from "../PageThumbnail.svelte";
 
   interface Props {
     entry: CloudEntry;
@@ -14,7 +15,7 @@
   let { entry, thumbnail, onmenu, ondragstart, ondragend }: Props = $props();
 
   const isDocument = $derived(entry.kind === "document");
-  const placeholderIcon = $derived(isDocument ? "mdi:file-document" : fileIcon(entry.name));
+  const placeholderIcon = $derived(isDocument ? "ph:file-text" : fileIcon(entry.name));
   const dateLabel = $derived(
     `${isDocument ? "Edited" : "Uploaded"} ${formatShortDate(entry.modified)}`,
   );
@@ -33,8 +34,8 @@
 </script>
 
 <div
-  class="group relative flex cursor-pointer flex-col rounded-lg border bg-[var(--color-surface)] shadow-sm transition hover:border-[var(--color-accent)]
-    {entry.syncState === 'pending' ? 'border-[var(--color-accent)]' : 'border-[var(--color-line)]'}"
+  class="card card-interactive group relative flex cursor-pointer flex-col overflow-hidden
+    {entry.syncState === 'pending' ? 'border-[var(--color-accent)]/50' : ''}"
   role="button"
   tabindex="0"
   draggable="true"
@@ -44,23 +45,15 @@
   ondragstart={(event) => ondragstart(event, entry)}
   ondragend={ondragend}
 >
-  <div class="pointer-events-none relative flex h-40 w-full items-center justify-center overflow-hidden rounded-t-lg border-b border-[var(--color-line)] bg-[var(--color-surface-muted)]">
-    {#if thumbnail?.kind === "svg"}
-      <div class="flex h-full w-full items-start justify-center bg-white transition-transform duration-300 group-hover:scale-110 [&_svg]:h-auto [&_svg]:w-full">
-        {@html thumbnail.data}
-      </div>
-    {:else if thumbnail}
-      <img src={thumbnail.data} alt={entry.name} class="h-full w-full object-contain transition-transform duration-300 group-hover:scale-110" />
-    {:else}
-      <div
-        class="rounded-lg p-4 transition-transform duration-300 group-hover:scale-110
-          {isDocument
-          ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent)]'
-          : 'bg-green-50 text-green-600 dark:bg-green-500/10 dark:text-green-400'}"
-      >
-        <Icon icon={placeholderIcon} class="text-4xl" />
-      </div>
-    {/if}
+  <div class="relative">
+    <PageThumbnail
+      {thumbnail}
+      name={entry.name}
+      fallbackIcon={placeholderIcon}
+      fallbackClass={isDocument
+        ? "bg-[var(--color-accent-soft)] text-[var(--color-accent)]"
+        : "bg-[var(--color-success)]/12 text-[var(--color-success)]"}
+    />
     {#if entry.syncState}
       <span class="absolute left-2 top-2">
         <CloudSyncBadge syncState={entry.syncState} />
@@ -68,19 +61,19 @@
     {/if}
   </div>
 
-  <div class="flex flex-grow flex-col p-4">
-    <div class="flex items-start justify-between gap-2">
-      <h3 class="pointer-events-none truncate text-lg font-semibold text-[var(--color-ink)]" title={entry.name}>{entry.name}</h3>
+  <div class="flex flex-grow flex-col py-2.5 pl-3 pr-2">
+    <div class="flex items-center justify-between gap-1">
+      <h3 class="pointer-events-none truncate text-[13px] font-medium text-[var(--color-ink)]" title={entry.name}>{entry.name}</h3>
       <button
-        class="shrink-0 rounded-md p-1 text-[var(--color-ink-muted)] transition-colors hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
+        class="icon-btn icon-btn-sm opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
         aria-label="{isDocument ? 'Document' : 'File'} actions"
         onclick={openMenuFromButton}
       >
-        <Icon icon="mdi:dots-vertical" class="text-xl" />
+        <Icon icon="ph:dots-three" class="text-base" />
       </button>
     </div>
-    <p class="pointer-events-none mt-2 flex items-center gap-1 text-xs text-[var(--color-ink-muted)]">
-      <Icon icon={isDocument ? "mdi:clock-outline" : isFontName(entry.name) ? "mdi:format-font" : "mdi:image-outline"} class="text-sm" />
+    <p class="pointer-events-none mt-0.5 flex items-center gap-1 text-[11px] text-[var(--color-ink-muted)]">
+      <Icon icon={isDocument ? "ph:clock" : isFontName(entry.name) ? "ph:text-aa" : "ph:image"} class="text-xs" />
       {dateLabel}
       {#if entry.detail !== "Document" && isDocument}
         <span class="opacity-60">·</span>

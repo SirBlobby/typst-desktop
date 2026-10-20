@@ -170,18 +170,22 @@ pub fn import_paths(sources: &[String], destination: &Path) -> Result<Vec<String
             .map(|n| n.to_string_lossy().to_string())
             .ok_or_else(|| format!("'{}' has no name", source))?;
 
+        let target = unique_destination(destination, &name);
+
         if source_path.is_dir() {
-            let target = unique_destination(destination, &name);
             copy_tree(source_path, &target)?;
         } else if source_path.is_file() {
-            let target = unique_destination(destination, &name);
             std::fs::copy(source_path, &target)
                 .map_err(|e| format!("Could not import '{}': {}", name, e))?;
         } else {
             return Err(format!("'{}' could not be read", source));
         }
 
-        imported.push(name);
+        let imported_name = target
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or(name);
+        imported.push(imported_name);
     }
 
     Ok(imported)

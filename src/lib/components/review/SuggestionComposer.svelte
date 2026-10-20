@@ -70,35 +70,35 @@
     aria-label="Suggest an edit"
     tabindex="-1"
     onkeydown={handleKeydown}
-    class="fixed z-[90] w-[360px] rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] p-3 shadow-2xl"
+    class="fixed z-[90] w-[360px] rounded-xl border border-[var(--color-line)] bg-[var(--color-surface-raised)] p-3 shadow-2xl"
     style="top: {position.top}px; left: {position.left}px;"
   >
     <div class="mb-2 flex items-center gap-2">
-      <Icon icon="mdi:file-document-edit-outline" class="text-base text-[var(--color-accent)]" />
+      <Icon icon="ph:note-pencil" class="text-base text-[var(--color-accent)]" />
       <p class="text-sm font-semibold text-[var(--color-ink)]">Suggest an edit</p>
       <button type="button" onclick={close} class="ml-auto rounded p-1 text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)]" aria-label="Cancel suggestion">
-        <Icon icon="mdi:close" class="text-sm" />
+        <Icon icon="ph:x" class="text-sm" />
       </button>
     </div>
 
     {#if $suggestionDraftStore.original_text}
-      <p class="mb-1 text-[11px] font-medium uppercase tracking-wider text-[var(--color-ink-muted)]">Replace</p>
+      <p class="section-label mb-1">Replace</p>
       <p class="mb-2 max-h-20 overflow-y-auto whitespace-pre-wrap break-words rounded-md bg-rose-500/10 px-2 py-1 font-mono text-xs text-rose-700 line-through dark:text-rose-300">{$suggestionDraftStore.original_text}</p>
     {/if}
 
-    <p class="mb-1 text-[11px] font-medium uppercase tracking-wider text-[var(--color-ink-muted)]">{$suggestionDraftStore.original_text ? 'With' : 'Insert'}</p>
+    <p class="section-label mb-1">{$suggestionDraftStore.original_text ? 'With' : 'Insert'}</p>
     <textarea
       bind:value={replacement}
       use:focusOnMount
       rows="3"
       placeholder="Leave empty to suggest deleting the text"
-      class="mb-2 w-full resize-y rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] px-2 py-1.5 font-mono text-xs text-[var(--color-ink)] focus:border-[var(--color-accent)] focus:outline-none"
+      class="field field-sm mb-2 resize-y font-mono"
     ></textarea>
 
     <input
       bind:value={note}
       placeholder="Add a note (optional)"
-      class="mb-2 w-full rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] px-2 py-1.5 text-xs text-[var(--color-ink)] focus:border-[var(--color-accent)] focus:outline-none"
+      class="field field-sm mb-2"
     />
 
     {#if errorMessage}
@@ -109,8 +109,8 @@
       <p class="text-[10px] text-[var(--color-ink-muted)]">Ctrl+Enter to suggest</p>
       <div class="flex gap-2">
         <button type="button" onclick={close} class="rounded-md px-2.5 py-1 text-xs font-medium text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)]">Cancel</button>
-        <button type="button" onclick={submit} disabled={saving} class="flex items-center gap-1 rounded-md bg-[var(--color-accent)] px-2.5 py-1 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50">
-          <Icon icon={saving ? 'mdi:loading' : 'mdi:send'} class="text-sm {saving ? 'animate-spin' : ''}" />
+        <button type="button" onclick={submit} disabled={saving} class="btn btn-primary">
+          <Icon icon={saving ? 'ph:circle-notch' : 'ph:paper-plane-right'} class="text-sm {saving ? 'animate-spin' : ''}" />
           Suggest
         </button>
       </div>

@@ -55,7 +55,7 @@
     </SettingsRow>
     <div class="px-4 py-3">
       <pre
-        class="overflow-x-auto rounded-md border border-[var(--color-line)] bg-[var(--color-surface-muted)] p-3"
+        class="overflow-x-auto rounded-lg border border-[var(--color-line)] bg-[var(--color-editor)] p-3"
         style="font-family: {previewFont.stack}; font-size: {$editorSettingsStore.fontSize}px;">{sampleText}</pre>
     </div>
   </SettingsCard>
@@ -103,7 +103,7 @@
 
   <div class="flex justify-end">
     <button
-      class="rounded-md border border-[var(--color-line)] px-3 py-1.5 text-xs hover:bg-[var(--color-surface-muted)]"
+      class="btn btn-secondary"
       onclick={() => editorSettingsStore.set(defaultEditorSettings)}
     >
       Reset to defaults

@@ -61,7 +61,7 @@
     />
   {:else}
     <div class="flex flex-col items-center gap-2 py-10 text-center text-[var(--color-ink-muted)]">
-      <Icon icon="mdi:file-document-edit-outline" class="text-4xl opacity-50" />
+      <Icon icon="ph:note-pencil" class="text-4xl opacity-50" />
       <p class="text-sm">{showHandled ? 'No handled suggestions yet' : 'No open suggestions'}</p>
       {#if !showHandled}
         <p class="max-w-[16rem] text-xs">Switch to Suggesting mode and type in the document to suggest a change.</p>

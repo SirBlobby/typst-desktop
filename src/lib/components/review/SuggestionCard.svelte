@@ -46,7 +46,7 @@
   tabindex="0"
   onclick={onSelect}
   onkeydown={(event) => { if (event.key === 'Enter') onSelect(); }}
-  class="cursor-pointer rounded-xl border bg-[var(--color-surface)] p-3 shadow-sm transition {active ? 'border-[var(--color-accent)] shadow-md' : 'border-[var(--color-line)] hover:shadow-md'} {suggestion.status !== 'pending' ? 'opacity-70' : ''}"
+  class="card cursor-pointer p-3 {active ? 'border-[var(--color-accent)] shadow-md' : 'card-interactive'} {suggestion.status !== 'pending' ? 'opacity-70' : ''}"
 >
   <div class="flex items-center gap-2">
     <PersonAvatar person={suggestion.author ?? fallbackPerson} sizeClass="h-7 w-7" textClass="text-xs" />
@@ -74,7 +74,7 @@
 
   {#if suggestion.status === 'pending' && changedSince}
     <p class="mt-2 flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400">
-      <Icon icon="mdi:alert-outline" class="text-sm" />
+      <Icon icon="ph:warning" class="text-sm" />
       The text changed after this was suggested.
     </p>
   {/if}
@@ -86,15 +86,15 @@
   {#if suggestion.status === 'pending' && (canReview || isAuthor)}
     <div class="mt-3 flex justify-end gap-2">
       {#if isAuthor && !canReview}
-        <button type="button" disabled={busy} onclick={(event) => { event.stopPropagation(); run(onWithdraw); }} class="rounded-md border border-[var(--color-line)] px-2.5 py-1 text-xs font-medium text-[var(--color-ink)] hover:bg-[var(--color-surface-sunken)] disabled:opacity-50">Withdraw</button>
+        <button type="button" disabled={busy} onclick={(event) => { event.stopPropagation(); run(onWithdraw); }} class="btn btn-secondary">Withdraw</button>
       {/if}
       {#if canReview}
-        <button type="button" disabled={busy} onclick={(event) => { event.stopPropagation(); run(onReject); }} class="flex items-center gap-1 rounded-md border border-[var(--color-line)] px-2.5 py-1 text-xs font-medium text-[var(--color-ink)] hover:bg-[var(--color-surface-sunken)] disabled:opacity-50">
-          <Icon icon="mdi:close" class="text-sm" />
+        <button type="button" disabled={busy} onclick={(event) => { event.stopPropagation(); run(onReject); }} class="btn btn-secondary gap-1">
+          <Icon icon="ph:x" class="text-sm" />
           Reject
         </button>
-        <button type="button" disabled={busy} onclick={(event) => { event.stopPropagation(); run(onAccept); }} class="flex items-center gap-1 rounded-md bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50">
-          <Icon icon="mdi:check" class="text-sm" />
+        <button type="button" disabled={busy} onclick={(event) => { event.stopPropagation(); run(onAccept); }} class="btn bg-[var(--color-success)] text-[var(--color-on-accent)] hover:opacity-90">
+          <Icon icon="ph:check" class="text-sm" />
           Accept
         </button>
       {/if}

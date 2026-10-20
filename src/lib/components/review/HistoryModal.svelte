@@ -99,31 +99,31 @@
   <header class="flex items-center gap-3 border-b border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-2">
     <button
       onclick={onClose}
-      class="rounded p-1 text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
+      class="icon-btn icon-btn-sm"
       title="Back to the editor"
       aria-label="Back to the editor"
     >
       <Icon icon="ph:arrow-left" class="text-lg" />
     </button>
     <div class="min-w-0">
-      <p class="text-[10px] uppercase tracking-wider text-[var(--color-ink-muted)]">Version history</p>
+      <p class="section-label">Version history</p>
       <h1 class="truncate text-sm font-semibold">{title}</h1>
     </div>
     <div class="ml-auto flex items-center gap-2">
       {#if selected && canEdit}
         <button
           onclick={() => (renaming = true)}
-          class="flex items-center gap-1.5 rounded-md border border-[var(--color-line)] px-3 py-1.5 text-xs font-medium hover:bg-[var(--color-surface-sunken)]"
+          class="btn btn-secondary"
         >
-          <Icon icon="mdi:tag-outline" class="text-sm" />
+          <Icon icon="ph:tag" class="text-sm" />
           {selected.label ? "Rename" : "Name this version"}
         </button>
         <button
           onclick={() => (confirmRestore = true)}
           disabled={busy}
-          class="flex items-center gap-1.5 rounded-md bg-[var(--color-accent)] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50"
+          class="btn btn-primary"
         >
-          <Icon icon={busy ? "mdi:loading" : "mdi:restore"} class="text-sm {busy ? 'animate-spin' : ''}" />
+          <Icon icon={busy ? "ph:circle-notch" : "ph:arrow-counter-clockwise"} class="text-sm {busy ? 'animate-spin' : ''}" />
           Restore this version
         </button>
       {/if}
@@ -137,10 +137,10 @@
   <div class="flex min-h-0 flex-1">
     <main class="scroll-thin min-h-0 flex-1 overflow-y-auto p-5">
       {#if loading}
-        <p class="flex items-center gap-2 text-sm text-[var(--color-ink-muted)]"><Icon icon="mdi:loading" class="animate-spin" /> Loading history...</p>
+        <p class="flex items-center gap-2 text-sm text-[var(--color-ink-muted)]"><Icon icon="ph:circle-notch" class="animate-spin" /> Loading history...</p>
       {:else if !selected}
         <div class="flex h-full flex-col items-center justify-center gap-2 text-center text-[var(--color-ink-muted)]">
-          <Icon icon="mdi:history" class="text-5xl opacity-50" />
+          <Icon icon="ph:clock-counter-clockwise" class="text-5xl opacity-50" />
           <p class="text-sm font-medium text-[var(--color-ink)]">No versions yet</p>
           <p class="max-w-sm text-xs">A version is saved every time someone leaves the editor after making changes, or when you save a version.</p>
         </div>
@@ -163,7 +163,7 @@
             <select
               bind:value={compareTarget}
               aria-label="Compare with"
-              class="rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] px-2 py-1 text-xs"
+              class="field field-sm w-auto"
             >
               <option value="previous">Changes in this version</option>
               <option value="current">Compare with current document</option>
@@ -198,7 +198,7 @@
   <PromptModal
     title="Name this version"
     label="Version name"
-    icon="mdi:tag-outline"
+    icon="ph:tag"
     value={selected.label ?? ""}
     confirmLabel="Save"
     onsubmit={submitRename}

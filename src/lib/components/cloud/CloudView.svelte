@@ -4,6 +4,7 @@
   import * as api from "$lib/ts/api";
   import type { CloudFile, CloudFolder } from "$lib/ts/api";
   import {
+    cloudSortOptions,
     defaultCloudFilters,
     documentEntry,
     fileEntry,
@@ -26,9 +27,11 @@
     refreshCloud,
     setError,
   } from "$lib/ts/state.svelte";
+  import { activeCloudSpace, canChangeActiveSpace } from "$lib/ts/cloud-spaces";
+  import { readStoredPreference, writeStoredPreference } from "$lib/ts/view-filters";
   import CloudActionMenu from "./CloudActionMenu.svelte";
   import CloudEmptyState from "./CloudEmptyState.svelte";
-  import CloudFilterBar from "./CloudFilterBar.svelte";
+  import FilterBar from "../FilterBar.svelte";
   import CloudHeader from "./CloudHeader.svelte";
   import CloudListView from "./CloudListView.svelte";
   import CloudRowCard from "./CloudRowCard.svelte";
@@ -76,31 +79,16 @@
   const FILTERS_KEY = "typst-desktop-cloud-filters";
   const VIEW_MODE_KEY = "typst-desktop-cloud-view-mode";
 
-  function readStored<T>(key: string, fallback: T): T {
-    try {
-      const stored = localStorage.getItem(key);
-      return stored ? (JSON.parse(stored) as T) : fallback;
-    } catch {
-      return fallback;
-    }
-  }
-
-  function writeStored(key: string, value: unknown) {
-    try {
-      localStorage.setItem(key, JSON.stringify(value));
-    } catch {}
-  }
-
   let searchQuery = $state("");
-  let filters = $state<CloudFilters>(readStored(FILTERS_KEY, defaultCloudFilters));
-  let viewMode = $state<ViewMode>(readStored(VIEW_MODE_KEY, "grid"));
+  let filters = $state<CloudFilters>(readStoredPreference(FILTERS_KEY, defaultCloudFilters));
+  let viewMode = $state<ViewMode>(readStoredPreference(VIEW_MODE_KEY, "grid"));
   let menu = $state<{ entry: CloudEntry; x: number; y: number } | null>(null);
   let dragging = $state<CloudEntry | null>(null);
   let dropTarget = $state<string | null>(null);
   let thumbnails = $state<Record<string, { kind: string; data: string }>>({});
 
-  $effect(() => writeStored(FILTERS_KEY, filters));
-  $effect(() => writeStored(VIEW_MODE_KEY, viewMode));
+  $effect(() => writeStoredPreference(FILTERS_KEY, filters));
+  $effect(() => writeStoredPreference(VIEW_MODE_KEY, viewMode));
 
   $effect(() => {
     if (app.account) untrack(() => refreshCloud());
@@ -125,7 +113,9 @@
 
   const inShared = $derived(app.cloudFolder === "shared");
   const folderPath = $derived(inShared ? [] : cloudBreadcrumbs());
-  const title = $derived(inShared ? "Shared with me" : (folderPath.at(-1)?.name ?? "Home"));
+  const team = $derived(activeCloudSpace());
+  const homeLabel = $derived(team?.name ?? "Home");
+  const title = $derived(inShared ? "Shared with me" : (folderPath.at(-1)?.name ?? homeLabel));
 
   const allEntries = $derived([
     ...app.cloudFolders.map((folder) => folderEntry(folder, handlers)),
@@ -169,6 +159,12 @@
       cancelled = true;
     };
   });
+
+  function thumbnailFor(entry: CloudEntry) {
+    const local = entry.localPath ? thumbnails[entry.localPath] : undefined;
+    if (local) return local;
+    return entry.thumbnailSvg ? { kind: "svg", data: entry.thumbnailSvg } : null;
+  }
 
   async function changeFolderColor(folderId: string, color: string | null) {
     try {
@@ -231,15 +227,15 @@
   }
 </script>
 
-<div class="scroll-thin h-full overflow-y-auto bg-[var(--color-surface-muted)] px-6 py-6 lg:px-10">
+<div class="scroll-thin h-full overflow-y-auto bg-[var(--color-surface-muted)] px-6 pb-6 pt-5">
   {#if !app.account}
     <CloudEmptyState
-      icon="mdi:cloud-off-outline"
+      icon="ph:cloud-slash"
       heading="Not connected"
       message="Connect a TypstDrive account to sync your documents and projects across devices."
     >
       <button
-        class="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90"
+        class="btn btn-primary"
         onclick={onsignin}
       >
         Sign in
@@ -249,9 +245,9 @@
     <CloudHeader
       {title}
       {folderPath}
-      rootLabel={inShared ? "Shared with me" : "Home"}
-      rootIcon={inShared ? "mdi:account-multiple-outline" : "mdi:home-outline"}
-      showActions={!inShared}
+      rootLabel={inShared ? "Shared with me" : homeLabel}
+      rootIcon={inShared ? "ph:users-three" : team ? "ph:users-four" : "ph:cloud"}
+      showActions={!inShared && canChangeActiveSpace()}
       loading={app.cloudLoading}
       {dropTarget}
       bind:searchQuery
@@ -266,45 +262,45 @@
     />
 
     {#if app.cloudOffline}
-      <div class="mb-4 flex items-center gap-2 rounded-lg border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-ink-muted)]">
-        <Icon icon="mdi:wifi-off" class="text-base" />
+      <div class="mb-4 flex items-center gap-2 rounded-lg border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/10 px-3 py-2 text-xs text-[var(--color-ink)]">
+        <Icon icon="ph:wifi-slash" class="text-sm text-[var(--color-warning)]" />
         Offline. Showing the last synced data.
       </div>
     {/if}
 
-    <CloudFilterBar bind:filters bind:viewMode />
+    <FilterBar bind:filters bind:viewMode sortOptions={cloudSortOptions} />
 
     {#if allEntries.length === 0 && app.cloudLoading}
       <div class="flex min-h-[45vh] items-center justify-center text-[var(--color-ink-muted)]">
-        <Icon icon="mdi:loading" class="animate-spin text-3xl" />
+        <Icon icon="ph:circle-notch" class="animate-spin text-2xl" />
       </div>
     {:else if allEntries.length === 0 && inShared}
       <CloudEmptyState
-        icon="mdi:account-multiple-outline"
+        icon="ph:users-three"
         heading="Nothing shared yet"
         message="Documents and projects other people share with you will appear here."
       />
     {:else if allEntries.length === 0}
       <CloudEmptyState
-        icon={app.cloudFolder === null ? "mdi:text-box-plus-outline" : "mdi:folder-open-outline"}
+        icon={app.cloudFolder === null ? "ph:file-plus" : "ph:folder-open"}
         heading={app.cloudFolder === null ? "Start your first document" : "This folder is empty"}
         message="Create a document, project or folder, or upload images and fonts to use in your Typst files."
       >
         <button
-          class="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90"
+          class="btn btn-primary"
           onclick={onnewclouddocument}
         >
           New document
         </button>
         <button
-          class="rounded-lg border border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-2 text-sm font-medium transition hover:bg-[var(--color-surface-sunken)]"
+          class="btn btn-secondary"
           onclick={onnewcloudproject}
         >
           New project
         </button>
       </CloudEmptyState>
     {:else if visibleEntries.length === 0}
-      <CloudEmptyState icon="mdi:magnify-remove-outline" heading="No matches" message="Nothing here matches your search." />
+      <CloudEmptyState icon="ph:magnifying-glass-minus" heading="No matches" message="Nothing here matches your search." />
     {:else if viewMode === "list"}
       <CloudListView
         entries={[...containerEntries, ...tileEntries]}
@@ -319,9 +315,9 @@
       />
     {:else}
       {#if containerEntries.length > 0}
-        <section class="mb-8">
+        <section class="mb-7">
           <CloudSectionTitle title="Folders & projects" />
-          <div class="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3">
+          <div class="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-2.5">
             {#each containerEntries as entry (entry.key)}
               <CloudRowCard
                 {entry}
@@ -342,11 +338,11 @@
       {#if tileEntries.length > 0}
         <section>
           <CloudSectionTitle title="Files" />
-          <div class="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4">
+          <div class="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
             {#each tileEntries as entry (entry.key)}
               <CloudTileCard
                 {entry}
-                thumbnail={entry.localPath ? (thumbnails[entry.localPath] ?? null) : null}
+                thumbnail={thumbnailFor(entry)}
                 onmenu={showMenu}
                 ondragstart={startDrag}
                 ondragend={endDrag}

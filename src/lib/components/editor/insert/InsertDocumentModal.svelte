@@ -43,17 +43,17 @@
   }
 </script>
 
-<Modal title="Insert document" icon="mdi:file-document-outline" width="max-w-lg" onclose={onClose}>
+<Modal title="Insert document" icon="ph:file-text" width="max-w-lg" onclose={onClose}>
   <div class="flex flex-col gap-3">
     <p class="text-xs text-[var(--color-ink-muted)]">Include another file of this project, or copy its content at the cursor.</p>
     <div class="relative">
-      <Icon icon="mdi:magnify" class="absolute left-3 top-1/2 -translate-y-1/2 text-lg text-[var(--color-ink-muted)]" />
+      <Icon icon="ph:magnifying-glass" class="absolute left-3 top-1/2 -translate-y-1/2 text-lg text-[var(--color-ink-muted)]" />
       <input
         type="search"
         bind:value={searchQuery}
         placeholder="Search files"
         use:focusOnMount
-        class="w-full rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] py-2 pl-9 pr-3 text-sm focus:border-[var(--color-accent)] focus:outline-none"
+        class="field pl-9"
       />
     </div>
 
@@ -74,7 +74,7 @@
             <button
               type="button"
               onclick={() => insertInclude(file)}
-              class="rounded-md border border-[var(--color-line)] px-2 py-1 text-xs hover:bg-[var(--color-surface-muted)]"
+              class="btn btn-secondary h-6 px-2"
             >
               Include
             </button>
@@ -82,10 +82,10 @@
               type="button"
               onclick={() => insertContent(file)}
               disabled={insertingPath !== null}
-              class="flex items-center gap-1 rounded-md border border-[var(--color-line)] px-2 py-1 text-xs hover:bg-[var(--color-surface-muted)] disabled:opacity-60"
+              class="btn btn-secondary h-6 gap-1 px-2"
             >
               {#if insertingPath === file.path}
-                <Icon icon="mdi:loading" class="animate-spin" />
+                <Icon icon="ph:circle-notch" class="animate-spin" />
               {/if}
               Copy content
             </button>

@@ -1,7 +1,7 @@
 <script lang="ts">
   import Icon from "@iconify/svelte";
   import type { CloudAction } from "$lib/ts/cloud-entries";
-  import { defaultFolderColor, folderColorOptions } from "$lib/ts/folder-colors";
+  import FolderColorSwatches from "../FolderColorSwatches.svelte";
   import { clampMenu } from "$lib/ts/menu-position";
 
   interface Props {
@@ -35,60 +35,38 @@
 
 <div
   use:clampMenu
-  class="fixed z-[100] w-52 rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] py-1 shadow-xl"
+  class="menu fixed z-[100] w-52"
   style="left: {x}px; top: {y}px"
   role="menu"
 >
   {#if onsetcolor}
-    <div class="grid grid-cols-5 gap-1.5 border-b border-[var(--color-line)] px-3 pb-2.5 pt-1.5">
-      {#each folderColorOptions as option (option.label)}
-        {@const selected = color === option.value}
-        <button
-          role="menuitemradio"
-          aria-checked={selected}
-          aria-label="{option.label} folder color"
-          title={option.label}
-          class="flex h-6 w-6 items-center justify-center rounded-full transition-transform hover:scale-110 {selected
-            ? 'ring-2 ring-[var(--color-ink)] ring-offset-2 ring-offset-[var(--color-surface)]'
-            : ''}"
-          style="background-color: {option.value ?? defaultFolderColor};"
-          onclick={(event) => {
-            event.stopPropagation();
-            chooseColor(option.value);
-          }}
-        >
-          {#if selected}
-            <Icon icon="mdi:check" class="text-sm text-white" />
-          {/if}
-        </button>
-      {/each}
-    </div>
+    <FolderColorSwatches {color} onchoose={chooseColor} />
   {/if}
   {#each regularActions as action (action.label)}
     <button
       role="menuitem"
-      class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
+      class="menu-item"
       onclick={(event) => {
         event.stopPropagation();
         run(action);
       }}
     >
-      <Icon icon={action.icon} class="text-lg {action.color ?? ''}" />
+      <Icon icon={action.icon} class="text-base {action.color ?? 'text-[var(--color-ink-muted)]'}" />
       {action.label}
     </button>
   {/each}
   {#if dangerActions.length > 0}
-    <div class="my-1 h-px bg-[var(--color-line)]"></div>
+    <div class="menu-separator"></div>
     {#each dangerActions as action (action.label)}
       <button
         role="menuitem"
-        class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-[var(--color-danger)] hover:bg-[var(--color-danger)]/10"
+        class="menu-item menu-item-danger"
         onclick={(event) => {
           event.stopPropagation();
           run(action);
         }}
       >
-        <Icon icon={action.icon} class="text-lg" />
+        <Icon icon={action.icon} class="text-base" />
         {action.label}
       </button>
     {/each}

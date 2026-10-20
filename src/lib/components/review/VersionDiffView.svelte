@@ -40,7 +40,7 @@
   const markers = { same: " ", added: "+", removed: "-" };
 </script>
 
-<div class="overflow-x-auto rounded-lg border border-[var(--color-line)] bg-[var(--color-surface)] font-mono text-[13px] leading-6">
+<div class="overflow-x-auto rounded-lg border border-[var(--color-line)] bg-[var(--color-editor)] font-mono text-[13px] leading-6">
   {#each rows as row, index (index)}
     {#if row.type === 'gap'}
       <div class="border-y border-dashed border-[var(--color-line)] bg-[var(--color-surface-muted)] px-4 py-1 text-xs text-[var(--color-ink-muted)]">

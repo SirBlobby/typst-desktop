@@ -34,9 +34,9 @@
 </script>
 
 <div
-  class="group relative flex cursor-pointer flex-row items-center rounded-lg border bg-[var(--color-surface)] p-3 shadow-sm transition
-    {entry.syncState === 'pending' ? 'border-[var(--color-accent)]' : 'border-[var(--color-line)]'}
-    {dropActive ? 'bg-[var(--color-accent-soft)] ring-2 ring-[var(--color-accent)]' : 'hover:border-[var(--color-accent)]'}"
+  class="card group relative flex cursor-pointer flex-row items-center py-2.5 pl-2.5 pr-3
+    {entry.syncState === 'pending' ? 'border-[var(--color-accent)]/50' : ''}
+    {dropActive ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)]' : 'card-interactive'}"
   role="button"
   tabindex="0"
   title={entry.name}
@@ -52,29 +52,29 @@
 >
   {#if isFolder}
     <div
-      class="pointer-events-none mr-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-md transition-transform group-hover:scale-105"
+      class="pointer-events-none mr-2.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-md"
       style={folderTileStyle(entry.color)}
     >
-      <Icon icon="mdi:folder" class="text-2xl" style={folderIconStyle(entry.color)} />
+      <Icon icon="ph:folder-fill" class="text-xl" style={folderIconStyle(entry.color)} />
     </div>
   {:else}
-    <div class="pointer-events-none mr-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-indigo-50 transition-transform group-hover:scale-105 dark:bg-indigo-500/10">
-      <Icon icon="mdi:folder-star" class="text-2xl text-indigo-500" />
+    <div class="pointer-events-none mr-2.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-[var(--color-accent-soft)]">
+      <Icon icon="ph:folder-star-fill" class="text-xl text-[var(--color-accent)]" />
     </div>
   {/if}
   <div class="pointer-events-none min-w-0 flex-1 pr-8">
-    <p class="truncate text-sm font-medium text-[var(--color-ink)]">{entry.name}</p>
+    <p class="truncate text-[13px] font-medium text-[var(--color-ink)]">{entry.name}</p>
     <div class="mt-0.5 flex items-center gap-1.5">
-      <p class="truncate text-xs text-[var(--color-ink-muted)]">{entry.detail}</p>
+      <p class="truncate text-[11px] text-[var(--color-ink-muted)]">{entry.detail}</p>
       <CloudSyncBadge syncState={entry.syncState} />
     </div>
   </div>
 
   <button
-    class="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-[var(--color-ink-muted)] opacity-0 transition-opacity hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] group-hover:opacity-100 group-focus-within:opacity-100"
+    class="icon-btn icon-btn-sm absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
     aria-label="{entry.kind === 'folder' ? 'Folder' : 'Project'} actions"
     onclick={openMenuFromButton}
   >
-    <Icon icon="mdi:dots-vertical" class="text-lg" />
+    <Icon icon="ph:dots-three" class="text-base" />
   </button>
 </div>

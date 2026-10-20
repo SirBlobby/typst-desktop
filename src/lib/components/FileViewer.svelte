@@ -1,8 +1,26 @@
 <script lang="ts">
   import Icon from "@iconify/svelte";
   import * as api from "$lib/ts/api";
-  import type { BrowseEntry, EntryKind } from "$lib/ts/api";
+  import type { BrowseEntry } from "$lib/ts/api";
   import { clampMenu } from "$lib/ts/menu-position";
+  import PageThumbnail from "./PageThumbnail.svelte";
+  import FolderColorSwatches from "./FolderColorSwatches.svelte";
+  import FilterBar from "./FilterBar.svelte";
+  import LocalHeader from "./local/LocalHeader.svelte";
+  import LocalListView from "./local/LocalListView.svelte";
+  import LocalSyncBadge from "./local/LocalSyncBadge.svelte";
+  import { folderIconStyle } from "$lib/ts/folder-colors";
+  import { entryIcon, formatDate, formatSize, isContainer, relativeTime } from "$lib/ts/local-entries";
+  import {
+    allSortOptions,
+    defaultViewFilters,
+    matchesQuery,
+    readStoredPreference,
+    sortByFilters,
+    writeStoredPreference,
+    type ViewFilters,
+    type ViewMode,
+  } from "$lib/ts/view-filters";
   import {
     app,
     breadcrumbs,
@@ -10,6 +28,7 @@
     openTarget,
     refreshEntries,
     setError,
+    shortcutForPath,
   } from "$lib/ts/state.svelte";
 
   interface Props {
@@ -17,11 +36,12 @@
     onnewproject: () => void;
     onnewdocument: () => void;
     onupload: () => void;
+    onconvert: () => void;
     onrename: (entry: BrowseEntry) => void;
     ondelete: (entry: BrowseEntry) => void;
     onlink: (entry: BrowseEntry) => void;
     onsavetocloud: (entry: BrowseEntry) => void;
-    onviewimage: (paths: string[], index: number) => void;
+    onviewfile: (paths: string[], index: number) => void;
   }
 
   let {
@@ -29,15 +49,30 @@
     onnewproject,
     onnewdocument,
     onupload,
+    onconvert,
     onrename,
     ondelete,
     onlink,
     onsavetocloud,
-    onviewimage,
+    onviewfile,
   }: Props = $props();
+
+  const FILTERS_KEY = "typst-desktop-local-filters";
+  const VIEW_MODE_KEY = "typst-desktop-local-view-mode";
 
   let menuFor = $state<string | null>(null);
   let menuAt = $state({ x: 0, y: 0 });
+  let searchQuery = $state("");
+  let filters = $state<ViewFilters>(readStoredPreference(FILTERS_KEY, defaultViewFilters));
+  let viewMode = $state<ViewMode>(readStoredPreference(VIEW_MODE_KEY, "grid"));
+
+  $effect(() => writeStoredPreference(FILTERS_KEY, filters));
+  $effect(() => writeStoredPreference(VIEW_MODE_KEY, viewMode));
+
+  $effect(() => {
+    app.currentDir;
+    searchQuery = "";
+  });
 
   function openContextMenu(event: MouseEvent, path: string) {
     event.preventDefault();
@@ -47,26 +82,24 @@
   }
 
   const trail = $derived(breadcrumbs());
-  let newMenuOpen = $state(false);
-
   const headerTitle = $derived(trail.at(-1)?.name ?? "Workspace");
+  const ancestors = $derived(trail.slice(0, -1));
+  const inShortcut = $derived(shortcutForPath(app.currentDir) !== null);
 
-  const containers = $derived(
-    app.entries.filter(
-      (entry) => entry.kind === "folder" || entry.kind === "project",
+  const visibleEntries = $derived(
+    sortByFilters(
+      app.entries.filter((entry) => matchesQuery(entry.name, searchQuery)),
+      filters,
+      (entry) => entry,
     ),
   );
-
-  const documents = $derived(
-    app.entries.filter(
-      (entry) => entry.kind === "document" || entry.kind === "file",
-    ),
-  );
+  const visibleContainers = $derived(visibleEntries.filter(isContainer));
+  const visibleDocuments = $derived(visibleEntries.filter((entry) => !isContainer(entry)));
 
   let thumbs = $state<Record<string, { kind: string; data: string }>>({});
 
   $effect(() => {
-    const pending = documents.map((entry) => entry.path);
+    const pending = app.entries.filter((entry) => !isContainer(entry)).map((entry) => entry.path);
     let cancelled = false;
 
     (async () => {
@@ -87,46 +120,15 @@
     };
   });
 
-  const iconFor: Record<EntryKind, string> = {
-    project: "ph:folder-star",
-    folder: "ph:folder",
-    document: "ph:file-text",
-    file: "ph:file",
-  };
-
-  const colorFor: Record<EntryKind, string> = {
-    project: "text-[var(--color-accent)]",
-    folder: "text-[var(--color-ink-muted)]",
-    document: "text-[var(--color-accent)]",
-    file: "text-[var(--color-ink-muted)]",
-  };
-
-  function relativeTime(value: string | null): string {
-    if (!value) return "";
-    const then = new Date(value).getTime();
-    if (Number.isNaN(then)) return "";
-
-    const minutes = Math.round((Date.now() - then) / 60000);
-    if (minutes < 1) return "just now";
-    if (minutes < 60) return `${minutes}m ago`;
-    if (minutes < 1440) return `${Math.round(minutes / 60)}h ago`;
-    return `${Math.round(minutes / 1440)}d ago`;
-  }
-
-  function syncLabel(entry: BrowseEntry): string {
-    if (entry.sync_state === "pending") return "Local changes not yet synced";
-    if (entry.sync_state === "synced") {
-      const when = relativeTime(entry.last_synced_at);
-      return when ? `Synced ${when}` : "Synced";
-    }
-    return "Linked to the cloud";
-  }
-
-  const imagePaths = $derived(
-    app.entries
-      .filter((entry) => api.isImagePath(entry.path))
+  const viewablePaths = $derived(
+    visibleEntries
+      .filter((entry) => entry.kind === "file" && api.isViewablePath(entry.path))
       .map((entry) => entry.path),
   );
+
+  function viewFile(path: string) {
+    onviewfile(viewablePaths, viewablePaths.indexOf(path));
+  }
 
   let dragging = $state<string | null>(null);
   let dropTarget = $state<string | null>(null);
@@ -159,6 +161,10 @@
     dropTarget = path;
   }
 
+  function leaveDrop(path: string) {
+    if (dropTarget === path) dropTarget = null;
+  }
+
   function handleDrop(event: DragEvent, destination: string) {
     event.preventDefault();
     const source = dragging ?? event.dataTransfer?.getData("text/plain");
@@ -167,58 +173,39 @@
     if (source) moveTo(source, destination);
   }
 
+  async function changeFolderColor(entry: BrowseEntry, color: string | null) {
+    menuFor = null;
+    if (color === entry.color) return;
+    try {
+      await api.setFolderColor(entry.path, color);
+      await refreshEntries();
+    } catch (error) {
+      setError(error);
+    }
+  }
+
   function activate(entry: BrowseEntry) {
     if (entry.kind === "folder") {
       browseTo(entry.path);
     } else if (entry.kind === "project" || entry.kind === "document") {
       openTarget(entry.path);
-    } else if (api.isImagePath(entry.path)) {
-      onviewimage(imagePaths, imagePaths.indexOf(entry.path));
+    } else if (api.isViewablePath(entry.path)) {
+      viewFile(entry.path);
     }
-  }
-
-  function formatSize(bytes: number): string {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-  }
-
-  function formatDate(value: string | null): string {
-    if (!value) return "";
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString();
   }
 </script>
 
-{#snippet sectionTitle(label: string)}
-  <div class="mb-2 flex items-center gap-2">
-    <h2 class="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">{label}</h2>
-    <div class="h-px flex-1 bg-[var(--color-line)]"></div>
-  </div>
-{/snippet}
-
-{#snippet syncBadge(entry: BrowseEntry)}
-  {#if entry.cloud_linked}
-    <span class="flex shrink-0 items-center" title={syncLabel(entry)}>
-      {#if entry.sync_state === "pending"}
-        <Icon
-          icon="ph:cloud-arrow-up"
-          class="text-sm text-[var(--color-accent)]"
-        />
-      {:else}
-        <Icon
-          icon="ph:cloud-check"
-          class="text-sm text-[var(--color-success)]"
-        />
-      {/if}
-    </span>
-  {/if}
+{#snippet sectionTitle(label: string, count: number)}
+  <h2 class="section-label flex items-center gap-1.5">
+    {label}
+    <span class="tabular-nums text-[var(--color-ink-subtle)]/70">{count}</span>
+  </h2>
 {/snippet}
 
 {#snippet actions(entry: BrowseEntry)}
   <button
     data-card-menu
-    class="shrink-0 rounded p-1 text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
+    class="icon-btn icon-btn-sm opacity-0 group-hover:opacity-100 focus-visible:opacity-100 {menuFor === entry.path ? 'opacity-100' : ''}"
     onclick={(event) => {
       event.stopPropagation();
       if (menuFor === entry.path) {
@@ -231,18 +218,21 @@
     }}
     aria-label="Actions"
   >
-    <Icon icon="ph:dots-three-vertical" />
+    <Icon icon="ph:dots-three" class="text-base" />
   </button>
 
   {#if menuFor === entry.path}
     <div
       use:clampMenu
-      class="fixed z-50 flex w-40 flex-col rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] py-1 text-xs shadow-lg"
+      class="menu fixed z-50 w-48"
       style="left: {menuAt.x}px; top: {menuAt.y}px"
     >
+      {#if entry.kind === "folder"}
+        <FolderColorSwatches color={entry.color} onchoose={(color) => changeFolderColor(entry, color)} />
+      {/if}
       {#if entry.kind === "project" || entry.kind === "document"}
         <button
-          class="px-3 py-1.5 text-left hover:bg-[var(--color-surface-sunken)]"
+          class="menu-item"
           onclick={() => {
             openTarget(entry.path);
             menuFor = null;
@@ -250,20 +240,20 @@
         >
           Open in editor
         </button>
-      {:else if api.isImagePath(entry.path)}
+      {:else if api.isViewablePath(entry.path)}
         <button
-          class="px-3 py-1.5 text-left hover:bg-[var(--color-surface-sunken)]"
+          class="menu-item"
           onclick={() => {
-            onviewimage(imagePaths, imagePaths.indexOf(entry.path));
+            viewFile(entry.path);
             menuFor = null;
           }}
         >
-          Open image
+          {api.isPdfPath(entry.path) ? "Open PDF" : "Open image"}
         </button>
       {/if}
       {#if entry.kind === "project" && !entry.cloud_project_id && app.account}
         <button
-          class="px-3 py-1.5 text-left hover:bg-[var(--color-surface-sunken)]"
+          class="menu-item"
           onclick={() => {
             onlink(entry);
             menuFor = null;
@@ -274,7 +264,7 @@
       {/if}
       {#if entry.kind === "document" && !entry.cloud_linked && app.account}
         <button
-          class="px-3 py-1.5 text-left hover:bg-[var(--color-surface-sunken)]"
+          class="menu-item"
           onclick={() => {
             onsavetocloud(entry);
             menuFor = null;
@@ -284,7 +274,7 @@
         </button>
       {/if}
       <button
-        class="px-3 py-1.5 text-left hover:bg-[var(--color-surface-sunken)]"
+        class="menu-item"
         onclick={() => {
           onrename(entry);
           menuFor = null;
@@ -293,7 +283,7 @@
         Rename
       </button>
       <button
-        class="px-3 py-1.5 text-left text-[var(--color-danger)] hover:bg-[var(--color-surface-sunken)]"
+        class="menu-item menu-item-danger"
         onclick={() => {
           ondelete(entry);
           menuFor = null;
@@ -306,12 +296,9 @@
 {/snippet}
 
 <svelte:window
-  on:click={(event) => {
+  onclick={(event) => {
     if (!(event.target as HTMLElement).closest("[data-card-menu]")) {
       menuFor = null;
-    }
-    if (!(event.target as HTMLElement).closest("[data-new-menu]")) {
-      newMenuOpen = false;
     }
   }}
 />
@@ -321,256 +308,180 @@
   role="presentation"
   oncontextmenu={(event) => event.preventDefault()}
 >
-  <header class="shrink-0 border-b border-[var(--color-line)] bg-[var(--color-surface)] px-5 pb-3 pt-3">
-    <nav class="mb-1 flex flex-wrap items-center gap-0.5 text-[11px] text-[var(--color-ink-muted)]" aria-label="Location">
-      <button
-        class="flex items-center gap-1 rounded px-1.5 py-0.5 transition hover:text-[var(--color-ink)]
-          {dropTarget === '' ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent)]' : ''}"
-        onclick={() => browseTo("")}
-        ondragover={(event) => allowDrop(event, "")}
-        ondragleave={() => {
-          if (dropTarget === "") dropTarget = null;
-        }}
-        ondrop={(event) => handleDrop(event, "")}
-      >
-        <Icon icon="ph:hard-drives" />
-        Workspace
-      </button>
-      {#each trail as crumb}
-        <span class="opacity-50">/</span>
-        <button
-          class="max-w-48 truncate rounded px-1.5 py-0.5 transition hover:text-[var(--color-ink)]
-            {dropTarget === crumb.path ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent)]' : ''}"
-          onclick={() => browseTo(crumb.path)}
-          ondragover={(event) => allowDrop(event, crumb.path)}
-          ondragleave={() => {
-            if (dropTarget === crumb.path) dropTarget = null;
-          }}
-          ondrop={(event) => handleDrop(event, crumb.path)}
-        >
-          {crumb.name}
-        </button>
-      {/each}
-    </nav>
+  <LocalHeader
+    title={headerTitle}
+    {ancestors}
+    showTrail={trail.length > 0 && (!inShortcut || ancestors.length > 0)}
+    {inShortcut}
+    {dropTarget}
+    bind:searchQuery
+    ondragovercrumb={allowDrop}
+    ondragleavecrumb={leaveDrop}
+    ondropcrumb={handleDrop}
+    {onupload}
+    {onnewdocument}
+    {onnewproject}
+    {onnewfolder}
+    {onconvert}
+  />
 
-    <div class="flex items-center gap-3">
-      <h1 class="min-w-0 flex-1 truncate text-lg font-semibold">{headerTitle}</h1>
-
-      <button
-        class="flex items-center gap-1.5 rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] px-2.5 py-1.5 text-xs font-medium transition hover:bg-[var(--color-surface-sunken)]"
-        onclick={onupload}
-      >
-        <Icon icon="ph:upload-simple" />
-        Import
-      </button>
-
-      <div class="relative flex" data-new-menu>
-        <button
-          class="flex items-center gap-1.5 rounded-l-md bg-[var(--color-accent)] py-1.5 pl-2.5 pr-2 text-xs font-semibold text-white transition hover:opacity-90"
-          onclick={onnewdocument}
-        >
-          <Icon icon="ph:file-plus" />
-          New document
-        </button>
-        <button
-          class="rounded-r-md border-l border-white/25 bg-[var(--color-accent)] px-1.5 py-1.5 text-xs text-white transition hover:opacity-90"
-          aria-label="More create options"
-          aria-haspopup="menu"
-          aria-expanded={newMenuOpen}
-          onclick={() => (newMenuOpen = !newMenuOpen)}
-        >
-          <Icon icon="ph:caret-down" />
-        </button>
-        {#if newMenuOpen}
-          <div role="menu" class="absolute right-0 top-full z-30 mt-1 w-52 rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] p-1 shadow-xl">
-            {#each [
-              { label: "Project", description: "Multi-file workspace", icon: "ph:folder-star", action: onnewproject },
-              { label: "Folder", description: "Organize your files", icon: "ph:folder-plus", action: onnewfolder },
-            ] as item}
-              <button
-                role="menuitem"
-                class="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left hover:bg-[var(--color-surface-sunken)]"
-                onclick={() => {
-                  newMenuOpen = false;
-                  item.action();
-                }}
-              >
-                <Icon icon={item.icon} class="text-lg text-[var(--color-accent)]" />
-                <span>
-                  <span class="block text-xs font-medium">{item.label}</span>
-                  <span class="block text-[10px] text-[var(--color-ink-muted)]">{item.description}</span>
-                </span>
-              </button>
-            {/each}
-          </div>
-        {/if}
-      </div>
-    </div>
-  </header>
-
-  <div class="scroll-thin flex-1 overflow-y-auto p-4">
+  <div class="scroll-thin flex-1 overflow-y-auto px-6 pb-6">
     {#if app.entries.length === 0}
-      <div
-        class="flex h-full flex-col items-center justify-center gap-3 text-[var(--color-ink-muted)]"
-      >
-        <Icon icon="ph:folder-open" class="text-5xl" />
-        <p class="text-sm">This folder is empty.</p>
+      <div class="empty-state h-full gap-3">
+        <span class="flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--color-surface-sunken)]">
+          <Icon icon="ph:folder-open" class="text-3xl text-[var(--color-ink-muted)]" />
+        </span>
+        <p class="text-sm text-[var(--color-ink-muted)]">This folder is empty</p>
         <div class="flex gap-2">
-          <button
-            class="rounded-md bg-[var(--color-accent)] px-3 py-1.5 text-xs font-medium text-white hover:opacity-90"
-            onclick={onnewdocument}
-          >
-            New document
-          </button>
-          <button
-            class="rounded-md border border-[var(--color-line)] px-3 py-1.5 text-xs hover:bg-[var(--color-surface)]"
-            onclick={onnewproject}
-          >
-            New project
-          </button>
+          <button class="btn btn-primary" onclick={onnewdocument}>New document</button>
+          <button class="btn btn-secondary" onclick={onnewproject}>New project</button>
         </div>
       </div>
     {:else}
-      <div class="flex flex-col gap-5">
-        {#if containers.length > 0}
-          <section class="flex flex-col gap-2">
-            {@render sectionTitle("Folders")}
-            <div class="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-2">
-              {#each containers as entry (entry.path)}
-                <div
-                  class="group relative flex items-center gap-2.5 rounded-lg border px-3 py-2.5 transition hover:border-[var(--color-accent)] hover:bg-[var(--color-surface)]
-                    {dropTarget === entry.path
-                    ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)]'
-                    : 'border-[var(--color-line)] bg-[var(--color-surface-sunken)]'}"
-                  role="group"
-                  draggable="true"
-                  ondragstart={(event) => startDrag(event, entry.path)}
-                  ondragend={endDrag}
-                  ondragover={(event) => allowDrop(event, entry.path)}
-                  ondragleave={() => {
-                    if (dropTarget === entry.path) dropTarget = null;
-                  }}
-                  ondrop={(event) => handleDrop(event, entry.path)}
-                  oncontextmenu={(event) => openContextMenu(event, entry.path)}
-                >
-                  <button
-                    class="flex min-w-0 flex-1 items-center gap-2.5 text-left"
-                    ondblclick={() => activate(entry)}
-                    onclick={() => activate(entry)}
+      <FilterBar bind:filters bind:viewMode sortOptions={allSortOptions} />
+
+      {#if visibleEntries.length === 0}
+        <div class="empty-state py-16">
+          <Icon icon="ph:magnifying-glass-minus" class="text-3xl" />
+          <p class="text-sm">Nothing here matches your search.</p>
+        </div>
+      {:else if viewMode === "list"}
+        <LocalListView
+          entries={visibleEntries}
+          {dropTarget}
+          {actions}
+          onactivate={activate}
+          oncontextmenu={openContextMenu}
+          ondragstart={startDrag}
+          ondragend={endDrag}
+          ondragover={allowDrop}
+          ondragleave={leaveDrop}
+          ondrop={handleDrop}
+        />
+      {:else}
+        <div class="flex flex-col gap-6">
+          {#if visibleContainers.length > 0}
+            <section class="flex flex-col gap-2.5">
+              {@render sectionTitle("Folders", visibleContainers.length)}
+              <div class="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-2.5">
+                {#each visibleContainers as entry (entry.path)}
+                  <div
+                    class="card card-interactive group relative flex items-center gap-2.5 py-2.5 pl-3 pr-2
+                      {dropTarget === entry.path
+                      ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)]'
+                      : ''}"
+                    role="group"
+                    draggable="true"
+                    ondragstart={(event) => startDrag(event, entry.path)}
+                    ondragend={endDrag}
+                    ondragover={(event) => allowDrop(event, entry.path)}
+                    ondragleave={() => leaveDrop(entry.path)}
+                    ondrop={(event) => handleDrop(event, entry.path)}
+                    oncontextmenu={(event) => openContextMenu(event, entry.path)}
                   >
-                    <Icon
-                      icon={entry.kind === "project"
-                        ? "ph:folder-star-fill"
-                        : "ph:folder-fill"}
-                      class="shrink-0 text-2xl {entry.kind === 'project'
-                        ? 'text-[var(--color-accent)]'
-                        : 'text-[var(--color-ink-muted)]'}"
-                    />
-                    <span class="min-w-0 flex-1">
-                      <span class="flex items-center gap-1.5">
-                        <span
-                          class="truncate text-xs font-medium"
-                          title={entry.name}
-                        >
-                          {entry.name}
-                        </span>
-                        {@render syncBadge(entry)}
-                      </span>
-                      <span
-                        class="block truncate text-[10px] text-[var(--color-ink-muted)]"
-                      >
-                        {entry.kind === "project" ? "Project · " : ""}{entry.child_count}
-                        items
-                      </span>
-                    </span>
-                  </button>
-
-                  {@render actions(entry)}
-                </div>
-              {/each}
-            </div>
-          </section>
-        {/if}
-
-        {#if documents.length > 0}
-          <section class="flex flex-col gap-2">
-            {@render sectionTitle("Documents")}
-            <div class="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-3">
-              {#each documents as entry (entry.path)}
-                <div
-                  class="group relative flex flex-col overflow-hidden rounded-lg border border-[var(--color-line)] bg-[var(--color-surface)] transition hover:border-[var(--color-accent)] hover:shadow-md"
-                  role="group"
-                  draggable="true"
-                  ondragstart={(event) => startDrag(event, entry.path)}
-                  ondragend={endDrag}
-                  oncontextmenu={(event) => openContextMenu(event, entry.path)}
-                >
-                  <button
-                    class="flex flex-col text-left"
-                    ondblclick={() => activate(entry)}
-                    onclick={() => activate(entry)}
-                  >
-                    <span
-                      class="flex h-24 items-center justify-center overflow-hidden border-b border-[var(--color-line)] bg-[var(--color-surface-muted)]"
-                    >
-                      {#if thumbs[entry.path]?.kind === "svg"}
-                        <span
-                          class="flex w-full origin-top scale-100 items-start justify-center bg-white p-1 [&_svg]:h-auto [&_svg]:w-full"
-                        >
-                          {@html thumbs[entry.path].data}
-                        </span>
-                      {:else if thumbs[entry.path]?.kind === "image"}
-                        <img
-                          src={thumbs[entry.path].data}
-                          alt={entry.name}
-                          class="h-full w-full object-contain"
-                        />
-                      {:else}
-                        <Icon
-                          icon={iconFor[entry.kind]}
-                          class="text-3xl {colorFor[entry.kind]}"
-                        />
-                      {/if}
-                    </span>
-
-                  </button>
-
-                  <div class="flex items-center gap-1 px-2.5 py-2">
                     <button
-                      class="flex min-w-0 flex-1 flex-col gap-0.5 text-left"
+                      class="flex min-w-0 flex-1 items-center gap-2.5 text-left"
+                      ondblclick={() => activate(entry)}
                       onclick={() => activate(entry)}
                     >
-                      <span class="flex items-center gap-1.5">
-                        <span
-                          class="min-w-0 flex-1 truncate text-xs font-medium"
-                          title={entry.name}
-                        >
-                          {entry.name}
+                      <Icon
+                        icon={entry.kind === "project"
+                          ? "ph:folder-star-fill"
+                          : "ph:folder-fill"}
+                        class="shrink-0 text-[1.375rem] {entry.kind === 'project' ? 'text-[var(--color-accent)]' : ''}"
+                        style={entry.kind === "folder" ? folderIconStyle(entry.color) : undefined}
+                      />
+                      <span class="min-w-0 flex-1">
+                        <span class="flex items-center gap-1.5">
+                          <span
+                            class="truncate text-[13px] font-medium"
+                            title={entry.name}
+                          >
+                            {entry.name}
+                          </span>
+                          <LocalSyncBadge {entry} />
                         </span>
-                        {@render syncBadge(entry)}
-                      </span>
-                      <span class="text-[10px] text-[var(--color-ink-muted)]">
-                        {#if entry.cloud_linked && entry.sync_state === "pending"}
-                          Not synced
-                        {:else if entry.cloud_linked}
-                          Synced {relativeTime(entry.last_synced_at)}
-                        {:else}
-                          {formatSize(entry.size)}
-                          {#if entry.modified}
-                            · {formatDate(entry.modified)}
-                          {/if}
-                        {/if}
+                        <span
+                          class="block truncate text-[11px] text-[var(--color-ink-muted)]"
+                        >
+                          {entry.kind === "project" ? "Project · " : ""}{entry.child_count}
+                          items
+                        </span>
                       </span>
                     </button>
 
                     {@render actions(entry)}
                   </div>
-                </div>
-              {/each}
-            </div>
-          </section>
-        {/if}
-      </div>
+                {/each}
+              </div>
+            </section>
+          {/if}
+
+          {#if visibleDocuments.length > 0}
+            <section class="flex flex-col gap-2.5">
+              {@render sectionTitle("Documents", visibleDocuments.length)}
+              <div class="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-3">
+                {#each visibleDocuments as entry (entry.path)}
+                  <div
+                    class="card card-interactive group relative flex flex-col overflow-hidden"
+                    role="group"
+                    draggable="true"
+                    ondragstart={(event) => startDrag(event, entry.path)}
+                    ondragend={endDrag}
+                    oncontextmenu={(event) => openContextMenu(event, entry.path)}
+                  >
+                    <button
+                      class="flex flex-col text-left"
+                      ondblclick={() => activate(entry)}
+                      onclick={() => activate(entry)}
+                    >
+                      <PageThumbnail
+                        thumbnail={thumbs[entry.path] ?? null}
+                        name={entry.name}
+                        fallbackIcon={entryIcon(entry)}
+                        fallbackClass={entry.kind === "document"
+                          ? "bg-[var(--color-accent-soft)] text-[var(--color-accent)]"
+                          : "bg-[var(--color-surface-sunken)] text-[var(--color-ink-muted)]"}
+                      />
+                    </button>
+
+                    <div class="flex items-center gap-1 py-2 pl-3 pr-1.5">
+                      <button
+                        class="flex min-w-0 flex-1 flex-col gap-0.5 text-left"
+                        onclick={() => activate(entry)}
+                      >
+                        <span class="flex items-center gap-1.5">
+                          <span
+                            class="min-w-0 flex-1 truncate text-[13px] font-medium"
+                            title={entry.name}
+                          >
+                            {entry.name}
+                          </span>
+                          <LocalSyncBadge {entry} />
+                        </span>
+                        <span class="text-[11px] text-[var(--color-ink-muted)]">
+                          {#if entry.cloud_linked && entry.sync_state === "pending"}
+                            Not synced
+                          {:else if entry.cloud_linked}
+                            Synced {relativeTime(entry.last_synced_at)}
+                          {:else}
+                            {formatSize(entry.size)}
+                            {#if entry.modified}
+                              · {formatDate(entry.modified)}
+                            {/if}
+                          {/if}
+                        </span>
+                      </button>
+
+                      {@render actions(entry)}
+                    </div>
+                  </div>
+                {/each}
+              </div>
+            </section>
+          {/if}
+        </div>
+      {/if}
     {/if}
   </div>
 </div>

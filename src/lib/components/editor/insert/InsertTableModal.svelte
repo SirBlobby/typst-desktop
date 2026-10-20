@@ -14,7 +14,7 @@
   }
 </script>
 
-<Modal title="Insert table" icon="mdi:table" width="max-w-sm" onclose={onClose}>
+<Modal title="Insert table" icon="ph:table" width="max-w-sm" onclose={onClose}>
   <div class="flex flex-col items-center gap-3">
     <div class="grid gap-1" style="grid-template-columns: repeat({gridSize}, minmax(0, 1fr));" role="grid" aria-label="Table size">
       {#each Array.from({ length: gridSize * gridSize }, (_, index) => index) as index (index)}

@@ -22,8 +22,11 @@
   import SettingsModal from "$lib/components/SettingsModal.svelte";
   import AssetsModal from "$lib/components/AssetsModal.svelte";
   import WindowControls from "$lib/components/WindowControls.svelte";
-  import ImageViewer from "$lib/components/ImageViewer.svelte";
+  import FileViewerOverlay from "$lib/components/viewer/FileViewerOverlay.svelte";
+  import ImageView from "$lib/components/viewer/ImageView.svelte";
+  import PdfView from "$lib/components/viewer/PdfView.svelte";
   import EditorToolbar from "$lib/components/EditorToolbar.svelte";
+  import ExportMenu from "$lib/components/ExportMenu.svelte";
   import PageSettingsModal from "$lib/components/PageSettingsModal.svelte";
   import InsertDialogs from "$lib/components/editor/insert/InsertDialogs.svelte";
   import ReviewLayer from "$lib/components/review/ReviewLayer.svelte";
@@ -43,6 +46,8 @@
   import * as api from "$lib/ts/api";
   import type { BrowseEntry, CloudFile, CloudFolder } from "$lib/ts/api";
   import { pickFiles } from "$lib/ts/import";
+  import { dropDestination, dropMessage, dropPaths } from "$lib/ts/drop";
+  import { exportFormat } from "$lib/ts/export-formats";
   import {
     app,
     browseTo,
@@ -102,7 +107,7 @@
   let dialog = $state<Dialog>({ kind: "none" });
   let editorView = $state<EditorView | null>(null);
   const editorExtensions = reviewExtensions();
-  let imageViewer = $state<{ paths: string[]; index: number } | null>(null);
+  let fileViewer = $state<{ paths: string[]; index: number } | null>(null);
   let selectedEntries = $state<Set<string>>(new Set());
   let selectedEntry = $state<string | null>(null);
   let selectedIsDir = $state(false);
@@ -274,8 +279,8 @@
   async function openCloudFile(fileId: string, name: string) {
     const path = await downloadCloudFile(fileId, name);
     if (!path) return;
-    if (api.isImagePath(name)) {
-      imageViewer = { paths: [path], index: 0 };
+    if (api.isViewablePath(name)) {
+      fileViewer = { paths: [path], index: 0 };
     } else {
       setStatus(`'${name}' is in your shared assets. Insert it from the Assets panel in the editor`);
     }
@@ -391,18 +396,40 @@
     }
   }
 
-  async function exportAs(format: string) {
-    if (!app.target) return;
+  async function convertDocuments() {
+    const sources = await pickFiles("convertible");
+    if (sources.length === 0) return;
 
-    const name = app.target.path.split("/").pop() ?? "document";
+    try {
+      setStatus("Converting with pandoc...");
+      const created: string[] = [];
+      for (const source of sources) {
+        created.push(await api.pandocImport(app.currentDir, source));
+      }
+      await refreshEntries();
+      if (created.length === 1) await openTarget(created[0]);
+      setStatus(`Converted ${created.length} document(s) to Typst`);
+    } catch (error) {
+      setError(error);
+    }
+  }
+
+  async function exportAs(formatId: string) {
+    const format = exportFormat(formatId);
+    if (!app.target || !format) return;
+
+    const sourceFile = format.id === "typ" ? app.activePath : null;
+    const baseName = (sourceFile ?? app.target.path).split("/").pop() ?? "document";
     const destination = await save({
-      defaultPath: `${name.replace(/\.typ$/i, "")}.${format}`,
-      filters: [{ name: format.toUpperCase(), extensions: [format] }],
+      defaultPath: `${baseName.replace(/\.typ$/i, "")}.${format.extension}`,
+      filters: [{ name: format.label, extensions: [format.extension] }],
     });
     if (!destination) return;
 
     try {
-      await api.exportTarget(app.target.path, format, destination);
+      if (app.dirty && !app.collabIntent) await saveAndCompile();
+      setStatus(`Exporting ${format.label}...`);
+      await api.exportTarget(app.target.path, format.id, destination, sourceFile);
       setStatus(`Exported to ${destination}`);
     } catch (error) {
       setError(error);
@@ -471,20 +498,8 @@
       setStatus("Conflicts resolved and uploaded");
     });
 
-  let dropActive = $state(false);
-
-  function dropDestination():
-    | { kind: "folder"; path: string }
-    | { kind: "target"; path: string }
-    | null {
-    if (app.view === "editor" && app.target) {
-      return { kind: "target", path: app.target.path };
-    }
-    if (app.view === "files" && app.scope === "local") {
-      return { kind: "folder", path: app.currentDir };
-    }
-    return null;
-  }
+  let draggedPaths = $state<string[]>([]);
+  let dropLabel = $state<string | null>(null);
 
   function folderUnderPointer(x: number, y: number): string | null {
     const element = document
@@ -495,29 +510,16 @@
     return element.dataset.treePath ?? "";
   }
 
-  async function dropPaths(paths: string[], folder: string | null) {
-    const destination = dropDestination();
-    if (!destination || paths.length === 0) return;
+  function showDropOverlay(paths: string[]) {
+    draggedPaths = paths;
+    const destination = dropDestination(paths);
+    dropLabel = destination ? dropMessage(destination, paths) : null;
+  }
 
-    try {
-      const imported =
-        destination.kind === "target"
-          ? await api.importIntoFolder(
-              folder ? targetChild(folder) : destination.path,
-              paths,
-            )
-          : await api.importIntoFolder(destination.path, paths);
-
-      if (destination.kind === "target") {
-        await refreshTarget();
-        await compile();
-      } else {
-        await refreshEntries();
-      }
-      setStatus(`Imported ${imported.length} item(s)`);
-    } catch (error) {
-      setError(error);
-    }
+  function hideDropOverlay() {
+    draggedPaths = [];
+    dropLabel = null;
+    treeDropTarget = null;
   }
 
   onMount(() => {
@@ -526,10 +528,12 @@
     );
 
     const pending = getCurrentWebview().onDragDropEvent((event) => {
-      if (event.payload.type === "over") {
-        dropActive = dropDestination() !== null;
+      if (event.payload.type === "enter") {
+        showDropOverlay(event.payload.paths);
+      } else if (event.payload.type === "over") {
+        if (!dropLabel && draggedPaths.length > 0) showDropOverlay(draggedPaths);
         treeDropTarget =
-          app.view === "editor"
+          app.view === "editor" && !app.target?.standalone
             ? folderUnderPointer(
                 event.payload.position.x,
                 event.payload.position.y,
@@ -537,12 +541,10 @@
             : null;
       } else if (event.payload.type === "drop") {
         const folder = treeDropTarget;
-        dropActive = false;
-        treeDropTarget = null;
+        hideDropOverlay();
         dropPaths(event.payload.paths, folder);
       } else {
-        dropActive = false;
-        treeDropTarget = null;
+        hideDropOverlay();
       }
     });
 
@@ -629,11 +631,11 @@
   spin = false,
 )}
   <span
-    class="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium
+    class="chip
       {tone === 'success'
-      ? 'bg-[var(--color-success)]/10 text-[var(--color-success)]'
+      ? 'bg-[var(--color-success)]/12 text-[var(--color-success)]'
       : tone === 'accent'
-        ? 'bg-[var(--color-accent)]/10 text-[var(--color-accent)]'
+        ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent)]'
         : 'bg-[var(--color-surface-sunken)] text-[var(--color-ink-muted)]'}"
   >
     <Icon {icon} class="text-xs {spin ? 'animate-spin' : ''}" />
@@ -644,11 +646,11 @@
 <div class="flex h-screen flex-col">
   <header
     data-tauri-drag-region
-    class="flex h-11 shrink-0 select-none items-center gap-2 border-b border-[var(--color-line)] bg-[var(--color-surface)] pl-3"
+    class="flex h-11 shrink-0 select-none items-center gap-1 border-b border-[var(--color-line)] bg-[var(--color-surface)] pl-2"
   >
     {#if app.view === "editor"}
       <button
-        class="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-ink)]"
+        class="btn btn-ghost px-2"
         onclick={closeTarget}
       >
         <Icon icon="ph:arrow-left" />
@@ -657,7 +659,7 @@
 
       {#if editorView}
         <button
-          class="rounded-md p-1.5 text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-ink)]"
+          class="icon-btn"
           title="Undo"
           aria-label="Undo"
           onclick={() => undoEdit(editorView)}
@@ -665,7 +667,7 @@
           <Icon icon="ph:arrow-counter-clockwise" class="text-sm" />
         </button>
         <button
-          class="rounded-md p-1.5 text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-ink)]"
+          class="icon-btn"
           title="Redo"
           aria-label="Redo"
           onclick={() => redoEdit(editorView)}
@@ -674,22 +676,19 @@
         </button>
       {/if}
 
-      <span data-tauri-drag-region class="text-sm font-medium">
+      <div class="divider-v"></div>
+      <span data-tauri-drag-region class="truncate px-1 text-[13px] font-medium">
         {app.target?.path.split("/").pop()}
       </span>
       {#if app.target?.standalone}
         {@render statusBadge("ph:file", "Single file", "muted")}
       {/if}
       {#if app.dirty}
-        <span class="h-1.5 w-1.5 rounded-full bg-[var(--color-accent)]"></span>
+        <span class="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--color-accent)]" title="Unsaved changes"></span>
       {/if}
     {:else}
-      <span
-        class="flex h-6 w-6 items-center justify-center rounded-md bg-[var(--color-accent)]"
-      >
-        <img src="/favicon.png" alt="Typst Desktop" class="h-6 w-6" />
-      </span>
-      <span data-tauri-drag-region class="text-sm font-semibold">
+      <img src="/favicon.png" alt="Typst Desktop" class="ml-1 h-5 w-5 rounded-md" />
+      <span data-tauri-drag-region class="ml-1 text-[13px] font-semibold tracking-tight">
         Typst Desktop
       </span>
     {/if}
@@ -737,7 +736,7 @@
 
       {#if !app.collabIntent}
         <button
-          class="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-ink)]"
+          class="btn btn-ghost"
           onclick={saveAndCompile}
         >
           <Icon icon="ph:floppy-disk" />
@@ -745,40 +744,21 @@
         </button>
       {/if}
 
-      <div class="group relative">
-        <button
-          class="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-ink)]"
-        >
-          <Icon icon="ph:export" />
-          Export
-        </button>
-        <div
-          class="invisible absolute right-0 top-full z-20 flex w-32 flex-col rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] py-1 text-xs shadow-lg group-hover:visible"
-        >
-          {#each ["pdf", "png", "html"] as format}
-            <button
-              class="px-3 py-1.5 text-left uppercase hover:bg-[var(--color-surface-sunken)]"
-              onclick={() => exportAs(format)}
-            >
-              {format}
-            </button>
-          {/each}
-        </div>
-      </div>
+      <ExportMenu onexport={exportAs} />
 
       <div class="group relative">
         <button
-          class="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-ink)]"
+          class="btn btn-ghost"
         >
           <Icon icon="ph:copy" />
           Copy
         </button>
         <div
-          class="invisible absolute right-0 top-full z-20 flex w-32 flex-col rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] py-1 text-xs shadow-lg group-hover:visible"
+          class="menu invisible absolute right-0 top-full z-20 w-32 opacity-0 transition-opacity group-hover:visible group-hover:opacity-100"
         >
           {#each ["png", "svg"] as format}
             <button
-              class="px-3 py-1.5 text-left uppercase hover:bg-[var(--color-surface-sunken)]"
+              class="menu-item uppercase"
               onclick={() => copyAs(format)}
             >
               {format}
@@ -789,7 +769,7 @@
 
       {#if (app.target?.cloud_project_id || app.documentLink) && !app.collabIntent}
         <button
-          class="flex items-center gap-1.5 rounded-md bg-[var(--color-accent)] px-2.5 py-1.5 text-xs font-medium text-white transition hover:opacity-90 disabled:opacity-50"
+          class="btn btn-primary ml-1"
           disabled={app.syncing}
           onclick={() => runSync("sync")}
         >
@@ -803,14 +783,14 @@
     {/if}
 
     <button
-      class="rounded-md p-1.5 text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-ink)]"
+      class="icon-btn"
       onclick={() => (dialog = { kind: "settings" })}
       aria-label="Settings"
     >
       <Icon icon="ph:gear-six" />
     </button>
 
-    <div class="ml-1 h-5 w-px bg-[var(--color-line)]"></div>
+    <div class="divider-v ml-1 mr-0"></div>
 
     <WindowControls />
   </header>
@@ -818,7 +798,7 @@
   {#if app.download}
     {@const progress = app.download}
     <div
-      class="flex shrink-0 items-center gap-3 border-b border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2"
+      class="flex shrink-0 items-center gap-3 border-b border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-2"
     >
       <Icon
         icon={progress.done ? "ph:check-circle" : "ph:cloud-arrow-down"}
@@ -833,10 +813,10 @@
       </span>
 
       <div
-        class="h-1.5 min-w-0 flex-1 overflow-hidden rounded-sm bg-[var(--color-surface-sunken)]"
+        class="h-1 min-w-0 flex-1 overflow-hidden rounded-full bg-[var(--color-surface-sunken)]"
       >
         <div
-          class="h-full rounded-sm transition-all duration-200
+          class="h-full rounded-full transition-all duration-200
             {progress.done
             ? 'bg-[var(--color-success)]'
             : 'bg-[var(--color-accent)]'}"
@@ -858,22 +838,22 @@
 
   {#if app.status || app.error}
     <div
-      class="flex shrink-0 items-center gap-2 border-b px-3 py-1.5 text-xs
+      class="flex shrink-0 items-center gap-2 border-b px-4 py-1.5 text-xs
         {app.error
-        ? 'border-[var(--color-danger)]/30 bg-[var(--color-danger)]/10 text-[var(--color-danger)]'
-        : 'border-[var(--color-success)]/30 bg-[var(--color-success)]/10 text-[var(--color-success)]'}"
+        ? 'border-[var(--color-danger)]/25 bg-[var(--color-danger)]/8 text-[var(--color-danger)]'
+        : 'border-[var(--color-success)]/25 bg-[var(--color-success)]/8 text-[var(--color-success)]'}"
     >
       <Icon icon={app.error ? "ph:warning-circle" : "ph:check-circle"} />
       <span class="flex-1">{app.error || app.status}</span>
       {#if app.conflicts.length > 0}
         <button
-          class="rounded border border-current px-2 py-0.5 font-medium"
+          class="btn h-6 border-current px-2"
           onclick={() => (dialog = { kind: "conflicts" })}
         >
           Resolve
         </button>
       {/if}
-      <button onclick={clearMessages} aria-label="Dismiss">
+      <button class="icon-btn icon-btn-sm text-current hover:bg-current/10 hover:text-current" onclick={clearMessages} aria-label="Dismiss">
         <Icon icon="ph:x" />
       </button>
     </div>
@@ -889,12 +869,13 @@
             onnewfolder={() => (dialog = { kind: "new-folder" })}
             onnewdocument={() => (dialog = { kind: "new-document" })}
             onupload={importFiles}
+            onconvert={convertDocuments}
             onrename={(entry) => (dialog = { kind: "rename-entry", entry })}
             ondelete={(entry) => (dialog = { kind: "delete-entry", entry })}
             onlink={(entry) => (dialog = { kind: "link-entry", entry })}
             onsavetocloud={(entry) =>
               (dialog = { kind: "save-document-to-cloud", entry })}
-            onviewimage={(paths, index) => (imageViewer = { paths, index })}
+            onviewfile={(paths, index) => (fileViewer = { paths, index })}
           />
         {:else}
           <CloudView
@@ -924,10 +905,10 @@
     {:else}
       {#if !app.target?.standalone && sidebarCollapsed}
         <div
-          class="flex w-8 shrink-0 flex-col items-center border-r border-[var(--color-line)] bg-[var(--color-surface)] py-1.5"
+          class="flex w-10 shrink-0 flex-col items-center border-r border-[var(--color-line)] bg-[var(--color-surface)] py-1.5"
         >
           <button
-            class="rounded p-1 text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
+            class="icon-btn"
             title="Show files"
             aria-label="Show files"
             onclick={toggleSidebar}
@@ -937,18 +918,14 @@
         </div>
       {:else if !app.target?.standalone}
         <div
-          class="flex w-56 shrink-0 flex-col border-r border-[var(--color-line)] bg-[var(--color-surface)]"
+          class="flex w-60 shrink-0 flex-col border-r border-[var(--color-line)] bg-[var(--color-surface)]"
         >
-          <div
-            class="flex items-center justify-between border-b border-[var(--color-line)] px-3 py-1.5"
-          >
-            <span
-              class="truncate text-[10px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]"
-            >
+          <div class="bar justify-between pl-3 pr-1.5">
+            <span class="section-label truncate">
               {selectedFolder ? selectedFolder : "Files"}
             </span>
             <button
-              class="shrink-0 rounded p-1 text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
+              class="icon-btn"
               title="Hide files"
               aria-label="Hide files"
               onclick={toggleSidebar}
@@ -993,12 +970,12 @@
             />
 
             <div
-              class="flex shrink-0 items-center gap-2.5 border-b border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-2 text-sm"
+              class="flex h-9 shrink-0 items-center gap-2 border-b border-[var(--color-line)] bg-[var(--color-editor)] px-4 text-xs"
             >
-              <Icon icon="ph:file-text" class="text-base text-[var(--color-ink-muted)]" />
-              <span>{app.activePath}</span>
+              <Icon icon="ph:file-text" class="text-sm text-[var(--color-ink-subtle)]" />
+              <span class="truncate font-medium">{app.activePath}</span>
               {#if app.dirty}
-                <span class="text-[var(--color-ink-muted)]">edited</span>
+                <span class="chip h-5 bg-[var(--color-surface-sunken)] px-1.5 text-[10px] text-[var(--color-ink-muted)]">Edited</span>
               {/if}
               <ReviewBar />
             </div>
@@ -1026,11 +1003,20 @@
               </div>
               <ReviewLayer view={editorView} title={app.target?.path.split("/").pop() ?? app.activePath} />
             {/key}
+          {:else if app.target && app.activePath && api.isViewablePath(app.activePath)}
+            {@const viewPath = `${app.target.path}/${app.activePath}`}
+            {#key viewPath}
+              {#if api.isPdfPath(viewPath)}
+                <PdfView path={viewPath} />
+              {:else}
+                <ImageView path={viewPath} />
+              {/if}
+            {/key}
           {:else}
             <div
-              class="flex flex-1 flex-col items-center justify-center gap-2 bg-[var(--color-surface)] text-[var(--color-ink-muted)]"
+              class="empty-state flex-1 bg-[var(--color-editor)]"
             >
-              <Icon icon="ph:file-dashed" class="text-4xl" />
+              <Icon icon="ph:file-dashed" class="text-3xl" />
               <p class="text-sm">
                 {app.activePath
                   ? "This file cannot be edited as text"
@@ -1054,31 +1040,27 @@
   </div>
 </div>
 
-{#if imageViewer}
-  <ImageViewer
-    paths={imageViewer.paths}
-    index={imageViewer.index}
-    onclose={() => (imageViewer = null)}
+{#if fileViewer}
+  <FileViewerOverlay
+    paths={fileViewer.paths}
+    index={fileViewer.index}
+    onclose={() => (fileViewer = null)}
   />
 {/if}
 
-{#if dropActive}
+{#if dropLabel}
   <div
-    class="pointer-events-none fixed inset-0 z-40 flex items-center justify-center bg-[var(--color-accent)]/10 p-8"
+    class="pointer-events-none fixed inset-0 z-40 flex items-center justify-center bg-[var(--backdrop)] p-8 backdrop-blur-[2px]"
   >
     <div
-      class="flex flex-col items-center gap-3 rounded-xl border-2 border-dashed border-[var(--color-accent)] bg-[var(--color-surface)]/95 px-10 py-8 shadow-xl"
+      class="flex flex-col items-center gap-2 rounded-2xl border-2 border-dashed border-[var(--color-accent)] bg-[var(--color-surface-raised)] px-12 py-9 shadow-2xl"
     >
-      <Icon icon="ph:tray-arrow-down" class="text-4xl text-[var(--color-accent)]" />
-      <p class="text-sm font-medium">
-        {app.view === "editor"
-          ? `Drop to add files to ${app.target?.path.split("/").pop()}`
-          : app.currentDir
-            ? `Drop to add files to ${app.currentDir.split("/").pop()}`
-            : "Drop to add files to your workspace"}
-      </p>
+      <span class="mb-1 flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--color-accent-soft)]">
+        <Icon icon="ph:tray-arrow-down" class="text-2xl text-[var(--color-accent)]" />
+      </span>
+      <p class="text-sm font-medium">{dropLabel}</p>
       <p class="text-xs text-[var(--color-ink-muted)]">
-        Images, fonts, and Typst files are copied in.
+        Typst files, images, and fonts are copied in.
       </p>
     </div>
   </div>

@@ -28,25 +28,27 @@
 <svelte:window on:keydown={handleKey} />
 
 <div
-  class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-6"
+  class="fixed inset-0 z-50 flex items-center justify-center bg-[var(--backdrop)] p-6 backdrop-blur-[2px]"
   role="presentation"
   onclick={(event) => {
     if (event.target === event.currentTarget) onclose();
   }}
 >
   <div
-    class="w-full {width} overflow-hidden rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] shadow-2xl"
+    class="w-full {width} overflow-hidden rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface-raised)] shadow-2xl"
     role="dialog"
     aria-modal="true"
     aria-label={title}
   >
     <header
-      class="flex items-center gap-2 border-b border-[var(--color-line)] px-5 py-3.5"
+      class="flex items-center gap-2.5 px-5 pb-1 pt-4"
     >
-      <Icon {icon} class="text-lg text-[var(--color-accent)]" />
+      <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--color-accent-soft)]">
+        <Icon {icon} class="text-base text-[var(--color-accent)]" />
+      </span>
       <h2 class="flex-1 text-sm font-semibold">{title}</h2>
       <button
-        class="rounded p-1 text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
+        class="icon-btn -mr-1.5"
         onclick={onclose}
         aria-label="Close"
       >
@@ -54,13 +56,13 @@
       </button>
     </header>
 
-    <div class="scroll-thin max-h-[70vh] overflow-y-auto px-5 py-4">
+    <div class="scroll-thin max-h-[70vh] overflow-y-auto px-5 pb-5 pt-3">
       {@render children()}
     </div>
 
     {#if footer}
       <footer
-        class="flex items-center justify-end gap-2 border-t border-[var(--color-line)] bg-[var(--color-surface-muted)] px-5 py-3"
+        class="flex items-center justify-end gap-2 border-t border-[var(--color-line)] bg-[var(--color-surface)] px-5 py-3"
       >
         {@render footer()}
       </footer>

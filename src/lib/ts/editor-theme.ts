@@ -4,13 +4,8 @@ import { tags as t } from "@lezer/highlight";
 import type { ColorTheme } from "$lib/ts/state.svelte";
 
 interface ThemeColors {
-  background: string;
-  surface: string;
   text: string;
-  selection: string;
-  activeLine: string;
   cursor: string;
-  border: string;
   keyword: string;
   string: string;
   number: string;
@@ -25,46 +20,51 @@ type Mode = "light" | "dark";
 const palettes: Record<ColorTheme, Record<Mode, ThemeColors>> = {
   catppuccin: {
     light: {
-      background: "#eff1f5", surface: "#e6e9ef", text: "#4c4f69", selection: "#ccd0da",
-      activeLine: "#e6e9ef", cursor: "#dc8a78", border: "#ccd0da", keyword: "#8839ef",
+      text: "#4c4f69", cursor: "#dc8a78", keyword: "#8839ef",
       string: "#40a02b", number: "#fe640b", comment: "#8c8fa1", variable: "#4c4f69",
       function: "#1e66f5", heading: "#1e66f5",
     },
     dark: {
-      background: "#1e1e2e", surface: "#181825", text: "#cdd6f4", selection: "#45475a",
-      activeLine: "#313244", cursor: "#f5e0dc", border: "#313244", keyword: "#cba6f7",
+      text: "#cdd6f4", cursor: "#f5e0dc", keyword: "#cba6f7",
       string: "#a6e3a1", number: "#fab387", comment: "#6c7086", variable: "#cdd6f4",
       function: "#89b4fa", heading: "#89b4fa",
     },
   },
   cerberus: {
     light: {
-      background: "#ffffff", surface: "#f8f8fa", text: "#18181b", selection: "#c7d2fe",
-      activeLine: "#f5f5f8", cursor: "#4f46e5", border: "#e2e2e8", keyword: "#9333ea",
+      text: "#18181b", cursor: "#4f46e5", keyword: "#9333ea",
       string: "#0f766e", number: "#c2410c", comment: "#71717a", variable: "#18181b",
       function: "#4f46e5", heading: "#4f46e5",
     },
     dark: {
-      background: "#171717", surface: "#121212", text: "#f5f5f5", selection: "#3a3a4a",
-      activeLine: "#262626", cursor: "#f5f5f5", border: "#262626", keyword: "#e879f9",
+      text: "#f5f5f5", cursor: "#f5f5f5", keyword: "#e879f9",
       string: "#2dd4bf", number: "#fbbf24", comment: "#737373", variable: "#f5f5f5",
       function: "#818cf8", heading: "#818cf8",
     },
   },
   archlinux: {
     light: {
-      background: "#ffffff", surface: "#f5f7f9", text: "#1f2328", selection: "#b6e3ff",
-      activeLine: "#f5f7f9", cursor: "#0a6ea8", border: "#d5dde3", keyword: "#cf222e",
+      text: "#1f2328", cursor: "#0a6ea8", keyword: "#cf222e",
       string: "#0a3069", number: "#0550ae", comment: "#6e7781", variable: "#1f2328",
       function: "#8250df", heading: "#0a6ea8",
     },
     dark: {
-      background: "#0d1117", surface: "#010409", text: "#c9d1d9", selection: "#264f78",
-      activeLine: "#161b22", cursor: "#c9d1d9", border: "#21262d", keyword: "#ff7b72",
+      text: "#c9d1d9", cursor: "#c9d1d9", keyword: "#ff7b72",
       string: "#a5d6ff", number: "#79c0ff", comment: "#6e7681", variable: "#c9d1d9",
       function: "#d2a8ff", heading: "#1793d1",
     },
   },
+};
+
+const surfaces = {
+  background: "var(--color-editor)",
+  popover: "var(--color-surface-raised)",
+  border: "var(--color-line)",
+  activeLine: "color-mix(in srgb, var(--color-ink) 4%, transparent)",
+  selection: "color-mix(in srgb, var(--color-accent) 32%, transparent)",
+  selectionUnfocused: "color-mix(in srgb, var(--color-ink) 14%, transparent)",
+  selectionMatch: "color-mix(in srgb, var(--color-accent) 14%, transparent)",
+  highlighted: "var(--color-accent-soft)",
 };
 
 export function editorTheme(isDark: boolean, colorTheme: ColorTheme) {
@@ -74,7 +74,7 @@ export function editorTheme(isDark: boolean, colorTheme: ColorTheme) {
     {
       "&": {
         color: colors.text,
-        backgroundColor: colors.background,
+        backgroundColor: surfaces.background,
         height: "100%",
       },
       ".cm-content": {
@@ -82,40 +82,43 @@ export function editorTheme(isDark: boolean, colorTheme: ColorTheme) {
         padding: "12px 0",
       },
       ".cm-cursor, .cm-dropCursor": { borderLeftColor: colors.cursor },
-      "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection":
-        { backgroundColor: colors.selection },
-      ".cm-activeLine": { backgroundColor: colors.activeLine },
+      ".cm-selectionBackground": { backgroundColor: surfaces.selectionUnfocused },
+      "&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground": {
+        backgroundColor: surfaces.selection,
+      },
+      ".cm-activeLine": { backgroundColor: surfaces.activeLine },
       ".cm-gutters": {
-        backgroundColor: colors.background,
+        backgroundColor: surfaces.background,
         color: colors.comment,
         border: "none",
       },
-      ".cm-activeLineGutter": { backgroundColor: colors.activeLine },
+      ".cm-activeLineGutter": { backgroundColor: surfaces.activeLine, color: colors.text },
       "&.cm-focused .cm-matchingBracket": {
-        backgroundColor: colors.selection,
-        outline: `1px solid ${colors.border}`,
+        backgroundColor: surfaces.selectionMatch,
+        outline: `1px solid ${surfaces.border}`,
       },
 
       ".cm-tooltip": {
-        backgroundColor: colors.surface,
+        backgroundColor: surfaces.popover,
         color: colors.text,
-        border: `1px solid ${colors.border}`,
-        borderRadius: "3px",
+        border: `1px solid ${surfaces.border}`,
+        borderRadius: "8px",
+        boxShadow: "var(--shadow-lg)",
         maxWidth: "500px",
       },
       ".cm-tooltip-hover": { maxHeight: "300px", overflow: "auto" },
       ".cm-tooltip .cm-tooltip-arrow:before": {
-        borderTopColor: colors.border,
-        borderBottomColor: colors.border,
+        borderTopColor: surfaces.border,
+        borderBottomColor: surfaces.border,
       },
       ".cm-tooltip .cm-tooltip-arrow:after": {
-        borderTopColor: colors.surface,
-        borderBottomColor: colors.surface,
+        borderTopColor: surfaces.popover,
+        borderBottomColor: surfaces.popover,
       },
 
       ".cm-tooltip.cm-tooltip-autocomplete": {
-        backgroundColor: colors.surface,
-        border: `1px solid ${colors.border}`,
+        backgroundColor: surfaces.popover,
+        border: `1px solid ${surfaces.border}`,
         padding: "4px",
       },
       ".cm-tooltip.cm-tooltip-autocomplete > ul": {
@@ -125,17 +128,17 @@ export function editorTheme(isDark: boolean, colorTheme: ColorTheme) {
       ".cm-tooltip.cm-tooltip-autocomplete > ul > li": {
         color: colors.text,
         padding: "3px 8px",
-        borderRadius: "2px",
+        borderRadius: "4px",
         display: "flex",
         alignItems: "center",
         gap: "6px",
       },
       ".cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected]": {
-        backgroundColor: colors.cursor,
-        color: "#ffffff",
+        backgroundColor: surfaces.highlighted,
+        color: colors.text,
       },
       ".cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected] .cm-completionDetail":
-        { color: "#ffffff" },
+        { color: colors.text },
       ".cm-completionLabel": { color: "inherit" },
       ".cm-completionMatchedText": {
         textDecoration: "none",
@@ -154,14 +157,14 @@ export function editorTheme(isDark: boolean, colorTheme: ColorTheme) {
         width: "1.1em",
       },
       ".cm-completionInfo": {
-        backgroundColor: colors.surface,
+        backgroundColor: surfaces.popover,
         color: colors.text,
-        border: `1px solid ${colors.border}`,
-        borderRadius: "3px",
+        border: `1px solid ${surfaces.border}`,
+        borderRadius: "8px",
         padding: "6px 8px",
       },
 
-      ".cm-selectionMatch": { backgroundColor: "#aafe661a" },
+      ".cm-selectionMatch": { backgroundColor: surfaces.selectionMatch },
     },
     { dark: isDark },
   );

@@ -13,6 +13,7 @@ const REQUEST_TIMEOUT_SECS: u64 = 30;
 fn agent() -> ureq::Agent {
     ureq::AgentBuilder::new()
         .timeout(std::time::Duration::from_secs(REQUEST_TIMEOUT_SECS))
+        .middleware(crate::spaces::add_space_header)
         .build()
 }
 
@@ -186,6 +187,16 @@ pub struct ProjectSummary {
     pub folder_id: Option<String>,
     pub role: String,
     pub updated_at: String,
+}
+
+pub fn list_spaces(server_url: &str, token: &str) -> Result<Vec<crate::spaces::CloudSpace>, String> {
+    agent()
+        .get(&endpoint(server_url, "/spaces"))
+        .set("Authorization", &format!("Bearer {}", token))
+        .call()
+        .map_err(describe)?
+        .into_json::<Vec<crate::spaces::CloudSpace>>()
+        .map_err(|e| e.to_string())
 }
 
 pub fn list_cloud_projects(server_url: &str, token: &str) -> Result<Vec<ProjectSummary>, String> {
@@ -752,6 +763,8 @@ pub struct CloudDocument {
     pub folder_id: Option<String>,
     pub role: String,
     pub updated_at: String,
+    #[serde(default)]
+    pub thumbnail_svg: Option<String>,
 }
 
 #[derive(Deserialize, Serialize)]
