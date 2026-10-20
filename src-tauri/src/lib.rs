@@ -3,6 +3,7 @@ mod compiler;
 mod db;
 mod fonts;
 mod lsp;
+mod review;
 mod sync;
 mod thumbnails;
 mod workspace;
@@ -706,24 +707,23 @@ fn lsp_running(state: State<'_, LspState>) -> bool {
     state.is_running()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn cloud_check_compatibility(server_url: String) -> sync::CompatibilityStatus {
     let server_url = server_url.trim_end_matches('/').to_string();
     sync::check_compatibility(&server_url)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn cloud_login(
     app: AppHandle,
     store: State<'_, Store>,
     ws_state: State<'_, WsState>,
     server_url: String,
-    email: String,
-    password: String,
+    code: String,
 ) -> Result<Account, String> {
     let server_url = server_url.trim_end_matches('/').to_string();
     let device_name = format!("Typst Desktop ({})", std::env::consts::OS);
-    let response = sync::login(&server_url, &email, &password, &device_name)?;
+    let response = sync::login_with_code(&server_url, &code, &device_name)?;
 
     let mut settings = load_settings(&app, &store)?;
     settings.server_url = server_url.clone();
@@ -741,7 +741,12 @@ fn cloud_login(
     })
 }
 
-#[tauri::command]
+#[tauri::command(async)]
+fn cloud_sign_in_url(server_url: String) -> String {
+    sync::sign_in_url(&server_url)
+}
+
+#[tauri::command(async)]
 fn cloud_logout(
     app: AppHandle,
     store: State<'_, Store>,
@@ -762,7 +767,7 @@ fn cloud_logout(
     Ok(())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn cloud_ws_start(app: AppHandle, store: State<'_, Store>, ws_state: State<'_, WsState>) -> Result<(), String> {
     let settings = load_settings(&app, &store)?;
     if let Some(token) = settings.device_token {
@@ -771,18 +776,18 @@ fn cloud_ws_start(app: AppHandle, store: State<'_, Store>, ws_state: State<'_, W
     Ok(())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn cloud_ws_stop(app: AppHandle, ws_state: State<'_, WsState>) -> Result<(), String> {
     ws_state.stop(&app);
     Ok(())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn cloud_ws_status(ws_state: State<'_, WsState>) -> Result<String, String> {
     Ok(ws_state.status())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn cloud_account(app: AppHandle, store: State<'_, Store>) -> Result<Option<Account>, String> {
     let settings = load_settings(&app, &store)?;
     let Some(token) = settings.device_token else {
@@ -792,13 +797,13 @@ fn cloud_account(app: AppHandle, store: State<'_, Store>) -> Result<Option<Accou
     Ok(sync::me(&settings.server_url, &token).ok())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn cloud_list_projects(app: AppHandle, store: State<'_, Store>) -> Result<Vec<ProjectSummary>, String> {
     let (server_url, token) = cloud_credentials(&app, &store)?;
     sync::list_cloud_projects(&server_url, &token)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn cloud_list_folders(
     app: AppHandle,
     store: State<'_, Store>,
@@ -807,7 +812,7 @@ fn cloud_list_folders(
     sync::list_folders(&server_url, &token)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn cloud_create_folder(
     app: AppHandle,
     store: State<'_, Store>,
@@ -818,7 +823,7 @@ fn cloud_create_folder(
     sync::create_folder(&server_url, &token, &name, parent_id.as_deref())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn cloud_rename_folder(
     app: AppHandle,
     store: State<'_, Store>,
@@ -829,7 +834,7 @@ fn cloud_rename_folder(
     sync::rename_folder(&server_url, &token, &folder_id, &name)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn cloud_move_folder(
     app: AppHandle,
     store: State<'_, Store>,
@@ -840,7 +845,7 @@ fn cloud_move_folder(
     sync::move_folder(&server_url, &token, &folder_id, parent_id.as_deref())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn cloud_delete_folder(
     app: AppHandle,
     store: State<'_, Store>,
@@ -850,7 +855,7 @@ fn cloud_delete_folder(
     sync::delete_folder(&server_url, &token, &folder_id)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn cloud_move_project(
     app: AppHandle,
     store: State<'_, Store>,
@@ -861,7 +866,7 @@ fn cloud_move_project(
     sync::move_cloud_project(&server_url, &token, &cloud_project_id, folder_id.as_deref())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn cloud_move_document(
     app: AppHandle,
     store: State<'_, Store>,
@@ -872,7 +877,7 @@ fn cloud_move_document(
     sync::move_document(&server_url, &token, &document_id, folder_id.as_deref())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn cloud_list_documents(
     app: AppHandle,
     store: State<'_, Store>,
@@ -882,7 +887,7 @@ fn cloud_list_documents(
     sync::list_documents(&server_url, &token, folder_id.as_deref())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn cloud_list_files(
     app: AppHandle,
     store: State<'_, Store>,
@@ -892,7 +897,7 @@ fn cloud_list_files(
     sync::list_account_files(&server_url, &token, folder_id.as_deref())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn cloud_download_file(
     app: AppHandle,
     store: State<'_, Store>,
@@ -914,7 +919,7 @@ fn cloud_download_file(
     Ok(file.name)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn cloud_delete_file(app: AppHandle, store: State<'_, Store>, file_id: String) -> Result<(), String> {
     let (server_url, token) = cloud_credentials(&app, &store)?;
     sync::delete_account_file(&server_url, &token, &file_id)
@@ -941,7 +946,7 @@ fn guess_mime_type(name: &str) -> &'static str {
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn cloud_upload_file(
     app: AppHandle,
     store: State<'_, Store>,
@@ -965,7 +970,7 @@ fn cloud_upload_file(
     )
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn cloud_rename_file(
     app: AppHandle,
     store: State<'_, Store>,
@@ -976,7 +981,7 @@ fn cloud_rename_file(
     sync::rename_account_file(&server_url, &token, &file_id, name.trim())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn cloud_move_file(
     app: AppHandle,
     store: State<'_, Store>,
@@ -987,7 +992,7 @@ fn cloud_move_file(
     sync::move_account_file(&server_url, &token, &file_id, folder_id.as_deref())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn cloud_delete_document(
     app: AppHandle,
     store: State<'_, Store>,
@@ -1005,7 +1010,7 @@ fn cloud_delete_document(
     Ok(())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn cloud_list_shared(
     app: AppHandle,
     store: State<'_, Store>,
@@ -1014,7 +1019,7 @@ fn cloud_list_shared(
     sync::list_shared(&server_url, &token)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn cloud_download_document(
     app: AppHandle,
     store: State<'_, Store>,
@@ -1053,7 +1058,7 @@ fn cloud_download_document(
     Ok(path)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn cloud_sync_document(
     app: AppHandle,
     store: State<'_, Store>,
@@ -1063,7 +1068,7 @@ fn cloud_sync_document(
     sync::sync_document(&server_url, &token, &app, &store, &path)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn cloud_room_id(
     app: AppHandle,
     store: State<'_, Store>,
@@ -1089,7 +1094,7 @@ fn cloud_room_id(
         .map(|entry| format!("project:{}:{}", cloud_project_id, entry.id)))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn cloud_resolve_document(
     app: AppHandle,
     store: State<'_, Store>,
@@ -1109,12 +1114,30 @@ fn cloud_resolve_document(
     )
 }
 
-#[tauri::command]
+#[tauri::command(async)]
+fn cloud_review_request(
+    app: AppHandle,
+    store: State<'_, Store>,
+    method: String,
+    path: String,
+    body: Option<serde_json::Value>,
+) -> Result<serde_json::Value, String> {
+    let (server_url, token) = cloud_credentials(&app, &store)?;
+    review::request(&server_url, &token, &method, &path, body)
+}
+
+#[tauri::command(async)]
+fn cloud_user_avatar(app: AppHandle, store: State<'_, Store>, user_id: String) -> Result<Option<String>, String> {
+    let (server_url, token) = cloud_credentials(&app, &store)?;
+    review::user_avatar(&server_url, &token, &user_id)
+}
+
+#[tauri::command(async)]
 fn cloud_unlink_document(store: State<'_, Store>, path: String) -> Result<(), String> {
     store.forget_document_link(&path)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn cloud_create_document(
     app: AppHandle,
     store: State<'_, Store>,
@@ -1146,7 +1169,7 @@ pub struct LinkedDocument {
     pub sync_state: Option<String>,
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn cloud_linked_documents(
     app: AppHandle,
     store: State<'_, Store>,
@@ -1180,7 +1203,7 @@ pub struct LinkedProject {
     pub sync_state: Option<String>,
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn cloud_linked_projects(
     app: AppHandle,
     store: State<'_, Store>,
@@ -1206,7 +1229,7 @@ fn cloud_linked_projects(
     Ok(linked)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn cloud_document_link(
     store: State<'_, Store>,
     path: String,
@@ -1214,7 +1237,7 @@ fn cloud_document_link(
     store.document_link(&path)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn cloud_create_project(
     app: AppHandle,
     store: State<'_, Store>,
@@ -1225,7 +1248,7 @@ fn cloud_create_project(
     sync::create_cloud_project(&server_url, &token, name.trim(), folder_id.as_deref())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn cloud_new_document(
     app: AppHandle,
     store: State<'_, Store>,
@@ -1242,13 +1265,13 @@ fn cloud_new_document(
     sync::create_document(&server_url, &token, title, &content, folder_id.as_deref())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn cloud_delete_project(app: AppHandle, store: State<'_, Store>, cloud_project_id: String) -> Result<(), String> {
     let (server_url, token) = cloud_credentials(&app, &store)?;
     sync::delete_cloud_project(&server_url, &token, &cloud_project_id)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn cloud_clone_project(
     app: AppHandle,
     store: State<'_, Store>,
@@ -1273,7 +1296,7 @@ fn cloud_clone_project(
     )
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn cloud_link_project(
     app: AppHandle,
     store: State<'_, Store>,
@@ -1295,7 +1318,7 @@ fn cloud_link_project(
     sync::push_project(&server_url, &token, &store, &project, &dir, &mut meta)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn cloud_unlink_project(app: AppHandle, store: State<'_, Store>, project: String) -> Result<(), String> {
     let (dir, mut meta) = load_project(&app, &store, &project)?;
     meta.cloud_project_id = None;
@@ -1305,21 +1328,21 @@ fn cloud_unlink_project(app: AppHandle, store: State<'_, Store>, project: String
     store.forget_project(&project)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn cloud_push(app: AppHandle, store: State<'_, Store>, project: String) -> Result<SyncReport, String> {
     let (server_url, token) = cloud_credentials(&app, &store)?;
     let (dir, mut meta) = load_project(&app, &store, &project)?;
     sync::push_project(&server_url, &token, &store, &project, &dir, &mut meta)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn cloud_pull(app: AppHandle, store: State<'_, Store>, project: String) -> Result<SyncReport, String> {
     let (server_url, token) = cloud_credentials(&app, &store)?;
     let (dir, mut meta) = load_project(&app, &store, &project)?;
     sync::pull_project(&server_url, &token, &store, &project, &dir, &mut meta)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn cloud_sync(app: AppHandle, store: State<'_, Store>, project: String) -> Result<SyncReport, String> {
     let (server_url, token) = cloud_credentials(&app, &store)?;
     let (dir, mut meta) = load_project(&app, &store, &project)?;
@@ -1344,7 +1367,7 @@ pub struct ResolutionRequest {
     pub server_hash: String,
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn cloud_resolve_conflicts(
     app: AppHandle,
     store: State<'_, Store>,
@@ -1452,6 +1475,9 @@ pub fn run() {
             cloud_download_document,
             cloud_delete_document,
             cloud_sync_document,
+            cloud_review_request,
+            cloud_sign_in_url,
+            cloud_user_avatar,
             cloud_room_id,
             cloud_resolve_document,
             cloud_document_link,

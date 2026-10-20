@@ -267,11 +267,11 @@ export interface CompatibilityStatus {
 export const cloudCheckCompatibility = (serverUrl: string) =>
   invoke<CompatibilityStatus>("cloud_check_compatibility", { serverUrl });
 
-export const cloudLogin = (
-  serverUrl: string,
-  email: string,
-  password: string,
-) => invoke<Account>("cloud_login", { serverUrl, email, password });
+export const cloudSignInUrl = (serverUrl: string) =>
+  invoke<string>("cloud_sign_in_url", { serverUrl });
+
+export const cloudLogin = (serverUrl: string, code: string) =>
+  invoke<Account>("cloud_login", { serverUrl, code });
 
 export const cloudLogout = () => invoke<void>("cloud_logout");
 

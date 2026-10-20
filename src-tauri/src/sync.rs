@@ -34,7 +34,7 @@ fn describe(error: ureq::Error) -> String {
     }
 }
 
-pub const MIN_SERVER_VERSION: &str = "1.5.0";
+pub const MIN_SERVER_VERSION: &str = "2.0.0";
 
 fn parse_version(version: &str) -> (u32, u32, u32) {
     let mut parts = version.trim().split('.').map(|part| part.parse::<u32>().unwrap_or(0));
@@ -131,10 +131,13 @@ pub struct LoginResponse {
     pub email: String,
 }
 
-pub fn login(
+pub fn sign_in_url(server_url: &str) -> String {
+    format!("{}/desktop/link", server_url.trim_end_matches('/'))
+}
+
+pub fn login_with_code(
     server_url: &str,
-    email: &str,
-    password: &str,
+    code: &str,
     device_name: &str,
 ) -> Result<LoginResponse, String> {
     let status = check_compatibility(server_url);
@@ -145,10 +148,9 @@ pub fn login(
     }
 
     agent()
-        .post(&endpoint(server_url, "/auth/login"))
+        .post(&endpoint(server_url, "/auth/exchange"))
         .send_json(ureq::json!({
-            "email": email,
-            "password": password,
+            "code": code,
             "device_name": device_name,
             "client_version": env!("CARGO_PKG_VERSION"),
         }))
