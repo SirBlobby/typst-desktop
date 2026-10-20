@@ -76,7 +76,6 @@ export function editorTheme(isDark: boolean, colorTheme: ColorTheme) {
         color: colors.text,
         backgroundColor: colors.background,
         height: "100%",
-        fontSize: "13px",
       },
       ".cm-content": {
         caretColor: colors.cursor,
@@ -162,8 +161,6 @@ export function editorTheme(isDark: boolean, colorTheme: ColorTheme) {
         padding: "6px 8px",
       },
 
-      ".cm-panels": { backgroundColor: colors.surface, color: colors.text },
-      ".cm-searchMatch": { backgroundColor: "#72a1ff59" },
       ".cm-selectionMatch": { backgroundColor: "#aafe661a" },
     },
     { dark: isDark },

@@ -8,6 +8,7 @@
   import SettingsCard from "./settings/SettingsCard.svelte";
   import SettingsRow from "./settings/SettingsRow.svelte";
   import ToggleSwitch from "./settings/ToggleSwitch.svelte";
+  import EditorSection from "./settings/EditorSection.svelte";
   import * as api from "$lib/ts/api";
   import type { AppInfo, CompatibilityStatus } from "$lib/ts/api";
   import {
@@ -44,6 +45,7 @@
   type Section =
     | "files"
     | "appearance"
+    | "editor"
     | "accessibility"
     | "account"
     | "lsp"
@@ -53,6 +55,7 @@
   const sections: { id: Section; label: string; icon: string }[] = [
     { id: "files", label: "Files", icon: "ph:folder" },
     { id: "appearance", label: "Appearance", icon: "ph:palette" },
+    { id: "editor", label: "Editor", icon: "ph:code" },
     { id: "accessibility", label: "Accessibility", icon: "ph:wheelchair" },
     { id: "account", label: "Account", icon: "ph:user-circle" },
     { id: "lsp", label: "Language Server", icon: "ph:plugs-connected" },
@@ -464,6 +467,8 @@
             </SettingsRow>
           </SettingsCard>
         </div>
+      {:else if section === "editor"}
+        <EditorSection {fieldClass} />
       {:else if section === "accessibility"}
         <SettingsHeader title="Accessibility" description="Make the app easier to read and calmer to use." icon="ph:wheelchair" />
         <SettingsCard>
@@ -630,6 +635,7 @@
     {@const draftless =
       section === "about" ||
       section === "appearance" ||
+      section === "editor" ||
       section === "accessibility" ||
       section === "lsp" ||
       section === "hotkeys"}

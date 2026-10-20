@@ -1,12 +1,8 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
-  import {
-    EditorView,
-    keymap,
-    lineNumbers,
-    highlightActiveLine,
-  } from "@codemirror/view";
-  import { EditorState, Compartment, StateField } from "@codemirror/state";
+  import { EditorView, keymap, highlightActiveLine } from "@codemirror/view";
+  import { EditorState, Compartment, StateField, type Extension } from "@codemirror/state";
+  import { searchKeymap } from "@codemirror/search";
   import { defaultKeymap, history, indentWithTab } from "@codemirror/commands";
   import {
     bracketMatching,
@@ -27,6 +23,11 @@
   import { typstCompletions } from "$lib/ts/completions";
   import { editorTheme } from "$lib/ts/editor-theme";
   import { LspBridge } from "$lib/ts/lsp";
+  import { lineCommentKeymap } from "$lib/ts/editor/line-comments";
+  import { searchExtensions } from "$lib/ts/editor/search";
+  import { editorSettingsStore } from "$lib/ts/editor/settings";
+  import { editorPreferenceExtensions } from "$lib/ts/editor/preferences";
+  import { loadEditorFont } from "$lib/ts/editor/fonts";
   import { app } from "$lib/ts/state.svelte";
   import type { Diagnostic } from "$lib/ts/api";
 
@@ -37,6 +38,7 @@
     enableLsp?: boolean;
     diagnostics?: Diagnostic[];
     collab?: { text: Y.Text; awareness: Awareness } | null;
+    extensions?: Extension[];
     onchange: (value: string) => void;
     onlspstatus?: (status: "off" | "starting" | "on" | "unavailable") => void;
     onready?: (view: EditorView | null) => void;
@@ -49,6 +51,7 @@
     enableLsp = true,
     diagnostics = [],
     collab = null,
+    extensions = [],
     onchange,
     onlspstatus,
     onready,
@@ -61,6 +64,9 @@
   const lspSlot = new Compartment();
   const themeSlot = new Compartment();
   const collabSlot = new Compartment();
+  const preferencesSlot = new Compartment();
+  const extraSlot = new Compartment();
+  let unsubscribePreferences: (() => void) | null = null;
 
   const bridge = new LspBridge();
   let client: LSPClient | null = null;
@@ -104,8 +110,6 @@
           try {
             parser.clearParser();
           } catch {
-            // The wasm parser instance panicked and is no longer usable.
-            // Drop syntax highlighting rather than crash on every keystroke.
             disableTypstLanguage();
           }
         }
@@ -160,7 +164,7 @@
       state: EditorState.create({
         doc: content,
         extensions: [
-          lineNumbers(),
+          preferencesSlot.of([]),
           lintGutter(),
           history(),
           bracketMatching(),
@@ -171,11 +175,15 @@
           lspSlot.of([]),
           themeSlot.of(editorTheme(app.theme === "dark", app.colorTheme)),
           collabSlot.of([]),
+          extraSlot.of([]),
+          ...searchExtensions(),
           ...(isToml
             ? []
             : [autocompletion({ override: [typstCompletions] })]),
           EditorView.lineWrapping,
           keymap.of([
+            ...lineCommentKeymap(isToml ? "#" : "//"),
+            ...searchKeymap,
             ...defaultKeymap,
             indentWithTab,
           ]),
@@ -188,11 +196,16 @@
 
     if (!isToml) {
       loadTypstLanguage()
-        .then((language) => {
-          view?.dispatch({ effects: languageSlot.reconfigure(language) });
+        .then((typstLanguage) => {
+          view?.dispatch({ effects: languageSlot.reconfigure(typstLanguage) });
         })
         .catch(() => {});
     }
+
+    unsubscribePreferences = editorSettingsStore.subscribe((settings) => {
+      view?.dispatch({ effects: preferencesSlot.reconfigure(editorPreferenceExtensions(settings)) });
+      loadEditorFont(settings.fontFamily).then(() => view?.requestMeasure());
+    });
 
     onready?.(view);
 
@@ -200,6 +213,7 @@
   });
 
   onDestroy(() => {
+    unsubscribePreferences?.();
     onready?.(null);
     bridge.stop();
     view?.destroy();
@@ -247,6 +261,13 @@
       current.dispatch({
         changes: { from: 0, to: current.state.doc.length, insert: next },
       });
+    });
+  });
+
+  $effect(() => {
+    const nextExtensions = extensions;
+    laterDispatch((current) => {
+      current.dispatch({ effects: extraSlot.reconfigure(nextExtensions) });
     });
   });
 

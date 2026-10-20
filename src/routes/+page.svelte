@@ -24,6 +24,11 @@
   import ImageViewer from "$lib/components/ImageViewer.svelte";
   import EditorToolbar from "$lib/components/EditorToolbar.svelte";
   import PageSettingsModal from "$lib/components/PageSettingsModal.svelte";
+  import InsertDialogs from "$lib/components/editor/insert/InsertDialogs.svelte";
+  import ReviewLayer from "$lib/components/review/ReviewLayer.svelte";
+  import ReviewBar from "$lib/components/review/ReviewBar.svelte";
+  import ReviewPanel from "$lib/components/review/ReviewPanel.svelte";
+  import { reviewExtensions } from "$lib/ts/review/extensions";
 
   import type { EditorView } from "@codemirror/view";
   import {
@@ -95,6 +100,7 @@
 
   let dialog = $state<Dialog>({ kind: "none" });
   let editorView = $state<EditorView | null>(null);
+  const editorExtensions = reviewExtensions();
   let imageViewer = $state<{ paths: string[]; index: number } | null>(null);
   let selectedEntries = $state<Set<string>>(new Set());
   let selectedEntry = $state<string | null>(null);
@@ -393,7 +399,7 @@
   }
 
   async function pngBytesToRgba(bytes: Uint8Array) {
-    const blob = new Blob([bytes], { type: "image/png" });
+    const blob = new Blob([new Uint8Array(bytes)], { type: "image/png" });
     const bitmap = await createImageBitmap(blob);
     const canvas = document.createElement("canvas");
     canvas.width = bitmap.width;
@@ -970,13 +976,14 @@
             />
 
             <div
-              class="flex shrink-0 items-center gap-2 border-b border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2 text-xs"
+              class="flex shrink-0 items-center gap-2.5 border-b border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-2 text-sm"
             >
-              <Icon icon="ph:file-text" class="text-[var(--color-ink-muted)]" />
+              <Icon icon="ph:file-text" class="text-base text-[var(--color-ink-muted)]" />
               <span>{app.activePath}</span>
               {#if app.dirty}
                 <span class="text-[var(--color-ink-muted)]">edited</span>
               {/if}
+              <ReviewBar />
             </div>
 
             {#key app.target?.path + ":" + app.activePath}
@@ -986,6 +993,7 @@
                   filePath={app.activePath}
                   targetPath={app.target?.path ?? ""}
                   diagnostics={app.diagnostics}
+                  extensions={editorExtensions}
                   collab={app.collab
                     ? { text: app.collab.text, awareness: app.collab.provider.awareness }
                     : null}
@@ -999,6 +1007,7 @@
                   onready={(view) => (editorView = view)}
                 />
               </div>
+              <ReviewLayer view={editorView} title={app.target?.path.split("/").pop() ?? app.activePath} />
             {/key}
           {:else}
             <div
@@ -1021,6 +1030,8 @@
             compiling={app.compiling}
           />
         </div>
+
+        <ReviewPanel />
       </div>
     {/if}
   </div>
@@ -1279,6 +1290,15 @@
     conflicts={app.conflicts}
     onresolve={app.documentLink ? resolveDocumentConflicts : resolveConflicts}
     onclose={close}
+  />
+{/if}
+
+{#if app.view === "editor" && app.target}
+  <InsertDialogs
+    view={editorView}
+    targetPath={app.target.path}
+    files={app.target.files}
+    activePath={app.activePath}
   />
 {/if}
 
