@@ -2,7 +2,7 @@
 
 # Typst Desktop
 
-[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/sirblobby/typst-desktop)
+[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/SirBlobby/typst-desktop.git)
 [![License](https://img.shields.io/badge/license-Apache_2.0-green.svg)](LICENSE)
 [![Typst Version](https://img.shields.io/badge/Typst-0.15.1-239dad?logo=typst&logoColor=white)](https://typst.app/)
 [![Rust](https://img.shields.io/badge/Rust-1.82+-orange?logo=rust&logoColor=white)](https://www.rust-lang.org/)
@@ -11,17 +11,17 @@
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
 [![SQLite](https://img.shields.io/badge/SQLite-003B57?logo=sqlite&logoColor=white)](https://www.sqlite.org/)
 
-A desktop editor for Typst. Your documents stay as plain files on your own drive, and can optionally sync to a [TypstDrive](https://github.com/SirBlobby/TypstDrive) server so the same notes open on any device.
+A desktop editor for Typst. Your documents stay as plain files on your own drive, and can optionally sync to a [TypstDrive](https://github.com/SirBlobby/TypstDrive.git) server so the same notes open on any device.
 
 The Typst compiler is built into the app — there is nothing extra to install to write and export documents.
 
 ## Install
 
-Packages are attached to each [release](https://github.com/sirblobby/typst-desktop/releases). Set the version you want first:
+Packages are attached to each [release](https://github.com/SirBlobby/typst-desktop/releases). Set the version you want first:
 
 ```bash
 VERSION=1.1.0
-BASE=https://github.com/sirblobby/typst-desktop/releases/download/v$VERSION
+BASE=https://github.com/SirBlobby/typst-desktop/releases/download/v$VERSION
 ```
 
 ### Debian and Ubuntu

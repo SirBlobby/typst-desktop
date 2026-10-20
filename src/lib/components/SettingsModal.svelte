@@ -257,7 +257,7 @@
     },
     {
       label: "GitHub Repository",
-      url: "https://github.com/SirBlobby/typst-desktop",
+      url: "https://github.com/SirBlobby/typst-desktop.git",
       icon: "ph:github-logo",
     },
     {
