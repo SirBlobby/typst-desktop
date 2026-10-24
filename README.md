@@ -61,13 +61,14 @@ The AppImage runs on any distribution, so it also works as a fallback on Debian 
 
 - **Local first**: Every document is an ordinary file in a folder you choose. Nothing is locked in a database, and any other editor can open the same files.
 - **Two views**: A file viewer for browsing local and cloud files, and an editor view for writing.
-- **Single files or projects**: Open a lone `.typ` file, or a project folder with its own `typst.toml`, chapters, bibliography, and assets.
-- **Live preview**: The preview recompiles as you type, and follows whichever file you are editing rather than only the entrypoint. Saving is not required to see changes.
+- **Single files or projects**: Open a lone `.typ` or `.tex` file, or a project folder with its own `typst.toml`, chapters, bibliography, and assets.
+- **LaTeX**: Create LaTeX documents and projects by picking the language when you create them. LaTeX is converted to Typst with [MiTeX](https://github.com/mitex-rs/mitex), so basic documents, sections, lists, tables, figures and math work, while packages, `\input` and bibliographies do not. `.tex` files get a LaTeX editor, toolbar and keyboard shortcuts, and sync with TypstDrive LaTeX documents.
+- **Live preview**: The preview recompiles as you type, and follows whichever file you are editing rather than only the entrypoint. Saving is not required to see changes. The **View** menu shows the editor and preview, the editor only, or the preview only.
 - **Editor**: Typst syntax highlighting, snippet autocompletion, a formatting toolbar with heading sizes and quotes, page settings, inline diagnostics, and optional `tinymist` language server support.
 - **Editor tools**: Find and search and replace, `Ctrl+/` to comment out lines, and quick insert for images, tables, project files, symbols and emoji.
 - **Editor settings**: Font, font size, spell checking, line numbers and a minimap with three sizes.
 - **Review**: For cloud documents open live, see who else is editing with their profile pictures, comment on text, reply and resolve threads, suggest edits that others accept or reject, save versions and browse, compare and restore version history.
-- **Export**: PDF, PNG, SVG, HTML and Typst source, plus Word, LaTeX, Markdown and HTML through `pandoc`. Word, LaTeX, Markdown and HTML files can also be converted into Typst documents.
+- **Export**: PDF, PNG, SVG, HTML and the source file, plus Word, LaTeX, Markdown and HTML through `pandoc`. LaTeX files are read as LaTeX by `pandoc`. Word, LaTeX, Markdown and HTML files can also be converted into Typst documents.
 - **Team spaces**: Browse and work in the TypstDrive team spaces you belong to from the sidebar.
 - **Viewer**: Open PDFs and images from the file browser, the project file tree, or TypstDrive.
 - **Local folders**: Add shortcuts to folders anywhere on your computer to browse and edit them alongside the workspace, and give folders colors.
@@ -89,6 +90,7 @@ Inside the workspace:
 |---|---|
 | `<workspace>/` | Your folders, projects, and documents. |
 | `<workspace>/.assets/` | Shared images and fonts available to every project. |
+| `<project>/.typst-desktop.json` | Marks a folder as a project when it has no `typst.toml`, such as a LaTeX project. |
 
 Application data — settings, sync state, and the thumbnail cache — is kept in a SQLite database in the platform's app-data directory. Documents themselves are never stored there.
 
