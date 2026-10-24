@@ -12,6 +12,7 @@
   import FileViewer from "$lib/components/FileViewer.svelte";
   import CloudView from "$lib/components/cloud/CloudView.svelte";
   import FileTree from "$lib/components/FileTree.svelte";
+  import NewFileModal from "$lib/components/NewFileModal.svelte";
   import BrowserSidebar from "$lib/components/BrowserSidebar.svelte";
   import Editor from "$lib/components/Editor.svelte";
   import Preview from "$lib/components/Preview.svelte";
@@ -319,10 +320,17 @@
     }
   }
 
-  const createFileInTarget = (parent: string, name: string) =>
+  const FOLDER_PLACEHOLDER = ".keep";
+
+  const targetFolders = $derived(
+    (app.target?.files ?? []).filter((file) => file.is_dir).map((file) => file.path),
+  );
+  const newFileExtension = $derived(
+    app.target?.entrypoint.toLowerCase().endsWith(".tex") ? "tex" : "typ",
+  );
+
+  const createFileInTarget = (path: string) =>
     guard(async () => {
-      const file = name.includes(".") ? name : `${name}.typ`;
-      const path = joinInTarget(parent, file);
       await api.writeTargetFile(app.target!.path, path, "");
       await refreshTarget();
       await openFile(path);
@@ -330,19 +338,36 @@
 
   const createFolderInTarget = (parent: string, name: string) =>
     guard(async () => {
-      await api.createFolderEntry(app.target!.path, joinInTarget(parent, name));
+      const folder = joinInTarget(parent, name.trim().replace(/^\/+|\/+$/g, ""));
+      if (app.target!.cloud_project_id) {
+        await api.writeTargetFile(app.target!.path, `${folder}/${FOLDER_PLACEHOLDER}`, "");
+      } else {
+        await api.createFolderEntry(app.target!.path, folder);
+      }
       await refreshTarget();
     });
 
+  function isWithin(path: string, entry: string): boolean {
+    return path === entry || path.startsWith(`${entry}/`);
+  }
+
+  function movedPath(path: string, from: string, to: string): string | null {
+    if (!isWithin(path, from)) return null;
+    return path === from ? to : `${to}/${path.slice(from.length + 1)}`;
+  }
+
+  async function relocateInTarget(from: string, to: string) {
+    await api.renameTargetEntry(app.target!.path, from, to);
+    await refreshTarget();
+    const activeMoved = app.activePath ? movedPath(app.activePath, from, to) : null;
+    if (activeMoved) await openFile(activeMoved);
+    await compile();
+  }
+
   const moveInTarget = (path: string, destination: string) =>
     guard(async () => {
-      await api.moveEntry(targetChild(path), targetChild(destination));
-      await refreshTarget();
-      if (app.activePath === path) {
-        const name = path.split("/").pop() ?? path;
-        await openFile(joinInTarget(destination, name));
-      }
-      await compile();
+      const name = path.split("/").pop() ?? path;
+      await relocateInTarget(path, joinInTarget(destination, name));
     });
 
   const duplicateInTarget = (path: string) =>
@@ -362,21 +387,16 @@
 
   const renameFile = (path: string, next: string) =>
     guard(async () => {
-      const payload = await api.readTargetFile(app.target!.path, path);
-      await api.writeTargetFile(app.target!.path, next, payload.content);
-      await api.deleteEntry(`${app.target!.path}/${path}`);
-      await refreshTarget();
-      if (app.activePath === path) await openFile(next);
+      await relocateInTarget(path, next);
     });
 
   const deleteFile = (paths: string[]) =>
     guard(async () => {
-      for (const path of paths) {
-        await api.deleteEntry(`${app.target!.path}/${path}`);
-        if (app.activePath === path) {
-          app.activePath = null;
-          app.editorContent = "";
-        }
+      await api.deleteTargetEntries(app.target!.path, paths);
+      const activePath = app.activePath;
+      if (activePath && paths.some((path) => isWithin(activePath, path))) {
+        app.activePath = null;
+        app.editorContent = "";
       }
       selectedEntries = new Set();
       selectedEntry = null;
@@ -1205,12 +1225,12 @@
   />
 {:else if dialog.kind === "new-file"}
   {@const target = dialog}
-  <PromptModal
-    title={target.parent ? `New file in ${target.parent}` : "New file"}
-    label="File name"
-    icon="ph:file-plus"
-    placeholder="chapter-1"
-    onsubmit={(name) => createFileInTarget(target.parent, name)}
+  <NewFileModal
+    existingPaths={(app.target?.files ?? []).map((file) => file.path)}
+    folders={targetFolders}
+    initialFolder={targetFolders.includes(target.parent) ? target.parent : ""}
+    defaultExtension={newFileExtension}
+    onsubmit={createFileInTarget}
     onclose={close}
   />
 {:else if dialog.kind === "new-subfolder"}
@@ -1226,7 +1246,7 @@
 {:else if dialog.kind === "rename-file"}
   {@const target = dialog}
   <PromptModal
-    title="Rename file"
+    title={targetFolders.includes(target.path) ? "Rename folder" : "Rename file"}
     label="New path"
     value={target.path}
     confirmLabel="Rename"

@@ -9,6 +9,7 @@ mod review;
 mod shortcuts;
 mod spaces;
 mod sync;
+mod target_entries;
 mod thumbnails;
 mod viewer;
 mod workspace;
@@ -1534,6 +1535,8 @@ pub fn run() {
             read_target_file,
             write_target_file,
             set_target_entrypoint,
+            target_entries::rename_target_entry,
+            target_entries::delete_target_entries,
             compile_target,
             export_target,
             set_folder_color,

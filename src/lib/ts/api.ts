@@ -175,6 +175,12 @@ export const writeTargetFile = (path: string, file: string, content: string) =>
 export const setTargetEntrypoint = (path: string, entrypoint: string) =>
   invoke<void>("set_target_entrypoint", { path, entrypoint });
 
+export const renameTargetEntry = (path: string, from: string, to: string) =>
+  invoke<string>("rename_target_entry", { path, from, to });
+
+export const deleteTargetEntries = (path: string, files: string[]) =>
+  invoke<string>("delete_target_entries", { path, files });
+
 export const compileTarget = (
   path: string,
   entrypoint?: string,
