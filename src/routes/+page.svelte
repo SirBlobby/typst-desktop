@@ -27,6 +27,8 @@
   import PdfView from "$lib/components/viewer/PdfView.svelte";
   import EditorToolbar from "$lib/components/EditorToolbar.svelte";
   import ExportMenu from "$lib/components/ExportMenu.svelte";
+  import PreviewModeMenu from "$lib/components/PreviewModeMenu.svelte";
+  import { previewMode } from "$lib/ts/preview-mode.svelte";
   import PageSettingsModal from "$lib/components/PageSettingsModal.svelte";
   import InsertDialogs from "$lib/components/editor/insert/InsertDialogs.svelte";
   import ReviewLayer from "$lib/components/review/ReviewLayer.svelte";
@@ -744,6 +746,8 @@
         </button>
       {/if}
 
+      <PreviewModeMenu />
+
       <ExportMenu onexport={exportAs} />
 
       <div class="group relative">
@@ -960,7 +964,7 @@
       {/if}
 
       <div class="flex min-w-0 flex-1">
-        <div class="flex min-w-0 flex-1 flex-col border-r border-[var(--color-line)]">
+        <div class="min-w-0 flex-1 flex-col border-r border-[var(--color-line)] {previewMode.current === 'preview' ? 'hidden' : 'flex'}">
           {#if app.activePath && activeFile?.is_text}
             <EditorToolbar
               view={editorView}
@@ -1026,13 +1030,15 @@
           {/if}
         </div>
 
-        <div class="min-w-0 flex-1">
-          <Preview
-            compiled={app.compiled}
-            diagnostics={app.diagnostics}
-            compiling={app.compiling}
-          />
-        </div>
+        {#if previewMode.current !== "editor"}
+          <div class="min-w-0 flex-1">
+            <Preview
+              compiled={app.compiled}
+              diagnostics={app.diagnostics}
+              compiling={app.compiling}
+            />
+          </div>
+        {/if}
 
         <ReviewPanel />
       </div>
