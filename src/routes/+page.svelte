@@ -39,13 +39,8 @@
   import { reviewExtensions } from "$lib/ts/review/extensions";
 
   import type { EditorView } from "@codemirror/view";
-  import {
-    insertText,
-    prefixLines,
-    redoEdit,
-    undoEdit,
-    wrapSelection,
-  } from "$lib/ts/editor-actions";
+  import { insertText, redoEdit, undoEdit } from "$lib/ts/editor-actions";
+  import { formattingCommandIds, runFormattingCommand } from "$lib/ts/editor/formatting-commands";
 
   import * as api from "$lib/ts/api";
   import type { BrowseEntry, CloudFile, CloudFolder } from "$lib/ts/api";
@@ -570,41 +565,12 @@
       event.preventDefault();
       if (app.view === "editor" && !app.target?.standalone) toggleSidebar();
     });
-    registerHotkey("bold", (event) => {
-      event.preventDefault();
-      if (app.view === "editor") wrapSelection(editorView, "*", "*", "bold");
-    });
-    registerHotkey("italic", (event) => {
-      event.preventDefault();
-      if (app.view === "editor") wrapSelection(editorView, "_", "_", "italic");
-    });
-    registerHotkey("underline", (event) => {
-      event.preventDefault();
-      if (app.view === "editor")
-        wrapSelection(editorView, "#underline[", "]", "underlined");
-    });
-    registerHotkey("strikethrough", (event) => {
-      event.preventDefault();
-      if (app.view === "editor")
-        wrapSelection(editorView, "#strike[", "]", "struck through");
-    });
-    registerHotkey("link", (event) => {
-      event.preventDefault();
-      if (app.view === "editor") insertText(editorView, '#link("https://")[text]');
-    });
-    registerHotkey("numberedList", (event) => {
-      event.preventDefault();
-      if (app.view === "editor") prefixLines(editorView, "+ ", "Numbered item");
-    });
-    registerHotkey("bulletedList", (event) => {
-      event.preventDefault();
-      if (app.view === "editor") prefixLines(editorView, "- ", "List item");
-    });
-    for (const level of [1, 2, 3, 4, 5, 6]) {
-      registerHotkey(`heading${level}`, (event) => {
+    for (const commandId of formattingCommandIds) {
+      registerHotkey(commandId, (event) => {
         event.preventDefault();
-        if (app.view === "editor")
-          prefixLines(editorView, "=".repeat(level) + " ", "Heading");
+        if (app.view !== "editor") return;
+        const language = isLatexPath(app.activePath ?? "") ? "latex" : "typst";
+        runFormattingCommand(editorView, commandId, language);
       });
     }
 
