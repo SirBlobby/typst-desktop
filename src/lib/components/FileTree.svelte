@@ -102,6 +102,7 @@
   function iconFor(node: TreeNode): string {
     if (node.isDir) return "ph:folder";
     if (node.name.endsWith(".typ")) return "ph:file-text";
+    if (node.name.endsWith(".tex")) return "ph:function";
     if (node.name.endsWith(".toml")) return "ph:gear-six";
     if (node.file?.is_text) return "ph:file";
     if (node.name.toLowerCase().endsWith(".pdf")) return "ph:file-pdf";
@@ -409,7 +410,7 @@
         Import files here
       </button>
       <div class="menu-separator"></div>
-    {:else if single && target.path.endsWith(".typ")}
+    {:else if single && /\.(typ|tex)$/i.test(target.path)}
       <button
         class="menu-item"
         onclick={() => onsetentry(target.path)}

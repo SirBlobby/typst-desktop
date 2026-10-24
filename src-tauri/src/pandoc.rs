@@ -66,7 +66,8 @@ pub fn export(root: &Path, entrypoint: &str, format: &str, destination: &str) ->
         return Err(format!("Pandoc cannot export to '{}'", format));
     }
 
-    let mut arguments = vec!["-f", "typst", "-t", format, "-o", destination];
+    let source_format = if crate::latex::is_latex_file(entrypoint) { "latex" } else { "typst" };
+    let mut arguments = vec!["-f", source_format, "-t", format, "-o", destination];
     if format == "html" || format == "latex" {
         arguments.push("--standalone");
     }

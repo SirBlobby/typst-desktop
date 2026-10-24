@@ -11,6 +11,7 @@ use typst_pdf::{pdf, PdfOptions};
 use typst_render::{render, PngFormat, RenderOptions};
 use typst_svg::{SvgFormat, SvgOptions};
 
+use crate::latex;
 use crate::world::ProjectWorld;
 
 const PAGE_GAP_PT: f64 = 10.0;
@@ -92,18 +93,18 @@ fn line_and_column(source: &str, offset: usize) -> (usize, usize) {
 
 fn collect_diagnostics(
     world: &ProjectWorld,
-    entrypoint_source: &str,
+    entrypoint_source: Option<&str>,
     errors: impl IntoIterator<Item = typst::diag::SourceDiagnostic>,
 ) -> Vec<Diagnostic> {
     errors
         .into_iter()
         .map(|diagnostic| {
-            let (line, column) = match world.range(diagnostic.span) {
-                Some(range) => {
+            let (line, column) = match (world.range(diagnostic.span), entrypoint_source) {
+                (Some(range), Some(entrypoint_source)) => {
                     let (line, column) = line_and_column(entrypoint_source, range.start);
                     (Some(line), Some(column))
                 }
-                None => (None, None),
+                _ => (None, None),
             };
             Diagnostic {
                 message: diagnostic.message.to_string(),
@@ -122,12 +123,22 @@ fn entrypoint_text(files: &HashMap<String, Vec<u8>>, entrypoint: &str) -> String
         .unwrap_or_default()
 }
 
+fn prepared_world(
+    entrypoint: String,
+    files: HashMap<String, Vec<u8>>,
+    enable_html: bool,
+) -> (ProjectWorld, Option<String>) {
+    let generated = latex::is_latex_file(&entrypoint);
+    let (entrypoint, files) = latex::with_generated_entrypoint(entrypoint, files);
+    let source_text = (!generated).then(|| entrypoint_text(&files, &entrypoint));
+    (ProjectWorld::new(entrypoint, files, enable_html), source_text)
+}
+
 pub fn compile_to_svg(
     entrypoint: String,
     files: HashMap<String, Vec<u8>>,
 ) -> Result<CompileResult, Vec<Diagnostic>> {
-    let source_text = entrypoint_text(&files, &entrypoint);
-    let world = ProjectWorld::new(entrypoint, files, false);
+    let (world, source_text) = prepared_world(entrypoint, files, false);
 
     match typst::compile::<PagedDocument>(&world) {
         Warned {
@@ -144,13 +155,13 @@ pub fn compile_to_svg(
             Ok(CompileResult {
                 pages,
                 stats: extract_stats(&document),
-                diagnostics: collect_diagnostics(&world, &source_text, warnings),
+                diagnostics: collect_diagnostics(&world, source_text.as_deref(), warnings),
             })
         }
         Warned {
             output: Err(errors),
             warnings: _,
-        } => Err(collect_diagnostics(&world, &source_text, errors)),
+        } => Err(collect_diagnostics(&world, source_text.as_deref(), errors)),
     }
 }
 
@@ -158,20 +169,19 @@ pub fn export_pdf(
     entrypoint: String,
     files: HashMap<String, Vec<u8>>,
 ) -> Result<Vec<u8>, Vec<Diagnostic>> {
-    let source_text = entrypoint_text(&files, &entrypoint);
-    let world = ProjectWorld::new(entrypoint, files, false);
+    let (world, source_text) = prepared_world(entrypoint, files, false);
 
     match typst::compile::<PagedDocument>(&world) {
         Warned {
             output: Ok(document),
             warnings: _,
         } => pdf(&document, &PdfOptions::default()).output.map_err(|errors| {
-            collect_diagnostics(&world, &source_text, errors)
+            collect_diagnostics(&world, source_text.as_deref(), errors)
         }),
         Warned {
             output: Err(errors),
             warnings: _,
-        } => Err(collect_diagnostics(&world, &source_text, errors)),
+        } => Err(collect_diagnostics(&world, source_text.as_deref(), errors)),
     }
 }
 
@@ -179,8 +189,7 @@ pub fn export_png(
     entrypoint: String,
     files: HashMap<String, Vec<u8>>,
 ) -> Result<Vec<u8>, Vec<Diagnostic>> {
-    let source_text = entrypoint_text(&files, &entrypoint);
-    let world = ProjectWorld::new(entrypoint, files, false);
+    let (world, source_text) = prepared_world(entrypoint, files, false);
 
     match typst::compile::<PagedDocument>(&world) {
         Warned {
@@ -196,7 +205,7 @@ pub fn export_png(
         Warned {
             output: Err(errors),
             warnings: _,
-        } => Err(collect_diagnostics(&world, &source_text, errors)),
+        } => Err(collect_diagnostics(&world, source_text.as_deref(), errors)),
     }
 }
 
@@ -204,8 +213,7 @@ pub fn export_svg(
     entrypoint: String,
     files: HashMap<String, Vec<u8>>,
 ) -> Result<Vec<u8>, Vec<Diagnostic>> {
-    let source_text = entrypoint_text(&files, &entrypoint);
-    let world = ProjectWorld::new(entrypoint, files, false);
+    let (world, source_text) = prepared_world(entrypoint, files, false);
 
     match typst::compile::<PagedDocument>(&world) {
         Warned {
@@ -216,7 +224,7 @@ pub fn export_svg(
         Warned {
             output: Err(errors),
             warnings: _,
-        } => Err(collect_diagnostics(&world, &source_text, errors)),
+        } => Err(collect_diagnostics(&world, source_text.as_deref(), errors)),
     }
 }
 
@@ -224,8 +232,7 @@ pub fn export_html(
     entrypoint: String,
     files: HashMap<String, Vec<u8>>,
 ) -> Result<Vec<u8>, Vec<Diagnostic>> {
-    let source_text = entrypoint_text(&files, &entrypoint);
-    let world = ProjectWorld::new(entrypoint, files, true);
+    let (world, source_text) = prepared_world(entrypoint, files, true);
 
     let document = match typst::compile::<HtmlDocument>(&world) {
         Warned {
@@ -235,10 +242,10 @@ pub fn export_html(
         Warned {
             output: Err(errors),
             warnings: _,
-        } => return Err(collect_diagnostics(&world, &source_text, errors)),
+        } => return Err(collect_diagnostics(&world, source_text.as_deref(), errors)),
     };
 
     typst_html::html(&document, &HtmlOptions::default())
         .map(|html| html.into_bytes())
-        .map_err(|errors| collect_diagnostics(&world, &source_text, errors))
+        .map_err(|errors| collect_diagnostics(&world, source_text.as_deref(), errors))
 }

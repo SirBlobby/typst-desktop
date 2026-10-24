@@ -2,6 +2,7 @@ mod assets;
 mod compiler;
 mod db;
 mod fonts;
+mod latex;
 mod lsp;
 mod pandoc;
 mod review;
@@ -150,14 +151,25 @@ fn create_folder_entry(app: AppHandle, store: State<'_, Store>, parent: String, 
     Ok(path)
 }
 
+fn is_latex_language(language: &Option<String>) -> bool {
+    language.as_deref() == Some("latex")
+}
+
 #[tauri::command]
-fn create_document_entry(app: AppHandle, store: State<'_, Store>, parent: String, name: String) -> Result<String, String> {
+fn create_document_entry(
+    app: AppHandle,
+    store: State<'_, Store>,
+    parent: String,
+    name: String,
+    language: Option<String>,
+) -> Result<String, String> {
     let mut name = name.trim().to_string();
     if name.is_empty() {
         return Err("Document name cannot be empty".to_string());
     }
-    if !name.to_lowercase().ends_with(".typ") {
-        name.push_str(".typ");
+    let extension = if is_latex_language(&language) { ".tex" } else { ".typ" };
+    if !name.to_lowercase().ends_with(extension) {
+        name.push_str(extension);
     }
 
     let path = join_path(&parent, &name);
@@ -169,15 +181,25 @@ fn create_document_entry(app: AppHandle, store: State<'_, Store>, parent: String
         std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
     }
 
-    let title = name.trim_end_matches(".typ").trim_end_matches(".TYP");
-    std::fs::write(&full, format!("= {}\n\nStart writing here.\n", title))
-        .map_err(|e| e.to_string())?;
+    let title = &name[..name.len() - extension.len()];
+    let starter = if is_latex_language(&language) {
+        latex::LATEX_STARTER.replace("New Document", title)
+    } else {
+        format!("= {}\n\nStart writing here.\n", title)
+    };
+    std::fs::write(&full, starter).map_err(|e| e.to_string())?;
 
     Ok(path)
 }
 
 #[tauri::command]
-fn create_project_entry(app: AppHandle, store: State<'_, Store>, parent: String, name: String) -> Result<String, String> {
+fn create_project_entry(
+    app: AppHandle,
+    store: State<'_, Store>,
+    parent: String,
+    name: String,
+    language: Option<String>,
+) -> Result<String, String> {
     let name = name.trim().to_string();
     if name.is_empty() {
         return Err("Project name cannot be empty".to_string());
@@ -190,14 +212,22 @@ fn create_project_entry(app: AppHandle, store: State<'_, Store>, parent: String,
     }
 
     std::fs::create_dir_all(&full).map_err(|e| e.to_string())?;
-    std::fs::write(full.join("main.typ"), NEW_PROJECT_MAIN).map_err(|e| e.to_string())?;
-    std::fs::write(full.join("typst.toml"), workspace::manifest_for(&name))
-        .map_err(|e| e.to_string())?;
+    let entrypoint = if is_latex_language(&language) {
+        std::fs::write(full.join("main.tex"), latex::LATEX_STARTER.replace("New Document", &name))
+            .map_err(|e| e.to_string())?;
+        workspace::ensure_project_marker(&full)?;
+        "main.tex"
+    } else {
+        std::fs::write(full.join("main.typ"), NEW_PROJECT_MAIN).map_err(|e| e.to_string())?;
+        std::fs::write(full.join("typst.toml"), workspace::manifest_for(&name))
+            .map_err(|e| e.to_string())?;
+        "main.typ"
+    };
 
     store.save_meta(
         &path,
         &ProjectMeta {
-            entrypoint: "main.typ".to_string(),
+            entrypoint: entrypoint.to_string(),
             ..Default::default()
         },
     )?;
@@ -636,7 +666,7 @@ fn list_resources(
     };
 
     for file in list_files(&target.root)? {
-        if file.is_dir || file.path.to_lowercase().ends_with(".typ") {
+        if file.is_dir || workspace::is_document_file(&file.path) {
             continue;
         }
 
@@ -1101,8 +1131,9 @@ fn cloud_download_document(
     if name.is_empty() {
         name = "document".to_string();
     }
-    if !name.to_lowercase().ends_with(".typ") {
-        name.push_str(".typ");
+    let extension = if document.language == "latex" { ".tex" } else { ".typ" };
+    if !name.to_lowercase().ends_with(extension) {
+        name.push_str(extension);
     }
 
     let path = join_path(&parent, &name);
@@ -1213,7 +1244,8 @@ fn cloud_create_document(
     let full = workspace_path(&app, &store, &path)?;
     let content = std::fs::read_to_string(&full).map_err(|e| e.to_string())?;
 
-    let document = sync::create_document(&server_url, &token, title.trim(), &content, None)?;
+    let language = if latex::is_latex_file(&path) { "latex" } else { "typst" };
+    let document = sync::create_document(&server_url, &token, title.trim(), &content, None, language)?;
 
     store.save_document_link(
         &path,
@@ -1308,9 +1340,11 @@ fn cloud_create_project(
     store: State<'_, Store>,
     name: String,
     folder_id: Option<String>,
+    language: Option<String>,
 ) -> Result<ProjectSummary, String> {
     let (server_url, token) = cloud_credentials(&app, &store)?;
-    sync::create_cloud_project(&server_url, &token, name.trim(), folder_id.as_deref())
+    let entrypoint = if is_latex_language(&language) { "main.tex" } else { "main.typ" };
+    sync::create_cloud_project(&server_url, &token, name.trim(), folder_id.as_deref(), Some(entrypoint))
 }
 
 #[tauri::command(async)]
@@ -1319,6 +1353,7 @@ fn cloud_new_document(
     store: State<'_, Store>,
     title: String,
     folder_id: Option<String>,
+    language: Option<String>,
 ) -> Result<sync::DocumentContent, String> {
     let title = title.trim();
     if title.is_empty() {
@@ -1326,8 +1361,12 @@ fn cloud_new_document(
     }
 
     let (server_url, token) = cloud_credentials(&app, &store)?;
-    let content = format!("= {}\n\nStart writing here.\n", title);
-    sync::create_document(&server_url, &token, title, &content, folder_id.as_deref())
+    let (content, language_name) = if is_latex_language(&language) {
+        (latex::LATEX_STARTER.replace("New Document", title), "latex")
+    } else {
+        (format!("= {}\n\nStart writing here.\n", title), "typst")
+    };
+    sync::create_document(&server_url, &token, title, &content, folder_id.as_deref(), language_name)
 }
 
 #[tauri::command(async)]
@@ -1373,7 +1412,7 @@ fn cloud_link_project(
 
     let cloud_project_id = match cloud_project_id {
         Some(id) if !id.trim().is_empty() => id,
-        _ => sync::create_cloud_project(&server_url, &token, &project, None)?.id,
+        _ => sync::create_cloud_project(&server_url, &token, &project, None, Some(&meta.entrypoint))?.id,
     };
 
     meta.cloud_project_id = Some(cloud_project_id);

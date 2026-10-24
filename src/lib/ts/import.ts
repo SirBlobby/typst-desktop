@@ -27,7 +27,7 @@ export async function pickFiles(kind: PickKind = "all"): Promise<string[]> {
             : [
                 {
                   name: "Typst files",
-                  extensions: ["typ", ...DATA_EXTENSIONS, ...IMAGE_EXTENSIONS, ...FONT_EXTENSIONS],
+                  extensions: ["typ", "tex", ...DATA_EXTENSIONS, ...IMAGE_EXTENSIONS, ...FONT_EXTENSIONS],
                 },
               ];
 

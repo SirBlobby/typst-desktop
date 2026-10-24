@@ -28,6 +28,8 @@
   import EditorToolbar from "$lib/components/EditorToolbar.svelte";
   import ExportMenu from "$lib/components/ExportMenu.svelte";
   import PreviewModeMenu from "$lib/components/PreviewModeMenu.svelte";
+  import LanguagePicker from "$lib/components/LanguagePicker.svelte";
+  import { isLatexPath, languageLabel, sourceExtension, type DocumentLanguage } from "$lib/ts/document-language";
   import { previewMode } from "$lib/ts/preview-mode.svelte";
   import PageSettingsModal from "$lib/components/PageSettingsModal.svelte";
   import InsertDialogs from "$lib/components/editor/insert/InsertDialogs.svelte";
@@ -107,6 +109,7 @@
     | { kind: "conflicts" };
 
   let dialog = $state<Dialog>({ kind: "none" });
+  let createLanguage = $state<DocumentLanguage>("typst");
   let editorView = $state<EditorView | null>(null);
   const editorExtensions = reviewExtensions();
   let fileViewer = $state<{ paths: string[]; index: number } | null>(null);
@@ -162,7 +165,7 @@
 
   const createProject = (name: string) =>
     guard(async () => {
-      const path = await api.createProjectEntry(app.currentDir, name);
+      const path = await api.createProjectEntry(app.currentDir, name, createLanguage);
       await refreshEntries();
       await openTarget(path);
     });
@@ -175,7 +178,7 @@
 
   const createDocument = (name: string) =>
     guard(async () => {
-      const path = await api.createDocumentEntry(app.currentDir, name);
+      const path = await api.createDocumentEntry(app.currentDir, name, createLanguage);
       await refreshEntries();
       await openTarget(path);
     });
@@ -213,13 +216,13 @@
 
   const createCloudProject = (name: string) =>
     guard(async () => {
-      await api.cloudCreateProject(name, currentCloudFolder());
+      await api.cloudCreateProject(name, currentCloudFolder(), createLanguage);
       await refreshCloud();
     });
 
   const createCloudDocument = (title: string) =>
     guard(async () => {
-      await api.cloudNewDocument(title, currentCloudFolder());
+      await api.cloudNewDocument(title, currentCloudFolder(), createLanguage);
       await refreshCloud();
     });
 
@@ -422,9 +425,10 @@
 
     const sourceFile = format.id === "typ" ? app.activePath : null;
     const baseName = (sourceFile ?? app.target.path).split("/").pop() ?? "document";
+    const extension = sourceFile && isLatexPath(sourceFile) ? "tex" : format.extension;
     const destination = await save({
-      defaultPath: `${baseName.replace(/\.typ$/i, "")}.${format.extension}`,
-      filters: [{ name: format.label, extensions: [format.extension] }],
+      defaultPath: `${baseName.replace(/\.(typ|tex)$/i, "")}.${extension}`,
+      filters: [{ name: format.label, extensions: [extension] }],
     });
     if (!destination) return;
 
@@ -966,12 +970,14 @@
       <div class="flex min-w-0 flex-1">
         <div class="min-w-0 flex-1 flex-col border-r border-[var(--color-line)] {previewMode.current === 'preview' ? 'hidden' : 'flex'}">
           {#if app.activePath && activeFile?.is_text}
+            {#if !isLatexPath(app.activePath)}
             <EditorToolbar
               view={editorView}
               disabled={app.activePath.toLowerCase().endsWith(".toml")}
               onassets={() => (dialog = { kind: "assets" })}
               onpagesettings={() => (dialog = { kind: "page-settings" })}
             />
+            {/if}
 
             <div
               class="flex h-9 shrink-0 items-center gap-2 border-b border-[var(--color-line)] bg-[var(--color-editor)] px-4 text-xs"
@@ -1074,13 +1080,15 @@
 
 {#if dialog.kind === "new-project"}
   <PromptModal
-    title="New project"
+    title="New {languageLabel(createLanguage)} project"
     label="Project name"
     icon="ph:folder-plus"
     placeholder="My thesis"
     onsubmit={createProject}
     onclose={close}
-  />
+  >
+    <LanguagePicker bind:language={createLanguage} />
+  </PromptModal>
 {:else if dialog.kind === "new-folder"}
   <PromptModal
     title="New folder"
@@ -1091,14 +1099,16 @@
   />
 {:else if dialog.kind === "new-document"}
   <PromptModal
-    title="New document"
+    title="New {languageLabel(createLanguage)} document"
     label="Document name"
     icon="ph:file-plus"
     placeholder="notes"
-    suffix=".typ"
+    suffix={sourceExtension(createLanguage)}
     onsubmit={createDocument}
     onclose={close}
-  />
+  >
+    <LanguagePicker bind:language={createLanguage} />
+  </PromptModal>
 {:else if dialog.kind === "rename-entry"}
   {@const target = dialog}
   <PromptModal
@@ -1132,27 +1142,31 @@
     title="Save to cloud"
     label="Document title"
     icon="ph:cloud-arrow-up"
-    value={target.entry.name.replace(/\.typ$/i, "")}
+    value={target.entry.name.replace(/\.(typ|tex)$/i, "")}
     confirmLabel="Save"
     onsubmit={(title) => saveDocumentToCloud(target.entry, title)}
     onclose={close}
   />
 {:else if dialog.kind === "new-cloud-project"}
   <PromptModal
-    title="New cloud project"
+    title="New {languageLabel(createLanguage)} cloud project"
     label="Project name"
     icon="ph:cloud-plus"
     onsubmit={createCloudProject}
     onclose={close}
-  />
+  >
+    <LanguagePicker bind:language={createLanguage} />
+  </PromptModal>
 {:else if dialog.kind === "new-cloud-document"}
   <PromptModal
-    title="New cloud document"
+    title="New {languageLabel(createLanguage)} cloud document"
     label="Document title"
     icon="ph:cloud-plus"
     onsubmit={createCloudDocument}
     onclose={close}
-  />
+  >
+    <LanguagePicker bind:language={createLanguage} />
+  </PromptModal>
 {:else if dialog.kind === "new-cloud-folder"}
   <PromptModal
     title="New cloud folder"

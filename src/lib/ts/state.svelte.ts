@@ -597,7 +597,7 @@ export async function openTarget(path: string) {
 
     const preferred =
       target.files.find((file) => file.path === target.entrypoint) ??
-      target.files.find((file) => file.path.endsWith(".typ")) ??
+      target.files.find((file) => /\.(typ|tex)$/i.test(file.path)) ??
       target.files[0];
 
     if (preferred) await openFile(preferred.path);
@@ -687,7 +687,7 @@ export async function compile() {
 
   try {
     const previewFile =
-      app.activePath && app.activePath.toLowerCase().endsWith(".typ")
+      app.activePath && /\.(typ|tex)$/i.test(app.activePath)
         ? app.activePath
         : undefined;
     const result = await api.compileTarget(

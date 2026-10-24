@@ -214,11 +214,12 @@ pub fn create_cloud_project(
     token: &str,
     name: &str,
     folder_id: Option<&str>,
+    entrypoint: Option<&str>,
 ) -> Result<ProjectSummary, String> {
     agent()
         .post(&endpoint(server_url, "/projects"))
         .set("Authorization", &format!("Bearer {}", token))
-        .send_json(ureq::json!({ "name": name, "folder_id": folder_id }))
+        .send_json(ureq::json!({ "name": name, "folder_id": folder_id, "entrypoint": entrypoint }))
         .map_err(describe)?
         .into_json::<ProjectSummary>()
         .map_err(|e| e.to_string())
@@ -696,6 +697,7 @@ pub fn clone_cloud_project(
     }
 
     report_progress(app, project, total, total, true);
+    crate::workspace::ensure_project_marker(project_dir)?;
 
     meta.last_synced_at = Some(chrono::Utc::now().to_rfc3339());
     store.save_meta(project, &meta)?;
@@ -901,6 +903,8 @@ pub struct DocumentContent {
     pub role: String,
     pub hash: String,
     pub content: String,
+    #[serde(default)]
+    pub language: String,
 }
 
 pub fn pull_document(
@@ -923,6 +927,7 @@ pub fn create_document(
     title: &str,
     content: &str,
     folder_id: Option<&str>,
+    language: &str,
 ) -> Result<DocumentContent, String> {
     agent()
         .post(&endpoint(server_url, "/documents"))
@@ -931,6 +936,7 @@ pub fn create_document(
             "title": title,
             "content": content,
             "folder_id": folder_id,
+            "language": language,
         }))
         .map_err(describe)?
         .into_json::<DocumentContent>()

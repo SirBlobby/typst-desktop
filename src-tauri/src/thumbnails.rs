@@ -137,7 +137,7 @@ pub fn thumbnail(app: &AppHandle, store: &Store, path: &str) -> Result<Thumbnail
 
     let is_project = full.is_dir();
     let image = is_image(&name);
-    if !image && !is_project && !name.to_lowercase().ends_with(".typ") {
+    if !image && !is_project && !crate::workspace::is_document_file(&name) {
         return Err("No preview available".to_string());
     }
 

@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import type { DocumentLanguage } from "./document-language";
 
 export interface Settings {
   workspace_root: string;
@@ -135,11 +136,11 @@ export const browseWorkspace = (path: string) =>
 export const createFolderEntry = (parent: string, name: string) =>
   invoke<string>("create_folder_entry", { parent, name });
 
-export const createDocumentEntry = (parent: string, name: string) =>
-  invoke<string>("create_document_entry", { parent, name });
+export const createDocumentEntry = (parent: string, name: string, language: DocumentLanguage) =>
+  invoke<string>("create_document_entry", { parent, name, language });
 
-export const createProjectEntry = (parent: string, name: string) =>
-  invoke<string>("create_project_entry", { parent, name });
+export const createProjectEntry = (parent: string, name: string, language: DocumentLanguage) =>
+  invoke<string>("create_project_entry", { parent, name, language });
 
 export const renameEntry = (path: string, newName: string) =>
   invoke<string>("rename_entry", { path, newName });
@@ -445,12 +446,14 @@ export interface DocumentContent {
   role: string;
   hash: string;
   content: string;
+  language: string;
 }
 
-export const cloudNewDocument = (title: string, folderId?: string | null) =>
+export const cloudNewDocument = (title: string, folderId: string | null, language: DocumentLanguage) =>
   invoke<DocumentContent>("cloud_new_document", {
     title,
-    folderId: folderId ?? null,
+    folderId,
+    language,
   });
 
 export const cloudSyncDocument = (path: string) =>
@@ -491,10 +494,11 @@ export const cloudDocumentLink = (path: string) =>
 export const cloudUnlinkDocument = (path: string) =>
   invoke<void>("cloud_unlink_document", { path });
 
-export const cloudCreateProject = (name: string, folderId?: string | null) =>
+export const cloudCreateProject = (name: string, folderId: string | null, language: DocumentLanguage) =>
   invoke<ProjectSummary>("cloud_create_project", {
     name,
-    folderId: folderId ?? null,
+    folderId,
+    language,
   });
 
 export const cloudDeleteProject = (cloudProjectId: string) =>

@@ -16,7 +16,7 @@ export type DropDestination =
   | { kind: "workspace"; folder: string; refreshTarget: boolean };
 
 export function isTypstPath(path: string): boolean {
-  return path.toLowerCase().endsWith(".typ");
+  return /\.(typ|tex)$/i.test(path);
 }
 
 function parentFolder(path: string): string {

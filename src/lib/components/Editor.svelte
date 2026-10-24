@@ -29,6 +29,7 @@
   import { editorPreferenceExtensions } from "$lib/ts/editor/preferences";
   import { loadEditorFont } from "$lib/ts/editor/fonts";
   import { app } from "$lib/ts/state.svelte";
+  import { isLatexPath } from "$lib/ts/document-language";
   import type { Diagnostic } from "$lib/ts/api";
 
   interface Props {
@@ -72,6 +73,8 @@
   let client: LSPClient | null = null;
 
   const isToml = $derived(filePath.toLowerCase().endsWith(".toml"));
+  const isLatex = $derived(isLatexPath(filePath));
+  const isTypst = $derived(!isToml && !isLatex);
 
   function disableTypstLanguage() {
     queueMicrotask(() => {
@@ -133,8 +136,20 @@
     );
   }
 
+  async function loadLatexLanguage() {
+    const { latex } = await import("codemirror-lang-latex");
+    return latex({
+      autoCloseTags: true,
+      autoCloseBrackets: false,
+      enableLinting: true,
+      enableTooltips: true,
+      enableAutocomplete: true,
+      fileName: filePath,
+    });
+  }
+
   async function connectLsp() {
-    if (!enableLsp || isToml || !view) return;
+    if (!enableLsp || !isTypst || !view) return;
 
     onlspstatus?.("starting");
     try {
@@ -168,7 +183,7 @@
           lintGutter(),
           history(),
           bracketMatching(),
-          ...bracketExtensions(isToml),
+          ...bracketExtensions(!isTypst),
           indentOnInput(),
           drawSelection(),
           highlightActiveLine(),
@@ -178,12 +193,12 @@
           collabSlot.of([]),
           extraSlot.of([]),
           ...searchExtensions(),
-          ...(isToml
-            ? []
-            : [autocompletion({ override: [typstCompletions] })]),
+          ...(isTypst
+            ? [autocompletion({ override: [typstCompletions] })]
+            : []),
           EditorView.lineWrapping,
           keymap.of([
-            ...lineCommentKeymap(isToml ? "#" : "//"),
+            ...lineCommentKeymap(isToml ? "#" : isLatex ? "%" : "//"),
             ...searchKeymap,
             ...defaultKeymap,
             indentWithTab,
@@ -196,9 +211,10 @@
     });
 
     if (!isToml) {
-      loadTypstLanguage()
-        .then((typstLanguage) => {
-          view?.dispatch({ effects: languageSlot.reconfigure(typstLanguage) });
+      const loadLanguage: Promise<Extension> = isLatex ? loadLatexLanguage() : loadTypstLanguage();
+      loadLanguage
+        .then((languageExtension) => {
+          view?.dispatch({ effects: languageSlot.reconfigure(languageExtension) });
         })
         .catch(() => {});
     }

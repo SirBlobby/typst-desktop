@@ -11,8 +11,8 @@ use walkdir::WalkDir;
 
 pub const PROJECT_META_FILE: &str = ".typst-desktop.json";
 
-const TEXT_EXTENSIONS: [&str; 10] = [
-    "typ", "toml", "bib", "csl", "yml", "yaml", "json", "md", "txt", "csv",
+const TEXT_EXTENSIONS: [&str; 11] = [
+    "typ", "tex", "toml", "bib", "csl", "yml", "yaml", "json", "md", "txt", "csv",
 ];
 
 pub fn is_text_file(path: &str) -> bool {
@@ -146,8 +146,17 @@ pub fn is_project_dir(path: &Path) -> bool {
     path.join(PROJECT_META_FILE).exists() || path.join("typst.toml").exists()
 }
 
-pub fn is_typst_file(path: &str) -> bool {
-    path.to_lowercase().ends_with(".typ")
+pub fn ensure_project_marker(dir: &Path) -> Result<(), String> {
+    if is_project_dir(dir) {
+        return Ok(());
+    }
+    std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    std::fs::write(dir.join(PROJECT_META_FILE), "{}\n").map_err(|e| e.to_string())
+}
+
+pub fn is_document_file(path: &str) -> bool {
+    let lower = path.to_lowercase();
+    lower.ends_with(".typ") || lower.ends_with(".tex")
 }
 
 #[derive(Serialize)]
@@ -286,7 +295,7 @@ pub fn browse(app: &AppHandle, store: &Store, relative: &str) -> Result<Vec<Brow
                 color,
             });
         } else {
-            let kind = if is_typst_file(&name) { "document" } else { "file" };
+            let kind = if is_document_file(&name) { "document" } else { "file" };
             let link = store.document_link(&path)?;
 
             if link.is_some() {
