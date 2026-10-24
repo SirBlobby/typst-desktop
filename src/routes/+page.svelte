@@ -970,14 +970,13 @@
       <div class="flex min-w-0 flex-1">
         <div class="min-w-0 flex-1 flex-col border-r border-[var(--color-line)] {previewMode.current === 'preview' ? 'hidden' : 'flex'}">
           {#if app.activePath && activeFile?.is_text}
-            {#if !isLatexPath(app.activePath)}
             <EditorToolbar
               view={editorView}
+              language={isLatexPath(app.activePath) ? "latex" : "typst"}
               disabled={app.activePath.toLowerCase().endsWith(".toml")}
               onassets={() => (dialog = { kind: "assets" })}
               onpagesettings={() => (dialog = { kind: "page-settings" })}
             />
-            {/if}
 
             <div
               class="flex h-9 shrink-0 items-center gap-2 border-b border-[var(--color-line)] bg-[var(--color-editor)] px-4 text-xs"

@@ -10,17 +10,21 @@
     collapsedGroupIds,
     type ToolbarItem,
   } from "$lib/ts/editor/toolbar-groups";
+  import { buildLatexToolbarGroups } from "$lib/ts/editor/latex-toolbar-groups";
+  import { currentSectionLevel, latexHeadingOptions, setSectionLevel } from "$lib/ts/editor/latex-actions";
+  import type { DocumentLanguage } from "$lib/ts/document-language";
   import { clampMenu } from "$lib/ts/menu-position";
   import { app } from "$lib/ts/state.svelte";
 
   interface Props {
     view: EditorView | null;
+    language?: DocumentLanguage;
     disabled?: boolean;
     onassets: () => void;
     onpagesettings: () => void;
   }
 
-  let { view, disabled = false, onassets, onpagesettings }: Props = $props();
+  let { view, language = "typst", disabled = false, onassets, onpagesettings }: Props = $props();
 
   let fonts = $state<string[]>([]);
   let selectedFont = $state("");
@@ -28,12 +32,16 @@
   let toolbarWidth = $state(0);
   let openMenu = $state<{ id: string; top: number; left: number } | null>(null);
 
-  const headingOptions = [
+  const typstHeadingOptions = [
     { level: 0, label: "Normal text" },
     ...[1, 2, 3, 4, 5, 6].map((level) => ({ level, label: `Heading ${level}` })),
   ];
 
-  const groups = $derived(buildToolbarGroups(view, onassets, onpagesettings));
+  const isLatex = $derived(language === "latex");
+  const headingOptions = $derived(isLatex ? latexHeadingOptions : typstHeadingOptions);
+  const groups = $derived(
+    isLatex ? buildLatexToolbarGroups(view, onassets) : buildToolbarGroups(view, onassets, onpagesettings),
+  );
   const collapsed = $derived(collapsedGroupIds(groups, toolbarWidth));
 
   const openMenuItems = $derived.by((): ToolbarItem[] => {
@@ -47,12 +55,13 @@
   const showFontInMenu = $derived(openMenu?.id === "document:group");
 
   function syncHeadingLevel() {
-    headingLevel = currentHeadingLevel(view);
+    headingLevel = isLatex ? currentSectionLevel(view) : currentHeadingLevel(view);
   }
 
   function applyHeading(level: number) {
     if (!view) return;
-    setHeadingLevel(view, level);
+    if (isLatex) setSectionLevel(view, level);
+    else setHeadingLevel(view, level);
     headingLevel = level;
   }
 
