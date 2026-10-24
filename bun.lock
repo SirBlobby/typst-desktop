@@ -22,6 +22,7 @@
         "@tauri-apps/plugin-dialog": "^2.8.3",
         "@tauri-apps/plugin-opener": "^2.7.2",
         "codemirror": "^6.0.2",
+        "codemirror-lang-latex": "^0.6.1",
         "codemirror-lang-typst": "^0.4.0",
         "hotkeys-js": "^4.0.8",
         "pdfjs-dist": "^5.4.296",
@@ -82,6 +83,8 @@
     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.31", "", { "dependencies": { "@jridgewell/resolve-uri": "^3.1.0", "@jridgewell/sourcemap-codec": "^1.4.14" } }, "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="],
 
     "@lezer/common": ["@lezer/common@1.5.3", "", {}, "sha512-H0iErY4e43LpXbYDyBci5W4v/RwTgGV3YzYOlJPiGZ8RY8w51kVE+xLn1tg3Z6UmSfyETvtsUK3r7YsgDQEI7Q=="],
+
+    "@lezer/generator": ["@lezer/generator@1.8.1", "", { "dependencies": { "@lezer/common": "^1.1.0", "@lezer/lr": "^1.3.0" }, "bin": { "lezer-generator": "src/lezer-generator.cjs" } }, "sha512-7q7szXqT7EPTs6SODBl58Qoz/4OrhNvm5pW4lbu1ZDnG5e0nn7drLzeN9Nxkm8j/1iMs5QZ9j3i4SV+W4Z6SQA=="],
 
     "@lezer/highlight": ["@lezer/highlight@1.2.5", "", { "dependencies": { "@lezer/common": "^1.3.0" } }, "sha512-O1GMVKgtf5YspFaRzpmqkVgMtIk2HG9uMAbH6wdAIdNh3TVzCsch/+cRi+6l2//UGDKe6NB9BW3cvuR5ezMQ0w=="],
 
@@ -236,6 +239,8 @@
     "clsx": ["clsx@2.1.1", "", {}, "sha512-eYm0QWBtUrBWZWG0d386OGAw16Z995PiOVo2B7bjWSbHedGl5e0ZWaq65kOGgUSNesEIDkB9ISbTg/JK9dhCZA=="],
 
     "codemirror": ["codemirror@6.0.2", "", { "dependencies": { "@codemirror/autocomplete": "^6.0.0", "@codemirror/commands": "^6.0.0", "@codemirror/language": "^6.0.0", "@codemirror/lint": "^6.0.0", "@codemirror/search": "^6.0.0", "@codemirror/state": "^6.0.0", "@codemirror/view": "^6.0.0" } }, "sha512-VhydHotNW5w1UGK0Qj96BwSk/Zqbp9WbnyK2W/eVMv4QyF41INRGpjUhFJY7/uDNuudSc33a/PKr4iDqRduvHw=="],
+
+    "codemirror-lang-latex": ["codemirror-lang-latex@0.6.1", "", { "peerDependencies": { "@codemirror/autocomplete": "^6.20.1", "@codemirror/commands": "^6.10.3", "@codemirror/language": "^6.12.3", "@codemirror/lint": "^6.9.5", "@codemirror/search": "^6.6.0", "@codemirror/state": "^6.6.0", "@codemirror/view": "^6.41.0", "@lezer/common": "^1.5.2", "@lezer/generator": "^1.8.0", "@lezer/highlight": "^1.2.3", "@lezer/lr": "^1.4.8" } }, "sha512-JdCVh2xs2W06zP4gEWolWt59BITnKNDu52DK+4HsZjOFK4Ax/kGM5zk2/N67LKR1yu7PVLJd8wRwws/u7MR5pw=="],
 
     "codemirror-lang-typst": ["codemirror-lang-typst@0.4.0", "", { "dependencies": { "@codemirror/language": "^6.11.2", "@codemirror/state": "^6.5.2", "@codemirror/view": "^6.38.1", "@lezer/common": "^1.2.3", "@lezer/highlight": "^1.2.1" } }, "sha512-jpHz5qQRC3LE48JH+C24qZJAEAhjqRzWA4MFodPaxriz7UwLVuTLCQ672rdDx9ziObBQ2BvHaRIm5/Upz4KoBQ=="],
 
