@@ -76,6 +76,7 @@ The AppImage runs on any distribution, so it also works as a fallback on Debian 
 - **Cloud workspace**: Browse your TypstDrive folders, documents, projects, and everything shared with you in a layout that matches the TypstDrive web drive, with search, sorting and grid or list view. Download what you want on this device and open it straight from the cloud view.
 - **Sync**: Three-way merge with a conflict resolver, plus optional automatic sync on a timer.
 - **Autosave**: Off by default, or every 5, 10, or 15 seconds.
+- **Citations**: Paste a DOI or arXiv ID to add a BibTeX or Hayagriva entry to a bibliography file, and sync Zotero libraries and collections into `.bib` or `.yml` files.
 - **Images and fonts**: Import from anywhere on disk, drag and drop, or pull from your TypstDrive assets. A searchable asset browser with previews sits in the editor toolbar.
 - **Thumbnails**: Documents and projects show their first compiled page; images show a preview.
 - **Image viewer**: Open images full screen with zoom and folder navigation.
@@ -103,6 +104,7 @@ Application data — settings, sync state, and the thumbnail cache — is kept i
 | Editor | Font, font size, spell checking, line numbers, minimap and minimap size. |
 | Accessibility | Text size, reduced motion and high contrast. |
 | Account | TypstDrive server, sign in and out, automatic sync interval. |
+| Citations | Connect or disconnect Zotero with an API key. |
 | Language Server | The `tinymist` language server. |
 | Hotkeys | View and change keyboard shortcuts. |
 | About | Version, Typst version, license, and links to the official Typst site. |
@@ -130,6 +132,15 @@ Reference an image by its file name:
 ```
 
 Images in the shared asset library are available to every project. Images inside a project folder are available to that project and override an asset of the same name.
+
+## Citations
+
+Open **Citations** from the Insert group of the editor toolbar.
+
+- **Add reference**: Paste a DOI, an arXiv ID or a link to either, pick a bibliography file or name a new one, then **Look up** and **Add to** the file. Files ending in `.bib` get BibTeX entries and `.yml` or `.yaml` files get Hayagriva entries. **Insert citation** puts `@key`, or `\cite{key}` in a LaTeX file, at the cursor.
+- **Zotero**: Connect Zotero once in **Settings → Citations** with a read-only API key from zotero.org. The key is stored on this computer. In the **Zotero** tab, pick a library, an optional collection and a file, then **Sync to** it. The refresh button updates the file later. Syncing replaces the whole file, so keep your own entries in a separate one.
+
+Bibliography files are ordinary files in the project or next to a single document, so they sync to TypstDrive like any other file. Lookups contact doi.org, and Zotero sync contacts api.zotero.org.
 
 ## Cloud Workspace
 

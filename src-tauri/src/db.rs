@@ -20,7 +20,7 @@ pub struct DocumentLink {
     pub synced_at: Option<String>,
 }
 
-const SCHEMA: [&str; 8] = [
+const SCHEMA: [&str; 9] = [
     "CREATE TABLE IF NOT EXISTS settings (
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL
@@ -67,6 +67,18 @@ const SCHEMA: [&str; 8] = [
         path TEXT NOT NULL,
         created_at TEXT NOT NULL
     )",
+    "CREATE TABLE IF NOT EXISTS citation_syncs (
+        id TEXT PRIMARY KEY,
+        target_path TEXT NOT NULL,
+        library_id TEXT NOT NULL,
+        library_name TEXT NOT NULL,
+        collection_key TEXT,
+        collection_name TEXT,
+        file_name TEXT NOT NULL,
+        item_count INTEGER NOT NULL DEFAULT 0,
+        last_synced_at TEXT,
+        UNIQUE (target_path, file_name)
+    )",
 ];
 
 const MIGRATIONS: [&str; 2] = [
@@ -105,7 +117,7 @@ impl Store {
         })
     }
 
-    fn with<T>(&self, run: impl FnOnce(&Connection) -> rusqlite::Result<T>) -> Result<T, String> {
+    pub(crate) fn with<T>(&self, run: impl FnOnce(&Connection) -> rusqlite::Result<T>) -> Result<T, String> {
         let connection = self
             .connection
             .lock()
@@ -249,6 +261,7 @@ impl Store {
                 params![project],
             )?;
             connection.execute("DELETE FROM projects WHERE path = ?1", params![project])?;
+            connection.execute("DELETE FROM citation_syncs WHERE target_path = ?1", params![project])?;
             Ok(())
         })
     }
@@ -261,6 +274,10 @@ impl Store {
             )?;
             connection.execute(
                 "UPDATE base_files SET project_path = ?2 WHERE project_path = ?1",
+                params![from, to],
+            )?;
+            connection.execute(
+                "UPDATE citation_syncs SET target_path = ?2 WHERE target_path = ?1",
                 params![from, to],
             )?;
             Ok(())

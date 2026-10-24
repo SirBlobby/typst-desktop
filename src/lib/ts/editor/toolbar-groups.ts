@@ -38,6 +38,7 @@ export function buildToolbarGroups(
   view: EditorView | null,
   onassets: () => void,
   onpagesettings: () => void,
+  oncitations: () => void,
 ): ToolbarGroup[] {
   return [
     {
@@ -81,6 +82,7 @@ export function buildToolbarGroups(
           run: () => insertText(view, '#figure(\n  image("file.png"),\n  caption: [Caption],\n)'),
         },
         { icon: "ph:images", label: "Images and fonts", run: onassets },
+        { icon: "ph:quotes", label: "Citations", run: oncitations },
       ],
       menu: {
         icon: "ph:plus-square",

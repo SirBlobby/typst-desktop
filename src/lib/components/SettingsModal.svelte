@@ -9,6 +9,7 @@
   import SettingsRow from "./settings/SettingsRow.svelte";
   import ToggleSwitch from "./settings/ToggleSwitch.svelte";
   import EditorSection from "./settings/EditorSection.svelte";
+  import CitationsSection from "./settings/CitationsSection.svelte";
   import AccountAvatar from "./AccountAvatar.svelte";
   import * as api from "$lib/ts/api";
   import type { AppInfo, CompatibilityStatus } from "$lib/ts/api";
@@ -38,11 +39,12 @@
   import { clearCloudSpaces } from "$lib/ts/cloud-spaces";
 
   interface Props {
+    initialSection?: Section;
     onclose: () => void;
     onsignin: () => void;
   }
 
-  let { onclose, onsignin }: Props = $props();
+  let { initialSection = "files", onclose, onsignin }: Props = $props();
 
   type Section =
     | "files"
@@ -50,6 +52,7 @@
     | "editor"
     | "accessibility"
     | "account"
+    | "citations"
     | "lsp"
     | "hotkeys"
     | "about";
@@ -60,6 +63,7 @@
     { id: "editor", label: "Editor", icon: "ph:code" },
     { id: "accessibility", label: "Accessibility", icon: "ph:wheelchair" },
     { id: "account", label: "Account", icon: "ph:user-circle" },
+    { id: "citations", label: "Citations", icon: "ph:quotes" },
     { id: "lsp", label: "Language Server", icon: "ph:plugs-connected" },
     { id: "hotkeys", label: "Hotkeys", icon: "ph:keyboard" },
     { id: "about", label: "About", icon: "ph:info" },
@@ -193,7 +197,7 @@
     { value: "xlarge", label: "Extra large" },
   ];
 
-  let section = $state<Section>("files");
+  let section = $state<Section>(untrack(() => initialSection));
 
   let workspaceRoot = $state(untrack(() => app.settings?.workspace_root ?? ""));
   let serverUrl = $state(untrack(() => app.settings?.server_url ?? ""));
@@ -549,6 +553,8 @@
             </SettingsRow>
           </SettingsCard>
         </div>
+      {:else if section === "citations"}
+        <CitationsSection {fieldClass} />
       {:else if section === "lsp"}
         <SettingsHeader title="Language Server" description="Autocomplete, diagnostics and hover help from tinymist." icon="ph:plugs-connected" />
         <div class="flex flex-col gap-4">
@@ -635,6 +641,7 @@
       section === "appearance" ||
       section === "editor" ||
       section === "accessibility" ||
+      section === "citations" ||
       section === "lsp" ||
       section === "hotkeys"}
     <button

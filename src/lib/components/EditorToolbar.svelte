@@ -22,9 +22,10 @@
     disabled?: boolean;
     onassets: () => void;
     onpagesettings: () => void;
+    oncitations: () => void;
   }
 
-  let { view, language = "typst", disabled = false, onassets, onpagesettings }: Props = $props();
+  let { view, language = "typst", disabled = false, onassets, onpagesettings, oncitations }: Props = $props();
 
   let fonts = $state<string[]>([]);
   let selectedFont = $state("");
@@ -40,7 +41,7 @@
   const isLatex = $derived(language === "latex");
   const headingOptions = $derived(isLatex ? latexHeadingOptions : typstHeadingOptions);
   const groups = $derived(
-    isLatex ? buildLatexToolbarGroups(view, onassets) : buildToolbarGroups(view, onassets, onpagesettings),
+    isLatex ? buildLatexToolbarGroups(view, onassets, oncitations) : buildToolbarGroups(view, onassets, onpagesettings, oncitations),
   );
   const collapsed = $derived(collapsedGroupIds(groups, toolbarWidth));
 

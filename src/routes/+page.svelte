@@ -33,6 +33,7 @@
   import { isLatexPath, languageLabel, sourceExtension, type DocumentLanguage } from "$lib/ts/document-language";
   import { previewMode } from "$lib/ts/preview-mode.svelte";
   import PageSettingsModal from "$lib/components/PageSettingsModal.svelte";
+  import CitationsModal from "$lib/components/citations/CitationsModal.svelte";
   import InsertDialogs from "$lib/components/editor/insert/InsertDialogs.svelte";
   import ReviewLayer from "$lib/components/review/ReviewLayer.svelte";
   import ReviewBar from "$lib/components/review/ReviewBar.svelte";
@@ -99,7 +100,8 @@
     | { kind: "rename-file"; path: string }
     | { kind: "delete-file"; paths: string[] }
     | { kind: "login" }
-    | { kind: "settings" }
+    | { kind: "settings"; section?: "citations" }
+    | { kind: "citations" }
     | { kind: "assets" }
     | { kind: "page-settings" }
     | { kind: "conflicts" };
@@ -962,6 +964,7 @@
               disabled={app.activePath.toLowerCase().endsWith(".toml")}
               onassets={() => (dialog = { kind: "assets" })}
               onpagesettings={() => (dialog = { kind: "page-settings" })}
+              oncitations={() => (dialog = { kind: "citations" })}
             />
 
             <div
@@ -1275,7 +1278,7 @@
     onclose={close}
   />
 {:else if dialog.kind === "settings"}
-  <SettingsModal onclose={close} onsignin={() => (dialog = { kind: "login" })} />
+  <SettingsModal initialSection={dialog.section} onclose={close} onsignin={() => (dialog = { kind: "login" })} />
 {:else if dialog.kind === "assets"}
   <AssetsModal
     oninsert={app.view === "editor" && editorView
@@ -1285,6 +1288,18 @@
         }
       : undefined}
     onchanged={compile}
+    onclose={close}
+  />
+{:else if dialog.kind === "citations" && app.target}
+  <CitationsModal
+    path={app.target.path}
+    latex={isLatexPath(app.activePath ?? "")}
+    view={editorView}
+    onchanged={async () => {
+      await refreshTarget();
+      await compile();
+    }}
+    onopensettings={() => (dialog = { kind: "settings", section: "citations" })}
     onclose={close}
   />
 {:else if dialog.kind === "page-settings"}

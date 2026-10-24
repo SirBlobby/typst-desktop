@@ -1,4 +1,5 @@
 mod assets;
+mod citations;
 mod compiler;
 mod db;
 mod fonts;
@@ -1537,6 +1538,18 @@ pub fn run() {
             set_target_entrypoint,
             target_entries::rename_target_entry,
             target_entries::delete_target_entries,
+            citations::commands::citation_lookup,
+            citations::commands::citation_files,
+            citations::commands::citation_add,
+            citations::commands::zotero_status,
+            citations::commands::zotero_connect,
+            citations::commands::zotero_disconnect,
+            citations::commands::zotero_libraries,
+            citations::commands::zotero_collections,
+            citations::commands::citation_syncs,
+            citations::commands::citation_sync_create,
+            citations::commands::citation_sync_run,
+            citations::commands::citation_sync_delete,
             compile_target,
             export_target,
             set_folder_color,
