@@ -6,7 +6,8 @@ use sha2::{Digest, Sha256};
 use tauri::{AppHandle, State};
 
 use super::format::{render_entry, render_library, title_of, BibliographyFormat};
-use super::lookup::{fetch_csl, parse_identifier};
+use super::identifiers::parse_identifier;
+use super::sources::fetch_csl;
 use super::storage::{CitationSync, ZoteroAccount};
 use super::zotero;
 use crate::db::Store;

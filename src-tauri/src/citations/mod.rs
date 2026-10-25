@@ -3,6 +3,7 @@ pub mod commands;
 pub mod csl;
 pub mod format;
 pub mod hayagriva;
-pub mod lookup;
+pub mod identifiers;
+pub mod sources;
 pub mod storage;
 pub mod zotero;

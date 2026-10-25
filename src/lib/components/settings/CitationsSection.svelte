@@ -56,7 +56,7 @@
 
 <SettingsHeader
   title="Citations"
-  description="Connect Zotero to sync libraries and collections into bibliography files. Add references by DOI or arXiv ID from the editor toolbar."
+  description="Connect Zotero to sync libraries and collections into bibliography files. Add references by DOI, arXiv, PubMed, PMC or Semantic Scholar ID from the editor toolbar."
   icon="ph:quotes"
 />
 <div class="flex flex-col gap-4">

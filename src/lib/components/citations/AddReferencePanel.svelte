@@ -90,12 +90,12 @@
 
 <div class="flex flex-col gap-4">
   <form onsubmit={lookUp} class="flex flex-col gap-1.5 text-xs">
-    <label for="citation-identifier" class="font-medium text-[var(--color-ink-muted)]">DOI or arXiv ID</label>
+    <label for="citation-identifier" class="font-medium text-[var(--color-ink-muted)]">DOI, arXiv, PubMed, PMC or Semantic Scholar ID</label>
     <div class="flex gap-2">
       <input
         id="citation-identifier"
         bind:value={identifier}
-        placeholder="10.1038/nature14539 or 1706.03762"
+        placeholder="10.1038/nature14539, 1706.03762, PMID 31452104"
         class="field min-w-0 flex-1 font-mono text-sm"
       />
       <button type="submit" class="btn btn-secondary" disabled={!identifier.trim() || busy !== null}>
@@ -103,6 +103,7 @@
         Look up
       </button>
     </div>
+    <p class="text-[var(--color-ink-muted)]">Paste an identifier or a link from doi.org, arxiv.org, pubmed.ncbi.nlm.nih.gov or semanticscholar.org.</p>
   </form>
 
   <BibliographyFilePicker {files} bind:value={fileName} defaultName="references.bib" />
