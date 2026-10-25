@@ -11,8 +11,8 @@
   import EditorSection from "./settings/EditorSection.svelte";
   import CitationsSection from "./settings/CitationsSection.svelte";
   import AccountAvatar from "./AccountAvatar.svelte";
-  import * as api from "$lib/ts/api";
-  import type { AppInfo, CompatibilityStatus } from "$lib/ts/api";
+  import * as api from "#lib/ts/api";
+  import type { AppInfo, CompatibilityStatus } from "#lib/ts/api";
   import {
     HOTKEY_DEFS,
     comboFromEvent,
@@ -20,7 +20,7 @@
     keysFor,
     rebindHotkey,
     resetHotkey,
-  } from "$lib/ts/hotkeys";
+  } from "#lib/ts/hotkeys";
   import {
     app,
     applyTheme,
@@ -35,8 +35,8 @@
     setError,
     type ThemePreference,
     type TextScale,
-  } from "$lib/ts/state.svelte";
-  import { clearCloudSpaces } from "$lib/ts/cloud-spaces";
+  } from "#lib/ts/state.svelte";
+  import { clearCloudSpaces } from "#lib/ts/cloud-spaces";
 
   interface Props {
     initialSection?: Section;

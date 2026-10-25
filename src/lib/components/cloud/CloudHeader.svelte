@@ -1,6 +1,6 @@
 <script lang="ts">
   import Icon from "@iconify/svelte";
-  import type { CloudFolder } from "$lib/ts/api";
+  import type { CloudFolder } from "#lib/ts/api";
 
   interface Props {
     title: string;

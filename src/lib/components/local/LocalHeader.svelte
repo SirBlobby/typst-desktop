@@ -1,6 +1,6 @@
 <script lang="ts">
   import Icon from "@iconify/svelte";
-  import { browseTo } from "$lib/ts/state.svelte";
+  import { browseTo } from "#lib/ts/state.svelte";
 
   interface Crumb {
     path: string;

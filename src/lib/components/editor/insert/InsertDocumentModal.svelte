@@ -1,9 +1,9 @@
 <script lang="ts">
   import Icon from "@iconify/svelte";
-  import Modal from "$lib/components/Modal.svelte";
-  import { focusOnMount } from "$lib/ts/focus-on-mount";
-  import * as api from "$lib/ts/api";
-  import type { FileEntry } from "$lib/ts/api";
+  import Modal from "#lib/components/Modal.svelte";
+  import { focusOnMount } from "#lib/ts/focus-on-mount";
+  import * as api from "#lib/ts/api";
+  import type { FileEntry } from "#lib/ts/api";
 
   let { targetPath, files, activePath, onInsert, onClose }: {
     targetPath: string;

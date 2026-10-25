@@ -1,6 +1,6 @@
 <script lang="ts">
   import Icon from "@iconify/svelte";
-  import type { DocumentLanguage } from "$lib/ts/document-language";
+  import type { DocumentLanguage } from "#lib/ts/document-language";
 
   interface Props {
     language: DocumentLanguage;

@@ -1,4 +1,4 @@
-import * as api from "$lib/ts/api";
+import * as api from "#lib/ts/api";
 import {
   app,
   compile,
@@ -9,7 +9,7 @@ import {
   setError,
   setStatus,
   shortcutForPath,
-} from "$lib/ts/state.svelte";
+} from "#lib/ts/state.svelte";
 
 export type DropDestination =
   | { kind: "project"; projectPath: string }

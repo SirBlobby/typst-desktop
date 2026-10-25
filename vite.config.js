@@ -9,9 +9,6 @@ import wasm from "vite-plugin-wasm";
 const host = process.env.TAURI_DEV_HOST;
 
 const svelteKitOptions = {
-  alias: {
-    $lib: "src/lib",
-  },
   preprocess: vitePreprocess(),
   adapter: adapter({
     fallback: "index.html",

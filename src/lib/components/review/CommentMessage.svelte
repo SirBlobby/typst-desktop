@@ -2,9 +2,9 @@
   import Icon from "@iconify/svelte";
   import PersonAvatar from "./PersonAvatar.svelte";
   import CommentComposer from "./CommentComposer.svelte";
-  import { reviewSessionStore } from "$lib/ts/review/session";
-  import { formatTimestamp } from "$lib/ts/review/session";
-  import type { CommentView } from "$lib/ts/review/comments";
+  import { reviewSessionStore } from "#lib/ts/review/session";
+  import { formatTimestamp } from "#lib/ts/review/session";
+  import type { CommentView } from "#lib/ts/review/comments";
 
   let { comment, canDelete, clampLines = false, onEdit, onDelete }: {
     comment: CommentView;

@@ -1,4 +1,4 @@
-import * as api from "$lib/ts/api";
+import * as api from "#lib/ts/api";
 
 export function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;

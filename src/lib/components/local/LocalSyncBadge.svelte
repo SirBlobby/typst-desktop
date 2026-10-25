@@ -1,7 +1,7 @@
 <script lang="ts">
   import Icon from "@iconify/svelte";
-  import type { BrowseEntry } from "$lib/ts/api";
-  import { syncLabel } from "$lib/ts/local-entries";
+  import type { BrowseEntry } from "#lib/ts/api";
+  import { syncLabel } from "#lib/ts/local-entries";
 
   let { entry }: { entry: BrowseEntry } = $props();
 </script>

@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { avatarFor } from "$lib/ts/review/client";
-  import type { PersonSummary } from "$lib/ts/review/people";
+  import { avatarFor } from "#lib/ts/review/client";
+  import type { PersonSummary } from "#lib/ts/review/people";
 
   let { person, sizeClass = "h-6 w-6", textClass = "text-[10px]" }: { person: PersonSummary; sizeClass?: string; textClass?: string } = $props();
 

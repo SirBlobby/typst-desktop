@@ -5,7 +5,7 @@
   import { EditorState } from "@codemirror/state";
   import { MergeView } from "@codemirror/merge";
   import Modal from "./Modal.svelte";
-  import type { Conflict, Resolution } from "$lib/ts/api";
+  import type { Conflict, Resolution } from "#lib/ts/api";
 
   interface Props {
     conflicts: Conflict[];

@@ -1,7 +1,7 @@
 <script lang="ts">
   import Icon from "@iconify/svelte";
-  import type { CloudEntry } from "$lib/ts/cloud-entries";
-  import { folderIconStyle, folderTileStyle } from "$lib/ts/folder-colors";
+  import type { CloudEntry } from "#lib/ts/cloud-entries";
+  import { folderIconStyle, folderTileStyle } from "#lib/ts/folder-colors";
   import CloudSyncBadge from "./CloudSyncBadge.svelte";
 
   interface Props {

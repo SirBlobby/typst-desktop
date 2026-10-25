@@ -1,7 +1,7 @@
 <script lang="ts">
   import Icon from "@iconify/svelte";
   import { untrack } from "svelte";
-  import * as api from "$lib/ts/api";
+  import * as api from "#lib/ts/api";
   import ImageView from "./ImageView.svelte";
   import PdfView from "./PdfView.svelte";
 

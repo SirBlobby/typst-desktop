@@ -1,10 +1,10 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import Icon from "@iconify/svelte";
-  import Modal from "$lib/components/Modal.svelte";
-  import { focusOnMount } from "$lib/ts/focus-on-mount";
-  import * as api from "$lib/ts/api";
-  import type { Resource } from "$lib/ts/api";
+  import Modal from "#lib/components/Modal.svelte";
+  import { focusOnMount } from "#lib/ts/focus-on-mount";
+  import * as api from "#lib/ts/api";
+  import type { Resource } from "#lib/ts/api";
 
   let { targetPath, onInsert, onClose }: {
     targetPath: string;

@@ -1,7 +1,7 @@
 <script lang="ts">
   import Icon from "@iconify/svelte";
-  import type { FileEntry } from "$lib/ts/api";
-  import { clampMenu } from "$lib/ts/menu-position";
+  import type { FileEntry } from "#lib/ts/api";
+  import { clampMenu } from "#lib/ts/menu-position";
 
   interface Props {
     files: FileEntry[];

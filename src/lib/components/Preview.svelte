@@ -1,6 +1,6 @@
 <script lang="ts">
   import Icon from "@iconify/svelte";
-  import type { CompileResult, Diagnostic } from "$lib/ts/api";
+  import type { CompileResult, Diagnostic } from "#lib/ts/api";
 
   interface Props {
     compiled: CompileResult | null;

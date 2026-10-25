@@ -1,7 +1,7 @@
 <script lang="ts">
   import Icon from "@iconify/svelte";
-  import * as api from "$lib/ts/api";
-  import { exportFormats } from "$lib/ts/export-formats";
+  import * as api from "#lib/ts/api";
+  import { exportFormats } from "#lib/ts/export-formats";
 
   interface Props {
     onexport: (formatId: string) => void;

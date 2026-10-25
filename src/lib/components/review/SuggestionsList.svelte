@@ -2,7 +2,7 @@
   import Icon from "@iconify/svelte";
   import SuggestionCard from "./SuggestionCard.svelte";
   import { get } from "svelte/store";
-  import { editorViewStore, reviewSessionStore } from "$lib/ts/review/session";
+  import { editorViewStore, reviewSessionStore } from "#lib/ts/review/session";
   import {
     acceptSuggestion,
     activeSuggestionStore,
@@ -12,7 +12,7 @@
     textChangedSince,
     withdrawSuggestion,
     type SuggestionView
-  } from "$lib/ts/review/suggestions";
+  } from "#lib/ts/review/suggestions";
 
   let { docId, canReview }: { docId: string; canReview: boolean } = $props();
 

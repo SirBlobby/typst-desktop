@@ -1,20 +1,20 @@
 <script lang="ts">
   import Icon from "@iconify/svelte";
   import type { EditorView } from "@codemirror/view";
-  import * as api from "$lib/ts/api";
-  import { setTypstConfig } from "$lib/ts/editor-actions";
-  import { currentHeadingLevel, setHeadingLevel } from "$lib/ts/editor/insert";
+  import * as api from "#lib/ts/api";
+  import { setTypstConfig } from "#lib/ts/editor-actions";
+  import { currentHeadingLevel, setHeadingLevel } from "#lib/ts/editor/insert";
   import {
     allGroupItems,
     buildToolbarGroups,
     collapsedGroupIds,
     type ToolbarItem,
-  } from "$lib/ts/editor/toolbar-groups";
-  import { buildLatexToolbarGroups } from "$lib/ts/editor/latex-toolbar-groups";
-  import { currentSectionLevel, latexHeadingOptions, setSectionLevel } from "$lib/ts/editor/latex-actions";
-  import type { DocumentLanguage } from "$lib/ts/document-language";
-  import { clampMenu } from "$lib/ts/menu-position";
-  import { app } from "$lib/ts/state.svelte";
+  } from "#lib/ts/editor/toolbar-groups";
+  import { buildLatexToolbarGroups } from "#lib/ts/editor/latex-toolbar-groups";
+  import { currentSectionLevel, latexHeadingOptions, setSectionLevel } from "#lib/ts/editor/latex-actions";
+  import type { DocumentLanguage } from "#lib/ts/document-language";
+  import { clampMenu } from "#lib/ts/menu-position";
+  import { app } from "#lib/ts/state.svelte";
 
   interface Props {
     view: EditorView | null;

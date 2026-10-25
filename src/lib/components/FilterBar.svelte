@@ -1,6 +1,6 @@
 <script lang="ts">
   import Icon from "@iconify/svelte";
-  import type { SortField, SortOption, ViewFilters, ViewMode } from "$lib/ts/view-filters";
+  import type { SortField, SortOption, ViewFilters, ViewMode } from "#lib/ts/view-filters";
 
   let {
     filters = $bindable(),

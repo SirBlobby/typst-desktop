@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { avatarFor } from "$lib/ts/review/client";
-  import { app } from "$lib/ts/state.svelte";
+  import { avatarFor } from "#lib/ts/review/client";
+  import { app } from "#lib/ts/state.svelte";
 
   let { sizeClass = "h-7 w-7 text-xs" }: { sizeClass?: string } = $props();
 

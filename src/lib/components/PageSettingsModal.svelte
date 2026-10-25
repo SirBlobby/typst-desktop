@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { EditorView } from "@codemirror/view";
   import Modal from "./Modal.svelte";
-  import { setTypstConfig } from "$lib/ts/editor-actions";
+  import { setTypstConfig } from "#lib/ts/editor-actions";
 
   interface Props {
     view: EditorView | null;

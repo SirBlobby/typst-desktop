@@ -9,9 +9,7 @@
     indentOnInput,
     language,
     Language,
-    StreamLanguage,
   } from "@codemirror/language";
-  import { toml } from "@codemirror/legacy-modes/mode/toml";
   import { autocompletion } from "@codemirror/autocomplete";
   import { lintGutter, setDiagnostics } from "@codemirror/lint";
   import { LSPClient, languageServerExtensions } from "@codemirror/lsp-client";
@@ -19,18 +17,18 @@
   import type { Awareness } from "y-protocols/awareness";
   import type * as Y from "yjs";
 
-  import { bracketExtensions } from "$lib/ts/editor-brackets";
-  import { typstCompletions } from "$lib/ts/completions";
-  import { editorTheme } from "$lib/ts/editor-theme";
-  import { LspBridge } from "$lib/ts/lsp";
-  import { lineCommentKeymap } from "$lib/ts/editor/line-comments";
-  import { searchExtensions } from "$lib/ts/editor/search";
-  import { editorSettingsStore } from "$lib/ts/editor/settings";
-  import { editorPreferenceExtensions } from "$lib/ts/editor/preferences";
-  import { loadEditorFont } from "$lib/ts/editor/fonts";
-  import { app } from "$lib/ts/state.svelte";
-  import { isLatexPath } from "$lib/ts/document-language";
-  import type { Diagnostic } from "$lib/ts/api";
+  import { bracketExtensions } from "#lib/ts/editor-brackets";
+  import { typstCompletions } from "#lib/ts/completions";
+  import { editorTheme } from "#lib/ts/editor-theme";
+  import { LspBridge } from "#lib/ts/lsp";
+  import { lineCommentKeymap } from "#lib/ts/editor/line-comments";
+  import { searchExtensions } from "#lib/ts/editor/search";
+  import { editorSettingsStore } from "#lib/ts/editor/settings";
+  import { editorPreferenceExtensions } from "#lib/ts/editor/preferences";
+  import { loadEditorFont } from "#lib/ts/editor/fonts";
+  import { app } from "#lib/ts/state.svelte";
+  import { editorFileKind, commentMarkerFor, dataFileLanguage } from "#lib/ts/editor/file-kind";
+  import type { Diagnostic } from "#lib/ts/api";
 
   interface Props {
     content: string;
@@ -72,9 +70,9 @@
   const bridge = new LspBridge();
   let client: LSPClient | null = null;
 
-  const isToml = $derived(filePath.toLowerCase().endsWith(".toml"));
-  const isLatex = $derived(isLatexPath(filePath));
-  const isTypst = $derived(!isToml && !isLatex);
+  const fileKind = $derived(editorFileKind(filePath));
+  const isLatex = $derived(fileKind === "latex");
+  const isTypst = $derived(fileKind === "typst");
 
   function disableTypstLanguage() {
     queueMicrotask(() => {
@@ -187,7 +185,7 @@
           indentOnInput(),
           drawSelection(),
           highlightActiveLine(),
-          languageSlot.of(isToml ? StreamLanguage.define(toml) : []),
+          languageSlot.of(dataFileLanguage(fileKind)),
           lspSlot.of([]),
           themeSlot.of(editorTheme(app.theme === "dark", app.colorTheme)),
           collabSlot.of([]),
@@ -198,7 +196,7 @@
             : []),
           EditorView.lineWrapping,
           keymap.of([
-            ...lineCommentKeymap(isToml ? "#" : isLatex ? "%" : "//"),
+            ...lineCommentKeymap(commentMarkerFor(fileKind)),
             ...searchKeymap,
             ...defaultKeymap,
             indentWithTab,
@@ -210,7 +208,7 @@
       }),
     });
 
-    if (!isToml) {
+    if (isTypst || isLatex) {
       const loadLanguage: Promise<Extension> = isLatex ? loadLatexLanguage() : loadTypstLanguage();
       loadLanguage
         .then((languageExtension) => {

@@ -1,7 +1,7 @@
 import type { EditorView } from "@codemirror/view";
-import { insertText, prefixLines, wrapSelection } from "$lib/ts/editor-actions";
-import { insertList, setSectionLevel } from "$lib/ts/editor/latex-actions";
-import type { DocumentLanguage } from "$lib/ts/document-language";
+import { insertText, prefixLines, wrapSelection } from "#lib/ts/editor-actions";
+import { insertList, setSectionLevel } from "#lib/ts/editor/latex-actions";
+import type { DocumentLanguage } from "#lib/ts/document-language";
 
 const HEADING_LEVELS = [1, 2, 3, 4, 5, 6];
 

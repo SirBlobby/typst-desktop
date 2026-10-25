@@ -1,7 +1,7 @@
 import { EditorView } from "@codemirror/view";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { tags as t } from "@lezer/highlight";
-import type { ColorTheme } from "$lib/ts/state.svelte";
+import type { ColorTheme } from "#lib/ts/state.svelte";
 
 interface ThemeColors {
   text: string;

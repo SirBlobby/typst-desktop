@@ -1,6 +1,6 @@
 <script lang="ts">
   import Icon from "@iconify/svelte";
-  import { previewMode, previewModeOptions, setPreviewMode, type PreviewMode } from "$lib/ts/preview-mode.svelte";
+  import { previewMode, previewModeOptions, setPreviewMode, type PreviewMode } from "#lib/ts/preview-mode.svelte";
 
   let open = $state(false);
 

@@ -15,7 +15,7 @@
     type CitationSync,
     type ZoteroLibrary,
     type ZoteroStatus,
-  } from "$lib/ts/citations";
+  } from "#lib/ts/citations";
 
   interface Props {
     path: string;

@@ -1,7 +1,7 @@
 import * as pdfjs from "pdfjs-dist/legacy/build/pdf.mjs";
 import workerUrl from "pdfjs-dist/legacy/build/pdf.worker.min.mjs?url";
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
-import * as api from "$lib/ts/api";
+import * as api from "#lib/ts/api";
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 

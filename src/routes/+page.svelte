@@ -1,7 +1,7 @@
 <script lang="ts">
   import Icon from "@iconify/svelte";
   import { onMount } from "svelte";
-  import { registerHotkey, unregisterAll } from "$lib/ts/hotkeys";
+  import { registerHotkey, unregisterAll } from "#lib/ts/hotkeys";
   import { save } from "@tauri-apps/plugin-dialog";
   import { writeImage, writeText } from "@tauri-apps/plugin-clipboard-manager";
   import { Image } from "@tauri-apps/api/image";
@@ -9,46 +9,46 @@
   import { getCurrentWebview } from "@tauri-apps/api/webview";
   import { listen } from "@tauri-apps/api/event";
 
-  import FileViewer from "$lib/components/FileViewer.svelte";
-  import CloudView from "$lib/components/cloud/CloudView.svelte";
-  import FileTree from "$lib/components/FileTree.svelte";
-  import NewFileModal from "$lib/components/NewFileModal.svelte";
-  import BrowserSidebar from "$lib/components/BrowserSidebar.svelte";
-  import Editor from "$lib/components/Editor.svelte";
-  import Preview from "$lib/components/Preview.svelte";
-  import PromptModal from "$lib/components/PromptModal.svelte";
-  import ConfirmModal from "$lib/components/ConfirmModal.svelte";
-  import ConflictModal from "$lib/components/ConflictModal.svelte";
-  import LoginModal from "$lib/components/LoginModal.svelte";
-  import SettingsModal from "$lib/components/SettingsModal.svelte";
-  import AssetsModal from "$lib/components/AssetsModal.svelte";
-  import WindowControls from "$lib/components/WindowControls.svelte";
-  import FileViewerOverlay from "$lib/components/viewer/FileViewerOverlay.svelte";
-  import ImageView from "$lib/components/viewer/ImageView.svelte";
-  import PdfView from "$lib/components/viewer/PdfView.svelte";
-  import EditorToolbar from "$lib/components/EditorToolbar.svelte";
-  import ExportMenu from "$lib/components/ExportMenu.svelte";
-  import PreviewModeMenu from "$lib/components/PreviewModeMenu.svelte";
-  import LanguagePicker from "$lib/components/LanguagePicker.svelte";
-  import { isLatexPath, languageLabel, sourceExtension, type DocumentLanguage } from "$lib/ts/document-language";
-  import { previewMode } from "$lib/ts/preview-mode.svelte";
-  import PageSettingsModal from "$lib/components/PageSettingsModal.svelte";
-  import CitationsModal from "$lib/components/citations/CitationsModal.svelte";
-  import InsertDialogs from "$lib/components/editor/insert/InsertDialogs.svelte";
-  import ReviewLayer from "$lib/components/review/ReviewLayer.svelte";
-  import ReviewBar from "$lib/components/review/ReviewBar.svelte";
-  import ReviewPanel from "$lib/components/review/ReviewPanel.svelte";
-  import { reviewExtensions } from "$lib/ts/review/extensions";
+  import FileViewer from "#lib/components/FileViewer.svelte";
+  import CloudView from "#lib/components/cloud/CloudView.svelte";
+  import FileTree from "#lib/components/FileTree.svelte";
+  import NewFileModal from "#lib/components/NewFileModal.svelte";
+  import BrowserSidebar from "#lib/components/BrowserSidebar.svelte";
+  import Editor from "#lib/components/Editor.svelte";
+  import Preview from "#lib/components/Preview.svelte";
+  import PromptModal from "#lib/components/PromptModal.svelte";
+  import ConfirmModal from "#lib/components/ConfirmModal.svelte";
+  import ConflictModal from "#lib/components/ConflictModal.svelte";
+  import LoginModal from "#lib/components/LoginModal.svelte";
+  import SettingsModal from "#lib/components/SettingsModal.svelte";
+  import AssetsModal from "#lib/components/AssetsModal.svelte";
+  import WindowControls from "#lib/components/WindowControls.svelte";
+  import FileViewerOverlay from "#lib/components/viewer/FileViewerOverlay.svelte";
+  import ImageView from "#lib/components/viewer/ImageView.svelte";
+  import PdfView from "#lib/components/viewer/PdfView.svelte";
+  import EditorToolbar from "#lib/components/EditorToolbar.svelte";
+  import ExportMenu from "#lib/components/ExportMenu.svelte";
+  import PreviewModeMenu from "#lib/components/PreviewModeMenu.svelte";
+  import LanguagePicker from "#lib/components/LanguagePicker.svelte";
+  import { isLatexPath, languageLabel, sourceExtension, type DocumentLanguage } from "#lib/ts/document-language";
+  import { previewMode } from "#lib/ts/preview-mode.svelte";
+  import PageSettingsModal from "#lib/components/PageSettingsModal.svelte";
+  import CitationsModal from "#lib/components/citations/CitationsModal.svelte";
+  import InsertDialogs from "#lib/components/editor/insert/InsertDialogs.svelte";
+  import ReviewLayer from "#lib/components/review/ReviewLayer.svelte";
+  import ReviewBar from "#lib/components/review/ReviewBar.svelte";
+  import ReviewPanel from "#lib/components/review/ReviewPanel.svelte";
+  import { reviewExtensions } from "#lib/ts/review/extensions";
 
   import type { EditorView } from "@codemirror/view";
-  import { insertText, redoEdit, undoEdit } from "$lib/ts/editor-actions";
-  import { formattingCommandIds, runFormattingCommand } from "$lib/ts/editor/formatting-commands";
+  import { insertText, redoEdit, undoEdit } from "#lib/ts/editor-actions";
+  import { formattingCommandIds, runFormattingCommand } from "#lib/ts/editor/formatting-commands";
 
-  import * as api from "$lib/ts/api";
-  import type { BrowseEntry, CloudFile, CloudFolder } from "$lib/ts/api";
-  import { pickFiles } from "$lib/ts/import";
-  import { dropDestination, dropMessage, dropPaths } from "$lib/ts/drop";
-  import { exportFormat } from "$lib/ts/export-formats";
+  import * as api from "#lib/ts/api";
+  import type { BrowseEntry, CloudFile, CloudFolder } from "#lib/ts/api";
+  import { pickFiles } from "#lib/ts/import";
+  import { dropDestination, dropMessage, dropPaths } from "#lib/ts/drop";
+  import { exportFormat } from "#lib/ts/export-formats";
   import {
     app,
     browseTo,
@@ -73,8 +73,8 @@
     setError,
     setStatus,
     trackDownload,
-  } from "$lib/ts/state.svelte";
-  import type { DownloadProgress } from "$lib/ts/state.svelte";
+  } from "#lib/ts/state.svelte";
+  import type { DownloadProgress } from "#lib/ts/state.svelte";
 
   type Dialog =
     | { kind: "none" }

@@ -1,8 +1,8 @@
 import type { EditorView } from "@codemirror/view";
-import { insertText, wrapSelection } from "$lib/ts/editor-actions";
-import { openFind, openReplace } from "$lib/ts/editor/insert";
-import { buildLatexTable, insertList, wrapEnvironment } from "$lib/ts/editor/latex-actions";
-import type { ToolbarGroup } from "$lib/ts/editor/toolbar-groups";
+import { insertText, wrapSelection } from "#lib/ts/editor-actions";
+import { openFind, openReplace } from "#lib/ts/editor/insert";
+import { buildLatexTable, insertList, wrapEnvironment } from "#lib/ts/editor/latex-actions";
+import type { ToolbarGroup } from "#lib/ts/editor/toolbar-groups";
 
 export function buildLatexToolbarGroups(view: EditorView | null, onassets: () => void, oncitations: () => void): ToolbarGroup[] {
   return [

@@ -1,9 +1,9 @@
 <script lang="ts">
   import Icon from "@iconify/svelte";
   import type { Snippet } from "svelte";
-  import type { BrowseEntry } from "$lib/ts/api";
-  import { folderIconStyle } from "$lib/ts/folder-colors";
-  import { entryIcon, entryTypeLabel, formatDate, isContainer, sizeLabel } from "$lib/ts/local-entries";
+  import type { BrowseEntry } from "#lib/ts/api";
+  import { folderIconStyle } from "#lib/ts/folder-colors";
+  import { entryIcon, entryTypeLabel, formatDate, isContainer, sizeLabel } from "#lib/ts/local-entries";
   import LocalSyncBadge from "./LocalSyncBadge.svelte";
 
   interface Props {

@@ -1,6 +1,6 @@
 import type { EditorView } from "@codemirror/view";
 import { openSearchPanel } from "@codemirror/search";
-import { insertText, wrapSelection } from "$lib/ts/editor-actions";
+import { insertText, wrapSelection } from "#lib/ts/editor-actions";
 
 export function insertBlock(view: EditorView, block: string) {
   const selection = view.state.selection.main;

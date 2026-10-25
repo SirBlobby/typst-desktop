@@ -1,11 +1,11 @@
 <script lang="ts">
   import type { EditorView } from "@codemirror/view";
-  import type { FileEntry } from "$lib/ts/api";
-  import { insertText } from "$lib/ts/editor-actions";
-  import { insertBlock } from "$lib/ts/editor/insert";
-  import { insertDialogStore } from "$lib/ts/editor/insert-dialog";
-  import { symbolCategories, type PickerCharacter } from "$lib/ts/editor/symbols";
-  import { emojiCategories } from "$lib/ts/editor/emoji";
+  import type { FileEntry } from "#lib/ts/api";
+  import { insertText } from "#lib/ts/editor-actions";
+  import { insertBlock } from "#lib/ts/editor/insert";
+  import { insertDialogStore } from "#lib/ts/editor/insert-dialog";
+  import { symbolCategories, type PickerCharacter } from "#lib/ts/editor/symbols";
+  import { emojiCategories } from "#lib/ts/editor/emoji";
   import InsertImageModal from "./InsertImageModal.svelte";
   import InsertTableModal from "./InsertTableModal.svelte";
   import InsertDocumentModal from "./InsertDocumentModal.svelte";

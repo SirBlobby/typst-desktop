@@ -5,7 +5,7 @@
   import SettingsHeader from "./SettingsHeader.svelte";
   import SettingsCard from "./SettingsCard.svelte";
   import SettingsRow from "./SettingsRow.svelte";
-  import { connectZotero, disconnectZotero, zoteroStatus, type ZoteroStatus } from "$lib/ts/citations";
+  import { connectZotero, disconnectZotero, zoteroStatus, type ZoteroStatus } from "#lib/ts/citations";
 
   interface Props {
     fieldClass: string;

@@ -1,7 +1,7 @@
 <script lang="ts">
   import Icon from "@iconify/svelte";
-  import { app, browseTo } from "$lib/ts/state.svelte";
-  import { openCloudSpace } from "$lib/ts/cloud-spaces";
+  import { app, browseTo } from "#lib/ts/state.svelte";
+  import { openCloudSpace } from "#lib/ts/cloud-spaces";
   import AccountAvatar from "./AccountAvatar.svelte";
   import SidebarShortcuts from "./SidebarShortcuts.svelte";
 

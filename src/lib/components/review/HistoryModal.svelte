@@ -2,13 +2,13 @@
   import { onMount } from "svelte";
   import { get } from "svelte/store";
   import Icon from "@iconify/svelte";
-  import ConfirmModal from "$lib/components/ConfirmModal.svelte";
-  import PromptModal from "$lib/components/PromptModal.svelte";
+  import ConfirmModal from "#lib/components/ConfirmModal.svelte";
+  import PromptModal from "#lib/components/PromptModal.svelte";
   import VersionTimeline from "./VersionTimeline.svelte";
   import VersionDiffView from "./VersionDiffView.svelte";
   import PersonAvatar from "./PersonAvatar.svelte";
-  import { reviewSessionStore } from "$lib/ts/review/session";
-  import { diffLines, summarize } from "$lib/ts/review/line-diff";
+  import { reviewSessionStore } from "#lib/ts/review/session";
+  import { diffLines, summarize } from "#lib/ts/review/line-diff";
   import {
     fetchVersions,
     renameVersion,
@@ -17,7 +17,7 @@
     versionKindLabels,
     versionTime,
     type DocumentVersion,
-  } from "$lib/ts/review/versions";
+  } from "#lib/ts/review/versions";
 
   type CompareTarget = "previous" | "current";
 

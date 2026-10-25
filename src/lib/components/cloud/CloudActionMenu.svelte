@@ -1,8 +1,8 @@
 <script lang="ts">
   import Icon from "@iconify/svelte";
-  import type { CloudAction } from "$lib/ts/cloud-entries";
+  import type { CloudAction } from "#lib/ts/cloud-entries";
   import FolderColorSwatches from "../FolderColorSwatches.svelte";
-  import { clampMenu } from "$lib/ts/menu-position";
+  import { clampMenu } from "#lib/ts/menu-position";
 
   interface Props {
     actions: CloudAction[];

@@ -1,8 +1,8 @@
 <script lang="ts">
   import { untrack } from "svelte";
   import Icon from "@iconify/svelte";
-  import * as api from "$lib/ts/api";
-  import type { CloudFile, CloudFolder } from "$lib/ts/api";
+  import * as api from "#lib/ts/api";
+  import type { CloudFile, CloudFolder } from "#lib/ts/api";
   import {
     cloudSortOptions,
     defaultCloudFilters,
@@ -16,7 +16,7 @@
     type CloudFilters,
     type CloudHandlers,
     type ViewMode,
-  } from "$lib/ts/cloud-entries";
+  } from "#lib/ts/cloud-entries";
   import {
     app,
     cloudBreadcrumbs,
@@ -26,9 +26,9 @@
     openTarget,
     refreshCloud,
     setError,
-  } from "$lib/ts/state.svelte";
-  import { activeCloudSpace, canChangeActiveSpace } from "$lib/ts/cloud-spaces";
-  import { readStoredPreference, writeStoredPreference } from "$lib/ts/view-filters";
+  } from "#lib/ts/state.svelte";
+  import { activeCloudSpace, canChangeActiveSpace } from "#lib/ts/cloud-spaces";
+  import { readStoredPreference, writeStoredPreference } from "#lib/ts/view-filters";
   import CloudActionMenu from "./CloudActionMenu.svelte";
   import CloudEmptyState from "./CloudEmptyState.svelte";
   import FilterBar from "../FilterBar.svelte";

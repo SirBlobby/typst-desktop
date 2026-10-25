@@ -1,16 +1,16 @@
 <script lang="ts">
   import Icon from "@iconify/svelte";
-  import * as api from "$lib/ts/api";
-  import type { BrowseEntry } from "$lib/ts/api";
-  import { clampMenu } from "$lib/ts/menu-position";
+  import * as api from "#lib/ts/api";
+  import type { BrowseEntry } from "#lib/ts/api";
+  import { clampMenu } from "#lib/ts/menu-position";
   import PageThumbnail from "./PageThumbnail.svelte";
   import FolderColorSwatches from "./FolderColorSwatches.svelte";
   import FilterBar from "./FilterBar.svelte";
   import LocalHeader from "./local/LocalHeader.svelte";
   import LocalListView from "./local/LocalListView.svelte";
   import LocalSyncBadge from "./local/LocalSyncBadge.svelte";
-  import { folderIconStyle } from "$lib/ts/folder-colors";
-  import { entryIcon, formatDate, formatSize, isContainer, relativeTime } from "$lib/ts/local-entries";
+  import { folderIconStyle } from "#lib/ts/folder-colors";
+  import { entryIcon, formatDate, formatSize, isContainer, relativeTime } from "#lib/ts/local-entries";
   import {
     allSortOptions,
     defaultViewFilters,
@@ -20,7 +20,7 @@
     writeStoredPreference,
     type ViewFilters,
     type ViewMode,
-  } from "$lib/ts/view-filters";
+  } from "#lib/ts/view-filters";
   import {
     app,
     breadcrumbs,
@@ -29,7 +29,7 @@
     refreshEntries,
     setError,
     shortcutForPath,
-  } from "$lib/ts/state.svelte";
+  } from "#lib/ts/state.svelte";
 
   interface Props {
     onnewfolder: () => void;

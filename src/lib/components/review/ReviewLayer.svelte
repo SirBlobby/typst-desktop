@@ -1,11 +1,11 @@
 <script lang="ts">
   import type { EditorView } from "@codemirror/view";
-  import { app } from "$lib/ts/state.svelte";
-  import { editorViewStore, reviewSessionStore } from "$lib/ts/review/session";
-  import { historyOpenStore, reviewPanelOpenStore } from "$lib/ts/review/client";
-  import { setLocalAwarenessUser } from "$lib/ts/review/awareness";
-  import { resetComments } from "$lib/ts/review/comments";
-  import { resetSuggestions, suggestingModeStore } from "$lib/ts/review/suggestions";
+  import { app } from "#lib/ts/state.svelte";
+  import { editorViewStore, reviewSessionStore } from "#lib/ts/review/session";
+  import { historyOpenStore, reviewPanelOpenStore } from "#lib/ts/review/client";
+  import { setLocalAwarenessUser } from "#lib/ts/review/awareness";
+  import { resetComments } from "#lib/ts/review/comments";
+  import { resetSuggestions, suggestingModeStore } from "#lib/ts/review/suggestions";
   import CommentHighlights from "./CommentHighlights.svelte";
   import SuggestionHighlights from "./SuggestionHighlights.svelte";
   import SuggestionComposer from "./SuggestionComposer.svelte";

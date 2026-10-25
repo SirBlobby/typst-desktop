@@ -1,8 +1,8 @@
 <script lang="ts">
   import Icon from "@iconify/svelte";
   import type { Snippet } from "svelte";
-  import * as api from "$lib/ts/api";
-  import { openPdf, pageSizes, renderPdfPage, type PageSize, type PdfDocument } from "$lib/ts/pdf";
+  import * as api from "#lib/ts/api";
+  import { openPdf, pageSizes, renderPdfPage, type PageSize, type PdfDocument } from "#lib/ts/pdf";
   import ZoomControls from "./ZoomControls.svelte";
 
   interface Props {

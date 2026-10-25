@@ -1,9 +1,9 @@
 <script lang="ts">
   import Icon from "@iconify/svelte";
   import PersonAvatar from "./PersonAvatar.svelte";
-  import { reviewSessionStore } from "$lib/ts/review/session";
-  import { formatTimestamp } from "$lib/ts/review/session";
-  import type { SuggestionView } from "$lib/ts/review/suggestions";
+  import { reviewSessionStore } from "#lib/ts/review/session";
+  import { formatTimestamp } from "#lib/ts/review/session";
+  import type { SuggestionView } from "#lib/ts/review/suggestions";
 
   let { suggestion, active, canReview, changedSince, onSelect, onAccept, onReject, onWithdraw }: {
     suggestion: SuggestionView;

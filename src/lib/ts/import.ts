@@ -1,5 +1,5 @@
 import { open } from "@tauri-apps/plugin-dialog";
-import { pandocImportExtensions } from "$lib/ts/export-formats";
+import { pandocImportExtensions } from "#lib/ts/export-formats";
 
 export const IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "gif", "svg", "webp"];
 export const FONT_EXTENSIONS = ["ttf", "otf", "ttc", "otc"];

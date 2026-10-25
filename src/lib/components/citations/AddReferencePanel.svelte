@@ -3,7 +3,7 @@
   import Icon from "@iconify/svelte";
   import type { EditorView } from "@codemirror/view";
   import BibliographyFilePicker from "./BibliographyFilePicker.svelte";
-  import { insertText } from "$lib/ts/editor-actions";
+  import { insertText } from "#lib/ts/editor-actions";
   import {
     addCitation,
     bibliographyFiles,
@@ -12,7 +12,7 @@
     lookupCitation,
     type AddedEntry,
     type LookupResult,
-  } from "$lib/ts/citations";
+  } from "#lib/ts/citations";
 
   interface Props {
     path: string;

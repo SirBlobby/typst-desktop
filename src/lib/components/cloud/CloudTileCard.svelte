@@ -1,6 +1,6 @@
 <script lang="ts">
   import Icon from "@iconify/svelte";
-  import { fileIcon, formatShortDate, isFontName, type CloudEntry } from "$lib/ts/cloud-entries";
+  import { fileIcon, formatShortDate, isFontName, type CloudEntry } from "#lib/ts/cloud-entries";
   import CloudSyncBadge from "./CloudSyncBadge.svelte";
   import PageThumbnail from "../PageThumbnail.svelte";
 

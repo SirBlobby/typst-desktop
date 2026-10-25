@@ -1,10 +1,10 @@
 <script lang="ts">
   import Icon from "@iconify/svelte";
   import Modal from "./Modal.svelte";
-  import * as api from "$lib/ts/api";
-  import type { Resource } from "$lib/ts/api";
-  import { pickFiles } from "$lib/ts/import";
-  import { app } from "$lib/ts/state.svelte";
+  import * as api from "#lib/ts/api";
+  import type { Resource } from "#lib/ts/api";
+  import { pickFiles } from "#lib/ts/import";
+  import { app } from "#lib/ts/state.svelte";
 
   interface Props {
     oninsert?: (snippet: string) => void;

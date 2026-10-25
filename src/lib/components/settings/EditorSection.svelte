@@ -3,7 +3,7 @@
   import SettingsCard from "./SettingsCard.svelte";
   import SettingsRow from "./SettingsRow.svelte";
   import ToggleSwitch from "./ToggleSwitch.svelte";
-  import { editorFonts, findEditorFont, loadEditorFont } from "$lib/ts/editor/fonts";
+  import { editorFonts, findEditorFont, loadEditorFont } from "#lib/ts/editor/fonts";
   import {
     defaultEditorSettings,
     editorSettingsStore,
@@ -11,8 +11,8 @@
     MIN_FONT_SIZE,
     spellCheckLanguages,
     updateEditorSettings,
-  } from "$lib/ts/editor/settings";
-  import { minimapSizeOptions, type MinimapSize } from "$lib/ts/editor/minimap/minimap-sizes";
+  } from "#lib/ts/editor/settings";
+  import { minimapSizeOptions, type MinimapSize } from "#lib/ts/editor/minimap/minimap-sizes";
 
   let { fieldClass }: { fieldClass: string } = $props();
 

@@ -1,16 +1,16 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { get } from "svelte/store";
-  import { editorViewStore, reviewSessionStore } from "$lib/ts/review/session";
-  import { anchorRange } from "$lib/ts/review/anchors";
+  import { editorViewStore, reviewSessionStore } from "#lib/ts/review/session";
+  import { anchorRange } from "#lib/ts/review/anchors";
   import {
     activeSuggestionStore,
     currentSuggestionRange,
     suggestingModeStore,
     suggestionDraftStore,
     suggestionsStore
-  } from "$lib/ts/review/suggestions";
-  import { setSuggestionMarks, suggestingCompartment, suggestingFilter, type CapturedEdit, type SuggestionMark } from "$lib/ts/review/suggestion-marks";
+  } from "#lib/ts/review/suggestions";
+  import { setSuggestionMarks, suggestingCompartment, suggestingFilter, type CapturedEdit, type SuggestionMark } from "#lib/ts/review/suggestion-marks";
 
   const { doc, text } = get(reviewSessionStore)!;
 

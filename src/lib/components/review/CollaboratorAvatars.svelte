@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import type { Awareness } from "y-protocols/awareness";
-  import { avatarFor } from "$lib/ts/review/client";
+  import { avatarFor } from "#lib/ts/review/client";
 
   interface Collaborator {
     clientId: number;

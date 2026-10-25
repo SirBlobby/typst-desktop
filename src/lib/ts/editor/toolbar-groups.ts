@@ -1,7 +1,7 @@
 import type { EditorView } from "@codemirror/view";
-import { insertText, prefixLines, wrapSelection } from "$lib/ts/editor-actions";
-import { insertQuote, openFind, openReplace } from "$lib/ts/editor/insert";
-import { insertDialogStore, insertOptions } from "$lib/ts/editor/insert-dialog";
+import { insertText, prefixLines, wrapSelection } from "#lib/ts/editor-actions";
+import { insertQuote, openFind, openReplace } from "#lib/ts/editor/insert";
+import { insertDialogStore, insertOptions } from "#lib/ts/editor/insert-dialog";
 
 export interface ToolbarItem {
   icon: string;

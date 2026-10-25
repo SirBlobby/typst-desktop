@@ -3,7 +3,7 @@
   import Icon from "@iconify/svelte";
   import { openUrl } from "@tauri-apps/plugin-opener";
   import Modal from "./Modal.svelte";
-  import * as api from "$lib/ts/api";
+  import * as api from "#lib/ts/api";
 
   interface Props {
     serverUrl: string;

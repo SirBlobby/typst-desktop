@@ -1,10 +1,10 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { get } from "svelte/store";
-  import { editorViewStore, reviewSessionStore } from "$lib/ts/review/session";
-  import { activeThreadStore, buildThreads, commentsStore } from "$lib/ts/review/comments";
-  import { resolveRange } from "$lib/ts/review/anchors";
-  import { setCommentMarks, type CommentMark } from "$lib/ts/review/comment-marks";
+  import { editorViewStore, reviewSessionStore } from "#lib/ts/review/session";
+  import { activeThreadStore, buildThreads, commentsStore } from "#lib/ts/review/comments";
+  import { resolveRange } from "#lib/ts/review/anchors";
+  import { setCommentMarks, type CommentMark } from "#lib/ts/review/comment-marks";
 
   const { doc } = get(reviewSessionStore)!;
 

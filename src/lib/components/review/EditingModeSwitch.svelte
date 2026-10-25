@@ -1,6 +1,6 @@
 <script lang="ts">
   import Icon from "@iconify/svelte";
-  import { suggestingModeStore } from "$lib/ts/review/suggestions";
+  import { suggestingModeStore } from "#lib/ts/review/suggestions";
 
   let { canEdit }: { canEdit: boolean } = $props();
 

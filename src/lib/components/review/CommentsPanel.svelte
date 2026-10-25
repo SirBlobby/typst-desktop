@@ -1,14 +1,14 @@
 <script lang="ts">
   import { onMount, untrack } from "svelte";
   import Icon from "@iconify/svelte";
-  import ConfirmModal from "$lib/components/ConfirmModal.svelte";
+  import ConfirmModal from "#lib/components/ConfirmModal.svelte";
   import CommentThreadCard from "./CommentThreadCard.svelte";
   import CommentComposer from "./CommentComposer.svelte";
   import SuggestionsList from "./SuggestionsList.svelte";
-  import { activeSuggestionStore, loadSuggestions, suggestionsStore } from "$lib/ts/review/suggestions";
+  import { activeSuggestionStore, loadSuggestions, suggestionsStore } from "#lib/ts/review/suggestions";
   import { get } from "svelte/store";
-  import { editorViewStore, reviewSessionStore } from "$lib/ts/review/session";
-  import { resolveRange } from "$lib/ts/review/anchors";
+  import { editorViewStore, reviewSessionStore } from "#lib/ts/review/session";
+  import { resolveRange } from "#lib/ts/review/anchors";
   import {
     activeThreadStore,
     buildThreads,
@@ -19,7 +19,7 @@
     pendingCommentStore,
     type CommentThread,
     type CommentView
-  } from "$lib/ts/review/comments";
+  } from "#lib/ts/review/comments";
 
   type PanelTab = "open" | "resolved" | "suggestions";
 

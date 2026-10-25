@@ -1,9 +1,9 @@
 <script lang="ts">
   import Icon from "@iconify/svelte";
   import type { Snippet } from "svelte";
-  import * as api from "$lib/ts/api";
-  import type { ImageData } from "$lib/ts/api";
-  import { formatFileSize } from "$lib/ts/viewer";
+  import * as api from "#lib/ts/api";
+  import type { ImageData } from "#lib/ts/api";
+  import { formatFileSize } from "#lib/ts/viewer";
   import ZoomControls from "./ZoomControls.svelte";
 
   interface Props {

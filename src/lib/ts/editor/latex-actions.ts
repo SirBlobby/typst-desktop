@@ -1,5 +1,5 @@
 import type { EditorView } from "@codemirror/view";
-import { wrapSelection } from "$lib/ts/editor-actions";
+import { wrapSelection } from "#lib/ts/editor-actions";
 
 export const latexSectionCommands = ["section", "subsection", "subsubsection", "paragraph", "subparagraph"];
 

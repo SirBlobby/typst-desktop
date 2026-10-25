@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { reviewSessionStore } from "$lib/ts/review/session";
-  import { reviewPanelOpenStore } from "$lib/ts/review/client";
+  import { reviewSessionStore } from "#lib/ts/review/session";
+  import { reviewPanelOpenStore } from "#lib/ts/review/client";
   import CommentsPanel from "./CommentsPanel.svelte";
 </script>
 

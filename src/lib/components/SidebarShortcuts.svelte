@@ -1,8 +1,8 @@
 <script lang="ts">
   import Icon from "@iconify/svelte";
   import { open } from "@tauri-apps/plugin-dialog";
-  import * as api from "$lib/ts/api";
-  import { app, browseTo, refreshShortcuts, setError, setStatus } from "$lib/ts/state.svelte";
+  import * as api from "#lib/ts/api";
+  import { app, browseTo, refreshShortcuts, setError, setStatus } from "#lib/ts/state.svelte";
 
   interface Props {
     collapsed: boolean;

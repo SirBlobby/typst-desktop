@@ -1,10 +1,10 @@
 <script lang="ts">
   import Icon from "@iconify/svelte";
-  import { app } from "$lib/ts/state.svelte";
-  import { editorViewStore, reviewSessionStore } from "$lib/ts/review/session";
-  import { historyOpenStore, reviewPanelOpenStore } from "$lib/ts/review/client";
-  import { startCommentOnSelection } from "$lib/ts/review/comments";
-  import { saveVersion } from "$lib/ts/review/versions";
+  import { app } from "#lib/ts/state.svelte";
+  import { editorViewStore, reviewSessionStore } from "#lib/ts/review/session";
+  import { historyOpenStore, reviewPanelOpenStore } from "#lib/ts/review/client";
+  import { startCommentOnSelection } from "#lib/ts/review/comments";
+  import { saveVersion } from "#lib/ts/review/versions";
   import CollaboratorAvatars from "./CollaboratorAvatars.svelte";
   import EditingModeSwitch from "./EditingModeSwitch.svelte";
 
