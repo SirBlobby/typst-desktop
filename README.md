@@ -235,6 +235,8 @@ bun install
 bun run tauri dev
 ```
 
+Shared front-end code is imported with `#lib/...`, mapped in `package.json` under `imports`. `#lib/ts/name` points to `src/lib/ts/name.ts`, so leave off the `.ts`. `#lib/components/Name.svelte` keeps its `.svelte`. A new folder under `src/lib` needs its own entry there, because TypeScript does not add extensions to `imports` targets.
+
 To build a release bundle for your own platform:
 
 ```bash
@@ -273,6 +275,24 @@ bun run build:linux
 Build on Ubuntu 22.04 (the CI baseline) rather than a rolling-release distro. glibc compatibility only works forward, so a binary is only guaranteed to run on distros with a glibc version equal to or newer than the one it was built against. This won't cover musl-based distros like Alpine, or glibc-based distros older than the build machine.
 
 On Arch, `packaging/arch/PKGBUILD` builds and installs a native package via `makepkg -si` from within `packaging/arch/`, instead of `bun run build:linux`.
+
+## Acknowledgements
+
+Typst Desktop is built on the work of many open-source projects and services:
+
+- [Typst](https://typst.app/) and its open-source [compiler](https://github.com/typst/typst), which turns documents into PDF, PNG, SVG and HTML (Apache License 2.0). Thanks to the Typst team and contributors for making it possible to build tools like this.
+- The authors of the packages and templates on [Typst Universe](https://typst.app/universe), which TypstDrive downloads and offers as templates.
+- [tinymist](https://github.com/Myriad-Dreamin/tinymist) for language server features such as completions and hover help.
+- [MiTeX](https://github.com/mitex-rs/mitex) for rendering LaTeX documents with Typst.
+- [Hayagriva](https://github.com/typst/hayagriva), Typst's bibliography format, used for `.yml` reference files.
+- [Pandoc](https://pandoc.org/) for converting to and from Word, Markdown, LaTeX and HTML.
+- [Tauri](https://tauri.app/) for the desktop shell, with [SvelteKit](https://svelte.dev/docs/kit), [Svelte](https://svelte.dev/), [Vite](https://vite.dev/) and [Tailwind CSS](https://tailwindcss.com/) for the interface.
+- [CodeMirror](https://codemirror.net/) for the editor, with [codemirror-lang-typst](https://www.npmjs.com/package/codemirror-lang-typst) and [codemirror-lang-latex](https://www.npmjs.com/package/codemirror-lang-latex) for highlighting.
+- [PDF.js](https://mozilla.github.io/pdf.js/) for PDF previews and [Iconify](https://iconify.design/) for icons.
+- [rusqlite](https://github.com/rusqlite/rusqlite) for local storage and [diffy](https://github.com/bmwill/diffy) for comparing versions.
+- The services behind the citation tools: [doi.org](https://www.doi.org/), [Crossref](https://www.crossref.org/), [DataCite](https://datacite.org/), [arXiv](https://arxiv.org/), the [National Library of Medicine](https://www.ncbi.nlm.nih.gov/) for PubMed and PMC, [Semantic Scholar](https://www.semanticscholar.org/) and [Zotero](https://www.zotero.org/).
+
+Each project keeps its own license. Typst Desktop is not affiliated with any of them.
 
 ## License
 
