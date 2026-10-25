@@ -161,6 +161,8 @@ Cards show whether an item is on this device and whether it has local changes wa
 
 To publish a local project, choose **Upload to cloud** on it in the Local view. That creates a Space from its contents.
 
+Deleting a cloud item from the app moves it to the TypstDrive trash, where it can be restored from the web drive until the server removes it for good.
+
 ### Sync
 
 Cloud files sync in two ways:
