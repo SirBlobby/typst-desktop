@@ -74,6 +74,6 @@ jobs:
         working-directory: typst-desktop
         run: bun run fetch:sidecars
 
-      - name: Check
+      - name: Check and test
         working-directory: typst-desktop/src-tauri
-        run: cargo check
+        run: cargo test --lib

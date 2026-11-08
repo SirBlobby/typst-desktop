@@ -4,7 +4,7 @@
 
 # Typst Desktop
 
-[![Version](https://img.shields.io/badge/version-2.1.0-blue.svg)](https://github.com/SirBlobby/typst-desktop.git)
+[![Version](https://img.shields.io/badge/version-2.2.0-blue.svg)](https://github.com/SirBlobby/typst-desktop.git)
 [![License](https://img.shields.io/badge/license-Apache_2.0-green.svg)](LICENSE)
 [![Typst Version](https://img.shields.io/badge/Typst-0.15.1-239dad?logo=typst&logoColor=white)](https://typst.app/)
 [![Rust](https://img.shields.io/badge/Rust-1.82+-orange?logo=rust&logoColor=white)](https://www.rust-lang.org/)
@@ -15,16 +15,24 @@
 
 A desktop editor for Typst. Your documents stay as plain files on your own drive, and can optionally sync to a [TypstDrive](https://github.com/SirBlobby/TypstDrive.git) server so the same notes open on any device.
 
-The Typst compiler is built into the app — there is nothing extra to install to write and export documents.
+The Typst compiler, the `tinymist` language server and `pandoc` are built into the app, so there is nothing extra to install to write, check and export documents.
 
 ## Install
 
 Packages are attached to each [release](https://github.com/SirBlobby/typst-desktop/releases). Set the version you want first:
 
 ```bash
-VERSION=2.1.0
+VERSION=2.2.0
 BASE=https://github.com/SirBlobby/typst-desktop/releases/download/v$VERSION
 ```
+
+### Windows
+
+Download and run `typst-desktop_${VERSION}_x64-setup.exe`, or `typst-desktop_${VERSION}_x64_en-US.msi` for managed installs. The installer can install for the current user or the whole machine, and installs the WebView2 runtime if it is missing.
+
+### macOS
+
+Download `typst-desktop_${VERSION}_aarch64.dmg` for Apple Silicon or `typst-desktop_${VERSION}_x64.dmg` for Intel Macs, open it and drag the app into **Applications**. macOS 10.15 or newer is required. The app is not signed yet, so see [Platform notes](#platform-notes) for opening it the first time.
 
 ### Debian and Ubuntu
 
@@ -33,7 +41,7 @@ wget "$BASE/typst-desktop_${VERSION}_amd64.deb"
 sudo apt install "./typst-desktop_${VERSION}_amd64.deb"
 ```
 
-Installing with `apt` rather than `dpkg -i` pulls in `libwebkit2gtk-4.1-0` and `libgtk-3-0` for you. Debian 12 or Ubuntu 22.04 and newer carry a new enough WebKit.
+Installing with `apt` rather than `dpkg -i` pulls in `libwebkit2gtk-4.1-0`, `libgtk-3-0`, `libssl3` and `xdg-utils` for you. Debian 12 or Ubuntu 22.04 and newer carry a new enough WebKit.
 
 Remove it with `sudo apt remove typst-desktop`.
 
@@ -43,6 +51,8 @@ Remove it with `sudo apt remove typst-desktop`.
 wget "$BASE/typst-desktop-${VERSION}-1.x86_64.rpm"
 sudo dnf install "./typst-desktop-${VERSION}-1.x86_64.rpm"
 ```
+
+`dnf` installs WebKitGTK 4.1, GTK 3, OpenSSL 3 and `xdg-utils` for you. The package requires them by library name, so it also installs with `zypper` on openSUSE.
 
 Remove it with `sudo dnf remove typst-desktop`.
 
@@ -55,6 +65,8 @@ sudo pacman -U "typst-desktop-${VERSION}-1-x86_64.pkg.tar.zst"
 
 Remove it with `sudo pacman -R typst-desktop`.
 
+`pacman` installs `webkit2gtk-4.1`, `gtk3`, `openssl`, `xdg-utils`, `pandoc-cli` and `tinymist` from the Arch repositories.
+
 There is no AUR package; the `.pkg.tar.zst` above is attached to each release directly. Prefer it over the AppImage on Arch specifically — a [known WebKitGTK issue](https://bugs.webkit.org/show_bug.cgi?id=280239) on Wayland crashes the AppImage build (`Could not create default EGL display`) against Arch's current webkit2gtk version. The native package links against your system's webkit2gtk instead, which avoids it.
 
 The AppImage runs on any distribution, so it also works as a fallback on Debian or Fedora — and on Arch too, but may hit the WebKitGTK/EGL crash described above there. Building from source is covered under [Development](#development).
@@ -66,7 +78,7 @@ The AppImage runs on any distribution, so it also works as a fallback on Debian 
 - **Single files or projects**: Open a lone `.typ` or `.tex` file, or a project folder with its own `typst.toml`, chapters, bibliography, and assets.
 - **LaTeX**: Create LaTeX documents and projects by picking the language when you create them. LaTeX is converted to Typst with [MiTeX](https://github.com/mitex-rs/mitex), so basic documents, sections, lists, tables, figures and math work, while packages, `\input` and bibliographies do not. `.tex` files get a LaTeX editor, toolbar and keyboard shortcuts, and sync with TypstDrive LaTeX documents.
 - **Live preview**: The preview recompiles as you type, and follows whichever file you are editing rather than only the entrypoint. Saving is not required to see changes. The **View** menu shows the editor and preview, the editor only, or the preview only.
-- **Editor**: Syntax highlighting for Typst, LaTeX, BibTeX, YAML and TOML, snippet autocompletion, a formatting toolbar with heading sizes and quotes, page settings, inline diagnostics, and optional `tinymist` language server support.
+- **Editor**: Syntax highlighting for Typst, LaTeX, BibTeX, YAML and TOML, snippet autocompletion, a formatting toolbar with heading sizes and quotes, page settings, inline diagnostics, and hover help and richer diagnostics from the bundled `tinymist` language server.
 - **Editor tools**: Find and search and replace, `Ctrl+/` to comment out lines, and quick insert for images, tables, project files, symbols and emoji.
 - **Editor settings**: Font, font size, spell checking, line numbers and a minimap with three sizes.
 - **Review**: For cloud documents open live, see who else is editing with their profile pictures, comment on text, reply and resolve threads, suggest edits that others accept or reject, save versions and browse, compare and restore version history.
@@ -82,6 +94,9 @@ The AppImage runs on any distribution, so it also works as a fallback on Debian 
 - **Images and fonts**: Import from anywhere on disk, drag and drop, or pull from your TypstDrive assets. A searchable asset browser with previews sits in the editor toolbar.
 - **Thumbnails**: Documents and projects show their first compiled page; images show a preview.
 - **Image viewer**: Open images full screen with zoom and folder navigation.
+- **Templates**: Start a document or project from any template on Typst Universe, with the authors filled in. See [Templates](#templates).
+- **Local packages**: Install a project as an `@local` package and manage every local package from the **Packages** section. See [Local Packages](#local-packages).
+- **GitHub**: Link a project to a folder in a GitHub repository, or import one as a new project, then pull and push changes. See [GitHub](#github).
 
 ## Storage
 
@@ -95,7 +110,15 @@ Inside the workspace:
 | `<workspace>/.assets/` | Shared images and fonts available to every project. |
 | `<project>/.typst-desktop.json` | Marks a folder as a project when it has no `typst.toml`, such as a LaTeX project. |
 
-Application data — settings, sync state, and the thumbnail cache — is kept in a SQLite database in the platform's app-data directory. Documents themselves are never stored there.
+Application data — settings, sync state, GitHub links and tokens, and the thumbnail cache — is kept in a SQLite database in the platform's app-data directory. Documents themselves are never stored there.
+
+Packages installed in the `@local` namespace live in the standard Typst package folder, shared with the Typst CLI and tinymist:
+
+| Platform | Folder |
+|---|---|
+| Linux | `~/.local/share/typst/packages/local/` |
+| macOS | `~/Library/Application Support/typst/packages/local/` |
+| Windows | `%APPDATA%\typst\packages\local\` |
 
 ## Settings
 
@@ -107,7 +130,8 @@ Application data — settings, sync state, and the thumbnail cache — is kept i
 | Accessibility | Text size, reduced motion and high contrast. |
 | Account | TypstDrive server, sign in and out, automatic sync interval. |
 | Citations | Connect or disconnect Zotero with an API key. |
-| Language Server | The `tinymist` language server. |
+| GitHub | Connect or disconnect a GitHub account with an access token. |
+| Language Server | Status of the bundled `tinymist` language server. |
 | Hotkeys | View and change keyboard shortcuts. |
 | About | Version, Typst version, license, and links to the official Typst site. |
 
@@ -272,9 +296,24 @@ On Linux, use `bun run build:linux` instead. It is the same command with `NO_STR
 
 `.msi` packages can only be built on Windows, because the WiX Toolset is Windows-only. Building on the target platform is the supported path for both Windows and macOS.
 
-The Windows installers download the WebView2 bootstrapper when the runtime is missing. Windows 10 (April 2018 or later) and Windows 11 already ship it, so this only affects older systems. The NSIS installer asks whether to install for the current user or the whole machine.
+The Windows installers embed the WebView2 bootstrapper and run it when the runtime is missing. Windows 10 (April 2018 or later) and Windows 11 already ship it, so this only affects older systems. The NSIS installer asks whether to install for the current user or the whole machine.
 
-macOS builds are unsigned. Gatekeeper blocks unsigned apps on first launch, so open the app once with right-click then **Open**, or run `xattr -dr com.apple.quarantine "/Applications/Typst Desktop.app"` after installing.
+macOS builds are unsigned. Gatekeeper blocks unsigned apps on first launch, so open the app once with right-click then **Open**, or run `xattr -dr com.apple.quarantine /Applications/typst-desktop.app` after installing.
+
+On Linux the app sets `WEBKIT_DISABLE_DMABUF_RENDERER=1` and `__NV_DISABLE_EXPLICIT_SYNC=1` at startup unless they are already set. This avoids blank windows and `Error 71` crashes with some GPU drivers, most often NVIDIA. If rendering still fails on an AMD GPU with a newer WebKitGTK, try starting the app with `WEBKIT_SKIA_ENABLE_CPU_RENDERING=1`. Prefer the `.deb`, `.rpm` or Arch package over the AppImage, because those use your system's WebKitGTK, which matches your graphics drivers.
+
+### Release builds
+
+`.github/workflows/build.yml` builds every package on GitHub Actions, each on its own platform:
+
+| Runner | Packages |
+|---|---|
+| `ubuntu-22.04` | `.deb`, `.rpm` and AppImage |
+| `windows-latest` | `.msi` and NSIS `.exe` |
+| `macos-latest` | `.dmg` and `.app` for Apple Silicon and for Intel |
+| `archlinux` container | `.pkg.tar.zst` |
+
+It runs on every `v*` tag and can also be started by hand. A tag push also creates a draft GitHub release with every package attached, ready to review and publish. `.github/workflows/ci.yml` type-checks the front end and checks and tests the Rust code on every push to `main` and every pull request.
 
 ### Building locally for another platform
 
@@ -288,7 +327,7 @@ git -C typst checkout bd5ebec285505889e8ff1d4f68804ab147a699f3
 Linux builds also need the WebKit and GTK development packages:
 
 ```bash
-sudo apt-get install libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev patchelf
+sudo apt-get install libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libssl-dev patchelf
 ```
 
 ```bash
@@ -304,7 +343,7 @@ On Arch, `packaging/arch/PKGBUILD` builds and installs a native package via `mak
 Typst Desktop is built on the work of many open-source projects and services:
 
 - [Typst](https://typst.app/) and its open-source [compiler](https://github.com/typst/typst), which turns documents into PDF, PNG, SVG and HTML (Apache License 2.0). Thanks to the Typst team and contributors for making it possible to build tools like this.
-- The authors of the packages and templates on [Typst Universe](https://typst.app/universe), which TypstDrive downloads and offers as templates.
+- The authors of the packages and templates on [Typst Universe](https://typst.app/universe), which Typst Desktop downloads and offers as templates.
 - [tinymist](https://github.com/Myriad-Dreamin/tinymist) for language server features such as completions and hover help.
 - [MiTeX](https://github.com/mitex-rs/mitex) for rendering LaTeX documents with Typst.
 - [Hayagriva](https://github.com/typst/hayagriva), Typst's bibliography format, used for `.yml` reference files.
@@ -314,6 +353,7 @@ Typst Desktop is built on the work of many open-source projects and services:
 - [PDF.js](https://mozilla.github.io/pdf.js/) for PDF previews and [Iconify](https://iconify.design/) for icons.
 - [rusqlite](https://github.com/rusqlite/rusqlite) for local storage and [diffy](https://github.com/bmwill/diffy) for comparing versions.
 - The services behind the citation tools: [doi.org](https://www.doi.org/), [Crossref](https://www.crossref.org/), [DataCite](https://datacite.org/), [arXiv](https://arxiv.org/), the [National Library of Medicine](https://www.ncbi.nlm.nih.gov/) for PubMed and PMC, [Semantic Scholar](https://www.semanticscholar.org/) and [Zotero](https://www.zotero.org/).
+- The [GitHub REST API](https://docs.github.com/en/rest) for linking projects to repositories.
 
 Each project keeps its own license. Typst Desktop is not affiliated with any of them.
 
