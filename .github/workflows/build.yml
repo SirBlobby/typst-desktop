@@ -137,7 +137,7 @@ jobs:
         run: |
           pacman -Syu --noconfirm
           pacman -S --noconfirm --needed \
-            git rust bun webkit2gtk-4.1 gtk3 openssl
+            git rust bun webkit2gtk-4.1 gtk3 openssl xdg-utils pandoc-cli tinymist
 
       - name: Create unprivileged build user
         run: |
