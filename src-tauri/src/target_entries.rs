@@ -31,7 +31,7 @@ fn is_entrypoint_candidate(path: &str) -> bool {
     lower.ends_with(".typ") || lower.ends_with(".tex")
 }
 
-fn entrypoint_after_removal(current: &str, remaining_paths: &[String]) -> String {
+pub(crate) fn entrypoint_after_removal(current: &str, remaining_paths: &[String]) -> String {
     let mut candidates: Vec<&String> = remaining_paths
         .iter()
         .filter(|path| is_entrypoint_candidate(path))

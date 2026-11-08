@@ -34,6 +34,7 @@
   interface Props {
     onnewfolder: () => void;
     onnewproject: () => void;
+    onnewfromtemplate: () => void;
     onnewdocument: () => void;
     onupload: () => void;
     onconvert: () => void;
@@ -41,12 +42,16 @@
     ondelete: (entry: BrowseEntry) => void;
     onlink: (entry: BrowseEntry) => void;
     onsavetocloud: (entry: BrowseEntry) => void;
+    oninstallpackage: (entry: BrowseEntry) => void;
+    ongithub: (entry: BrowseEntry) => void;
+    onimportgithub: () => void;
     onviewfile: (paths: string[], index: number) => void;
   }
 
   let {
     onnewfolder,
     onnewproject,
+    onnewfromtemplate,
     onnewdocument,
     onupload,
     onconvert,
@@ -54,6 +59,9 @@
     ondelete,
     onlink,
     onsavetocloud,
+    oninstallpackage,
+    ongithub,
+    onimportgithub,
     onviewfile,
   }: Props = $props();
 
@@ -273,6 +281,26 @@
           Save to cloud
         </button>
       {/if}
+      {#if entry.kind === "project"}
+        <button
+          class="menu-item"
+          onclick={() => {
+            oninstallpackage(entry);
+            menuFor = null;
+          }}
+        >
+          Install as @local package
+        </button>
+        <button
+          class="menu-item"
+          onclick={() => {
+            ongithub(entry);
+            menuFor = null;
+          }}
+        >
+          GitHub sync
+        </button>
+      {/if}
       <button
         class="menu-item"
         onclick={() => {
@@ -321,6 +349,8 @@
     {onupload}
     {onnewdocument}
     {onnewproject}
+    {onnewfromtemplate}
+    {onimportgithub}
     {onnewfolder}
     {onconvert}
   />
@@ -335,6 +365,7 @@
         <div class="flex gap-2">
           <button class="btn btn-primary" onclick={onnewdocument}>New document</button>
           <button class="btn btn-secondary" onclick={onnewproject}>New project</button>
+          <button class="btn btn-secondary" onclick={onnewfromtemplate}>From template</button>
         </div>
       </div>
     {:else}

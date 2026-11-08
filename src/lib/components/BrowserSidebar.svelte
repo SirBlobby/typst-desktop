@@ -35,6 +35,16 @@
     browseTo("");
   }
 
+  function openPackages() {
+    app.scope = "packages";
+  }
+
+  function openTemplates() {
+    app.scope = "templates";
+  }
+
+  const inPackages = $derived(app.scope === "packages");
+  const inTemplates = $derived(app.scope === "templates");
   const inWorkspace = $derived(app.scope === "local" && !app.currentDir.startsWith("shortcut:"));
   const inPersonalCloud = $derived(app.scope === "cloud" && app.cloudSpace === null);
   const inCloudHome = $derived(inPersonalCloud && app.cloudFolder !== "shared");
@@ -76,9 +86,14 @@
     {collapsed ? 'w-12' : 'w-56'}"
 >
   <nav class="flex-1 space-y-5 {collapsed ? 'p-1.5' : 'px-2.5 pb-2.5 pt-4'}">
+    {@render navItem("New", "ph:plus-circle", inTemplates, openTemplates)}
     <div class="space-y-0.5">
       {@render groupLabel("This computer")}
       {@render navItem("Workspace", "ph:hard-drives", inWorkspace, openWorkspace)}
+      {@render navItem("Packages", "ph:package", inPackages, openPackages)}
+    </div>
+    <div class="space-y-0.5">
+      {@render groupLabel("Folders")}
       <SidebarShortcuts {collapsed} />
     </div>
     {#if app.account}

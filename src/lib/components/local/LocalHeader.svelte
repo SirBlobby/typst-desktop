@@ -20,6 +20,8 @@
     onupload: () => void;
     onnewdocument: () => void;
     onnewproject: () => void;
+    onnewfromtemplate: () => void;
+    onimportgithub: () => void;
     onnewfolder: () => void;
     onconvert: () => void;
   }
@@ -37,6 +39,8 @@
     onupload,
     onnewdocument,
     onnewproject,
+    onnewfromtemplate,
+    onimportgithub,
     onnewfolder,
     onconvert,
   }: Props = $props();
@@ -45,6 +49,8 @@
 
   const createOptions = $derived([
     { label: "Project", description: "Multi-file workspace", icon: "ph:folder-star", action: onnewproject },
+    { label: "From template", description: "Start from Typst Universe", icon: "ph:squares-four", action: onnewfromtemplate },
+    { label: "From GitHub", description: "Import and sync a repository", icon: "ph:github-logo", action: onimportgithub },
     { label: "Folder", description: "Organize your files", icon: "ph:folder-plus", action: onnewfolder },
     { label: "Convert to Typst", description: "From Word, LaTeX, Markdown or HTML", icon: "ph:file-arrow-up", action: onconvert },
   ]);

@@ -46,7 +46,7 @@ impl LspState {
     ) -> Result<LspHandle, String> {
         self.stop();
 
-        let mut child = Command::new("tinymist")
+        let mut child = Command::new(crate::sidecar::program_path("tinymist"))
             .arg("lsp")
             .current_dir(root)
             .stdin(Stdio::piped())
@@ -56,7 +56,7 @@ impl LspState {
             .map_err(|e| {
                 format!(
                     "Could not start the Typst language server (tinymist): {}. \
-                     Install tinymist and make sure it is on your PATH.",
+                     Reinstall Typst Desktop or install tinymist on your PATH.",
                     e
                 )
             })?;

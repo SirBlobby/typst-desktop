@@ -10,6 +10,7 @@
   import ToggleSwitch from "./settings/ToggleSwitch.svelte";
   import EditorSection from "./settings/EditorSection.svelte";
   import CitationsSection from "./settings/CitationsSection.svelte";
+  import GithubSection from "./settings/GithubSection.svelte";
   import AccountAvatar from "./AccountAvatar.svelte";
   import * as api from "#lib/ts/api";
   import type { AppInfo, CompatibilityStatus } from "#lib/ts/api";
@@ -53,6 +54,7 @@
     | "accessibility"
     | "account"
     | "citations"
+    | "github"
     | "lsp"
     | "hotkeys"
     | "about";
@@ -64,6 +66,7 @@
     { id: "accessibility", label: "Accessibility", icon: "ph:wheelchair" },
     { id: "account", label: "Account", icon: "ph:user-circle" },
     { id: "citations", label: "Citations", icon: "ph:quotes" },
+    { id: "github", label: "GitHub", icon: "ph:github-logo" },
     { id: "lsp", label: "Language Server", icon: "ph:plugs-connected" },
     { id: "hotkeys", label: "Hotkeys", icon: "ph:keyboard" },
     { id: "about", label: "About", icon: "ph:info" },
@@ -555,6 +558,8 @@
         </div>
       {:else if section === "citations"}
         <CitationsSection {fieldClass} />
+      {:else if section === "github"}
+        <GithubSection {fieldClass} />
       {:else if section === "lsp"}
         <SettingsHeader title="Language Server" description="Autocomplete, diagnostics and hover help from tinymist." icon="ph:plugs-connected" />
         <div class="flex flex-col gap-4">
@@ -575,13 +580,13 @@
             </div>
             <p class="px-4 py-3 text-xs text-[var(--color-ink-muted)]">
               Typst Desktop uses <span class="font-medium text-[var(--color-ink)]">tinymist</span>, the official Typst
-              language server. It must be installed and available on your PATH; Typst Desktop does not bundle it.
+              language server. It ships with Typst Desktop; a tinymist on your PATH is used as a fallback.
             </p>
           </SettingsCard>
 
           {#if app.lspStatus === "unavailable"}
             <div class="rounded-lg border border-[var(--color-danger)]/25 bg-[var(--color-danger)]/8 p-3 text-xs text-[var(--color-danger)]">
-              tinymist could not be started. Confirm it's installed and on your PATH, then reopen the file.
+              tinymist could not be started. Reinstall Typst Desktop or install tinymist on your PATH, then reopen the file.
             </div>
           {/if}
         </div>
@@ -642,6 +647,7 @@
       section === "editor" ||
       section === "accessibility" ||
       section === "citations" ||
+      section === "github" ||
       section === "lsp" ||
       section === "hotkeys"}
     <button

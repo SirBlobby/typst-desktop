@@ -1,4 +1,6 @@
-<img src="src-tauri/icons/icon.png" width="96" alt="Typst Desktop icon" />
+<p align="center">
+  <img src="src-tauri/icons/icon.png" width="96" alt="Typst Desktop icon" />
+</p>
 
 # Typst Desktop
 
@@ -188,15 +190,36 @@ These features need a TypstDrive server that supports them. Versions are also sa
 
 When a file changed both locally and in the cloud, a three-way merge is attempted against the version last synced. If the merge cannot be resolved automatically, a conflict resolver opens where you can keep either version or edit the merged result. Binary files cannot be merged and keep the cloud version. Automatic sync pauses while conflicts are unresolved.
 
+## Templates
+
+Choose **New** in the sidebar, or **New document > From template**, to start from any template on [Typst Universe](https://typst.app/universe). The new document or project is created in the folder you were last browsing. Search by name or filter by type, pick a template, give it a name, and optionally list the authors to fill in. Single-file templates become a document, and the rest become a project. Each template is downloaded only when you use it.
+
+## Local Packages
+
+Any Typst project with a `typst.toml` can be installed as a package in the `@local` namespace. Right-click a project and choose **Install as @local package**. The project is copied into the standard Typst package folder, so other documents, the Typst CLI and tinymist can import it:
+
+```typst
+#import "@local/my-project:0.1.0": *
+```
+
+The name, version and entrypoint come from the project's `typst.toml`. Installing the same version again replaces it, and installed versions can be removed from the same dialog.
+
+The **Packages** section in the sidebar lists every package in the `@local` namespace on this computer, including ones installed outside Typst Desktop. Each package shows its description, authors, license and import line, and each version can be opened in its folder or removed.
+
+## GitHub
+
+Any project can be linked to a folder in a GitHub repository. Right-click a project and choose **GitHub sync**, or click **GitHub** in the editor header. Enter the repository address, branch and an optional folder, check the repository, and link it. To start a new project from a repository, choose **New document > From GitHub**.
+
+Only document sources, bibliographies, images and fonts are synced. Everything else stays in the repository untouched, so large repositories are fine. Paths can also be excluded, such as `data/` or `*.csv`.
+
+- **Pull** downloads new commits. When a file changed both locally and in the repository, you choose which version to keep.
+- **Commit and push** sends the selected local changes as one commit. Pull first if the repository has new commits.
+
+Private repositories and pushing need a fine-grained access token with read and write access to repository contents. Add a token to a single link, or connect an account in **Settings > GitHub** to use it for every link. Tokens are stored on this computer.
+
 ## Language Server
 
-Typst Desktop can use [`tinymist`](https://github.com/Myriad-Dreamin/tinymist) for hover documentation, go-to-definition, and richer diagnostics. It is not bundled — install it and make sure it is on your `PATH`:
-
-```bash
-curl -L -o ~/.cargo/bin/tinymist \
-  https://github.com/Myriad-Dreamin/tinymist/releases/latest/download/tinymist-linux-x64 \
-  && chmod +x ~/.cargo/bin/tinymist
-```
+Typst Desktop uses [`tinymist`](https://github.com/Myriad-Dreamin/tinymist) for hover documentation, go-to-definition, and richer diagnostics. It ships with the app, and its license is installed alongside it. If the bundled copy is missing, a `tinymist` on your `PATH` is used instead. The Arch package depends on the `tinymist` and `pandoc-cli` packages rather than bundling them.
 
 The editor header shows the language server status. Without `tinymist` the editor still has syntax highlighting, autocompletion, and compiler diagnostics.
 
@@ -204,13 +227,13 @@ The editor header shows the language server status. Without `tinymist` the edito
 
 Exporting to Word, LaTeX, Markdown and HTML, and converting those formats into Typst, uses [`pandoc`](https://pandoc.org), which ships with the app. Pandoc is licensed under the GPL, version 2 or later, and its license is installed alongside the app.
 
-When building from source, `bun run tauri dev` and `bun run tauri build` download the pinned pandoc release for your platform into `src-tauri/binaries/` first. To fetch it on its own, for example before running `cargo` directly:
+When building from source, `bun run tauri dev` and `bun run tauri build` download the pinned pandoc and tinymist releases for your platform into `src-tauri/binaries/` first. To fetch them on their own, for example before running `cargo` directly:
 
 ```bash
-bun run fetch:pandoc
+bun run fetch:sidecars
 ```
 
-The pandoc version is set by `PANDOC_VERSION` in `scripts/fetch-pandoc.mjs`.
+The pandoc and tinymist versions are set in the `sidecars` list in `scripts/fetch-sidecars.mjs`.
 
 ## Development
 
@@ -296,12 +319,24 @@ Each project keeps its own license. Typst Desktop is not affiliated with any of 
 
 ## License
 
-Apache License 2.0. See [LICENSE](LICENSE).
+Typst Desktop is released under the [Apache License 2.0](LICENSE).
 
-Typst Desktop is a community application and is not affiliated with, endorsed by, or supported by the official Typst project. Links to Typst documentation and Typst Universe open the official Typst website in your browser.
+Typst Desktop uses the [Typst](https://github.com/typst/typst) compiler, which is also released under the Apache License 2.0.
 
+## Disclaimer
+
+Typst Desktop is a community application and is not affiliated with, endorsed by, or supported by the official Typst project. "Typst" is used only to describe the document language Typst Desktop works with. Links to Typst documentation and Typst Universe open the official Typst website in your browser.
+
+## Previews
 
 <img src="images/preview1.png" alt="Typst Desktop editor preview" />
 <img src="images/preview2.png" alt="Typst Desktop project editor preview" />
 <img src="images/preview3.png" alt="Typst Desktop editor preview" />
+
+## Donate
+If you like this project, consider donating to me. It will help me to maintain this project and make more projects like this.
+<br>
+As a broke college student, every donation goes straight to the important things: textbooks, energy drinks, and upgrading my diet from instant ramen to slightly more expensive instant ramen.
+<br>
+[![Ko-fi](https://img.shields.io/badge/Donate-Ko--fi-red)](https://ko-fi.com/sirblob)
 

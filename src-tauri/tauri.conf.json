@@ -4,9 +4,9 @@
   "version": "2.1.0",
   "identifier": "co.sirblob.typst-desktop",
   "build": {
-    "beforeDevCommand": "bun run fetch:pandoc && bun run dev",
+    "beforeDevCommand": "bun run fetch:sidecars && bun run dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "bun run fetch:pandoc && bun run build",
+    "beforeBuildCommand": "bun run fetch:sidecars && bun run build",
     "frontendDist": "../build"
   },
   "app": {
@@ -35,9 +35,10 @@
     "longDescription": "A desktop editor for Typst documents with a built-in compiler, live preview, and optional sync to a TypstDrive server.",
     "homepage": "https://github.com/SirBlobby/typst-desktop.git",
     "licenseFile": "../LICENSE",
-    "externalBin": ["binaries/pandoc"],
+    "externalBin": ["binaries/pandoc", "binaries/tinymist"],
     "resources": {
-      "binaries/pandoc-COPYRIGHT.txt": "licenses/pandoc-COPYRIGHT.txt"
+      "binaries/pandoc-COPYRIGHT.txt": "licenses/pandoc-COPYRIGHT.txt",
+      "binaries/tinymist-LICENSE.txt": "licenses/tinymist-LICENSE.txt"
     },
     "icon": [
       "icons/32x32.png",
@@ -50,13 +51,23 @@
       "deb": {
         "depends": [
           "libwebkit2gtk-4.1-0",
-          "libgtk-3-0"
+          "libgtk-3-0",
+          "libssl3",
+          "xdg-utils"
+        ]
+      },
+      "rpm": {
+        "depends": [
+          "libwebkit2gtk-4.1.so.0()(64bit)",
+          "libgtk-3.so.0()(64bit)",
+          "libssl.so.3()(64bit)",
+          "xdg-utils"
         ]
       }
     },
     "windows": {
       "webviewInstallMode": {
-        "type": "downloadBootstrapper"
+        "type": "embedBootstrapper"
       },
       "nsis": {
         "installMode": "both",

@@ -3,14 +3,18 @@ mod citations;
 mod compiler;
 mod db;
 mod fonts;
+mod github;
 mod latex;
+mod local_packages;
 mod lsp;
 mod pandoc;
 mod review;
 mod shortcuts;
+mod sidecar;
 mod spaces;
 mod sync;
 mod target_entries;
+mod templates;
 mod thumbnails;
 mod viewer;
 mod workspace;
@@ -134,7 +138,7 @@ fn parent_of(path: &str) -> String {
     }
 }
 
-fn join_path(parent: &str, name: &str) -> String {
+pub(crate) fn join_path(parent: &str, name: &str) -> String {
     if parent.is_empty() {
         name.to_string()
     } else {
@@ -1538,6 +1542,27 @@ pub fn run() {
             set_target_entrypoint,
             target_entries::rename_target_entry,
             target_entries::delete_target_entries,
+            templates::index::list_templates,
+            templates::create::create_from_template,
+            local_packages::local_package_info,
+            local_packages::install_local_package,
+            local_packages::remove_local_package,
+            local_packages::listing::list_local_packages,
+            local_packages::listing::local_packages_folder,
+            github::commands::github_account,
+            github::commands::github_connect,
+            github::commands::github_disconnect,
+            github::commands::git_link_status,
+            github::commands::git_linked_projects,
+            github::commands::git_preview_link,
+            github::commands::git_create_link,
+            github::commands::git_update_link,
+            github::commands::git_delete_link,
+            github::commands::git_changes,
+            github::commands::git_pull,
+            github::commands::git_push,
+            github::commands::git_preview_import,
+            github::commands::git_import_project,
             citations::commands::citation_lookup,
             citations::commands::citation_files,
             citations::commands::citation_add,

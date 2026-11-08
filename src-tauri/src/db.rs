@@ -20,7 +20,7 @@ pub struct DocumentLink {
     pub synced_at: Option<String>,
 }
 
-const SCHEMA: [&str; 9] = [
+const SCHEMA: [&str; 11] = [
     "CREATE TABLE IF NOT EXISTS settings (
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL
@@ -78,6 +78,24 @@ const SCHEMA: [&str; 9] = [
         item_count INTEGER NOT NULL DEFAULT 0,
         last_synced_at TEXT,
         UNIQUE (target_path, file_name)
+    )",
+    "CREATE TABLE IF NOT EXISTS git_links (
+        project_path TEXT PRIMARY KEY,
+        repo_url TEXT NOT NULL,
+        branch TEXT NOT NULL,
+        folder TEXT NOT NULL DEFAULT '',
+        token TEXT,
+        uses_account INTEGER NOT NULL DEFAULT 0,
+        excluded_paths TEXT,
+        base_commit TEXT,
+        last_synced_at TEXT
+    )",
+    "CREATE TABLE IF NOT EXISTS git_link_files (
+        project_path TEXT NOT NULL,
+        path TEXT NOT NULL,
+        blob_sha TEXT NOT NULL,
+        content_hash TEXT NOT NULL,
+        PRIMARY KEY (project_path, path)
     )",
 ];
 
@@ -262,6 +280,8 @@ impl Store {
             )?;
             connection.execute("DELETE FROM projects WHERE path = ?1", params![project])?;
             connection.execute("DELETE FROM citation_syncs WHERE target_path = ?1", params![project])?;
+            connection.execute("DELETE FROM git_link_files WHERE project_path = ?1", params![project])?;
+            connection.execute("DELETE FROM git_links WHERE project_path = ?1", params![project])?;
             Ok(())
         })
     }
@@ -278,6 +298,14 @@ impl Store {
             )?;
             connection.execute(
                 "UPDATE citation_syncs SET target_path = ?2 WHERE target_path = ?1",
+                params![from, to],
+            )?;
+            connection.execute(
+                "UPDATE git_links SET project_path = ?2 WHERE project_path = ?1",
+                params![from, to],
+            )?;
+            connection.execute(
+                "UPDATE git_link_files SET project_path = ?2 WHERE project_path = ?1",
                 params![from, to],
             )?;
             Ok(())

@@ -26,7 +26,7 @@ import type {
   TargetInfo,
 } from "./api";
 
-export type Scope = "local" | "cloud";
+export type Scope = "local" | "cloud" | "packages" | "templates";
 export type View = "files" | "editor";
 export type LspStatus = "off" | "starting" | "on" | "unavailable";
 export type ThemePreference = "light" | "dark" | "system";

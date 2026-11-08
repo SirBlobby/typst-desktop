@@ -20,8 +20,10 @@ export default defineConfig(async () => ({
 
   optimizeDeps: {
     exclude: ["codemirror-lang-typst"],
-    esbuildOptions: {
-      target: "esnext",
+    rolldownOptions: {
+      transform: {
+        target: "esnext",
+      },
     },
   },
   build: {

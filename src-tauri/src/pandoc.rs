@@ -19,12 +19,7 @@ fn import_format(source: &Path) -> Result<&'static str, String> {
 }
 
 fn pandoc_program() -> PathBuf {
-    let file_name = if cfg!(windows) { "pandoc.exe" } else { "pandoc" };
-    std::env::current_exe()
-        .ok()
-        .and_then(|executable| executable.parent().map(|dir| dir.join(file_name)))
-        .filter(|bundled| bundled.is_file())
-        .unwrap_or_else(|| PathBuf::from("pandoc"))
+    crate::sidecar::program_path("pandoc")
 }
 
 fn run_pandoc(working_dir: &Path, arguments: &[&str]) -> Result<(), String> {

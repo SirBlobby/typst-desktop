@@ -40,6 +40,7 @@ sha2 = "0.11.1"
 base64 = "0.23.1"
 diffy = "0.5.2"
 walkdir = "2.5.0"
+toml = { version = "0.8", default-features = false, features = ["parse"] }
 ureq = { version = "2.12.1", features = ["json"] }
 tungstenite = { version = "0.30.0", features = ["native-tls"] }
 

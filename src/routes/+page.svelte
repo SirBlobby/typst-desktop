@@ -30,6 +30,12 @@
   import ExportMenu from "#lib/components/ExportMenu.svelte";
   import PreviewModeMenu from "#lib/components/PreviewModeMenu.svelte";
   import LanguagePicker from "#lib/components/LanguagePicker.svelte";
+  import TemplatesView from "#lib/components/templates/TemplatesView.svelte";
+  import LocalPackageModal from "#lib/components/LocalPackageModal.svelte";
+  import PackagesView from "#lib/components/packages/PackagesView.svelte";
+  import GithubModal from "#lib/components/github/GithubModal.svelte";
+  import GithubImportModal from "#lib/components/github/GithubImportModal.svelte";
+  import { createFromTemplate, type TemplateAuthor, type UniverseTemplate } from "#lib/ts/templates";
   import { isLatexPath, languageLabel, sourceExtension, type DocumentLanguage } from "#lib/ts/document-language";
   import { previewMode } from "#lib/ts/preview-mode.svelte";
   import PageSettingsModal from "#lib/components/PageSettingsModal.svelte";
@@ -67,6 +73,7 @@
     resolveCollabConflict,
     cancelCollabConflict,
     runSync,
+    saveActiveFile,
     saveAndCompile,
     scheduleAutosave,
     scheduleCompile,
@@ -79,6 +86,9 @@
   type Dialog =
     | { kind: "none" }
     | { kind: "new-project" }
+    | { kind: "install-local-package"; entry: BrowseEntry }
+    | { kind: "github"; path: string }
+    | { kind: "import-github" }
     | { kind: "new-folder" }
     | { kind: "new-document" }
     | { kind: "rename-entry"; entry: BrowseEntry }
@@ -167,6 +177,33 @@
       await refreshEntries();
       await openTarget(path);
     });
+
+  async function createTemplateEntry(template: UniverseTemplate, title: string, authors: TemplateAuthor[]) {
+    const created = await createFromTemplate(template, title, app.currentDir, authors);
+    app.scope = "local";
+    await refreshEntries();
+    await openTarget(created.path);
+    if (created.authors_filled === false) {
+      setStatus("This template has no author field to fill in, so add the authors in the document yourself.");
+    }
+  }
+
+  async function openGithub() {
+    if (!app.target) return;
+    if (app.dirty) await saveActiveFile();
+    dialog = { kind: "github", path: app.target.path };
+  }
+
+  async function githubChanged(path: string) {
+    if (app.view === "editor" && app.target?.path === path) await refreshTarget();
+    else await refreshEntries();
+  }
+
+  async function openImportedProject(path: string) {
+    close();
+    await refreshEntries();
+    await openTarget(path);
+  }
 
   const createFolder = (name: string) =>
     guard(async () => {
@@ -740,6 +777,13 @@
 
       <PreviewModeMenu />
 
+      {#if app.target && !app.target.standalone}
+        <button class="btn btn-ghost" onclick={openGithub} title="Pull and push with GitHub">
+          <Icon icon="ph:github-logo" />
+          GitHub
+        </button>
+      {/if}
+
       <ExportMenu onexport={exportAs} />
 
       <div class="group relative">
@@ -862,6 +906,10 @@
         {#if app.scope === "local"}
           <FileViewer
             onnewproject={() => (dialog = { kind: "new-project" })}
+            onnewfromtemplate={() => (app.scope = "templates")}
+            oninstallpackage={(entry) => (dialog = { kind: "install-local-package", entry })}
+            ongithub={(entry) => (dialog = { kind: "github", path: entry.path })}
+            onimportgithub={() => (dialog = { kind: "import-github" })}
             onnewfolder={() => (dialog = { kind: "new-folder" })}
             onnewdocument={() => (dialog = { kind: "new-document" })}
             onupload={importFiles}
@@ -873,6 +921,10 @@
               (dialog = { kind: "save-document-to-cloud", entry })}
             onviewfile={(paths, index) => (fileViewer = { paths, index })}
           />
+        {:else if app.scope === "packages"}
+          <PackagesView />
+        {:else if app.scope === "templates"}
+          <TemplatesView oncreate={createTemplateEntry} />
         {:else}
           <CloudView
             ondownloaddocument={(documentId, title) =>
@@ -1077,6 +1129,14 @@
   >
     <LanguagePicker bind:language={createLanguage} />
   </PromptModal>
+{:else if dialog.kind === "install-local-package"}
+  {@const target = dialog}
+  <LocalPackageModal path={target.entry.path} onclose={close} />
+{:else if dialog.kind === "github"}
+  {@const target = dialog}
+  <GithubModal path={target.path} onchanged={() => githubChanged(target.path)} onclose={close} />
+{:else if dialog.kind === "import-github"}
+  <GithubImportModal parent={app.currentDir} onimported={openImportedProject} onclose={close} />
 {:else if dialog.kind === "new-folder"}
   <PromptModal
     title="New folder"
