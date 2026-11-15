@@ -4,7 +4,7 @@
 
 # Typst Desktop
 
-[![Version](https://img.shields.io/badge/version-2.2.0-blue.svg)](https://github.com/SirBlobby/typst-desktop.git)
+[![Version](https://img.shields.io/badge/version-2.2.2-blue.svg)](https://github.com/SirBlobby/typst-desktop.git)
 [![License](https://img.shields.io/badge/license-Apache_2.0-green.svg)](LICENSE)
 [![Typst Version](https://img.shields.io/badge/Typst-0.15.1-239dad?logo=typst&logoColor=white)](https://typst.app/)
 [![Rust](https://img.shields.io/badge/Rust-1.82+-orange?logo=rust&logoColor=white)](https://www.rust-lang.org/)
@@ -22,7 +22,7 @@ The Typst compiler, the `tinymist` language server and `pandoc` are built into t
 Packages are attached to each [release](https://github.com/SirBlobby/typst-desktop/releases). Set the version you want first:
 
 ```bash
-VERSION=2.2.0
+VERSION=2.2.2
 BASE=https://github.com/SirBlobby/typst-desktop/releases/download/v$VERSION
 ```
 
@@ -81,7 +81,7 @@ The AppImage runs on any distribution, so it also works as a fallback on Debian 
 - **Editor**: Syntax highlighting for Typst, LaTeX, BibTeX, YAML and TOML, snippet autocompletion, a formatting toolbar with heading sizes and quotes, page settings, inline diagnostics, and hover help and richer diagnostics from the bundled `tinymist` language server.
 - **Editor tools**: Find and search and replace, `Ctrl+/` to comment out lines, and quick insert for images, tables, project files, symbols and emoji.
 - **Editor settings**: Font, font size, spell checking, line numbers and a minimap with three sizes.
-- **Review**: For cloud documents open live, see who else is editing with their profile pictures, comment on text, reply and resolve threads, suggest edits that others accept or reject, save versions and browse, compare and restore version history.
+- **Review**: For cloud documents and projects open live, see who else is editing with their profile pictures, comment on text, reply and resolve threads, suggest edits that others accept or reject, save versions and browse, compare and restore version history.
 - **Export**: PDF, PNG, SVG, HTML and the source file, plus Word, LaTeX, Markdown and HTML through `pandoc`. LaTeX files are read as LaTeX by `pandoc`. Word, LaTeX, Markdown and HTML files can also be converted into Typst documents.
 - **Team spaces**: Browse and work in the TypstDrive team spaces you belong to from the sidebar.
 - **Viewer**: Open PDFs and images from the file browser, the project file tree, or TypstDrive.
@@ -202,11 +202,11 @@ Viewer access is read-only: a document shared with the viewer role can be downlo
 
 ### Comments, suggestions and history
 
-When a cloud document is open with live collaboration, the bar above the editor shows who is editing, the **Editing** or **Suggesting** mode, and buttons for comments, saving a version and version history.
+When a cloud document or project is open with live collaboration, the bar above the editor shows who is editing, the **Editing** or **Suggesting** mode, and buttons for comments, saving a version and version history.
 
 - Select text and press `Ctrl+Alt+M`, or use the comment button, to comment on it. Hover over highlighted text to preview a comment, and click it to open the thread, reply or resolve it.
 - In **Suggesting** mode your edits become suggestions. Owners and editors accept or reject them from the **Suggestions** tab. People shared a document with the suggester role are always in suggesting mode.
-- **Version history** lists every version with who edited and when. Compare a version with the one before it or with the current document, name it, or restore it.
+- **Version history** (documents only) lists every version with who edited and when. Compare a version with the one before it or with the current document, name it, or restore it.
 
 These features need a TypstDrive server that supports them. Versions are also saved automatically when you leave a document after editing it.
 
