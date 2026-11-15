@@ -1,7 +1,7 @@
 <script lang="ts">
   import Icon from "@iconify/svelte";
   import { app } from "#lib/ts/state.svelte";
-  import { editorViewStore, reviewSessionStore } from "#lib/ts/review/session";
+  import { editorViewStore, hasVersionHistory, reviewSessionStore } from "#lib/ts/review/session";
   import { historyOpenStore, reviewPanelOpenStore } from "#lib/ts/review/client";
   import { startCommentOnSelection } from "#lib/ts/review/comments";
   import { saveVersion } from "#lib/ts/review/versions";
@@ -23,13 +23,14 @@
 
   let canEdit = $derived($reviewSessionStore?.role === "owner" || $reviewSessionStore?.role === "editor");
   let canComment = $derived(!!$reviewSessionStore && $reviewSessionStore.role !== "viewer");
+  let showVersions = $derived(hasVersionHistory($reviewSessionStore));
 
   async function handleSaveVersion() {
     const session = $reviewSessionStore;
     if (!session || saveStatus === "saving") return;
     saveStatus = "saving";
     try {
-      const result = await saveVersion(session.documentId);
+      const result = await saveVersion(session.scope.id);
       saveStatus = result.created ? "saved" : "unchanged";
     } catch {
       saveStatus = "error";
@@ -61,7 +62,7 @@
         startCommentOnSelection($editorViewStore, $reviewSessionStore?.text ?? null),
       )}
     {/if}
-    {#if canEdit}
+    {#if canEdit && showVersions}
       <button
         class="btn btn-ghost {saveStatus === 'error' ? 'text-[var(--color-danger)]' : ''}"
         title="Save a version of this document"
@@ -72,7 +73,9 @@
         {saveStatusLabels[saveStatus]}
       </button>
     {/if}
-    {@render barButton("ph:clock-counter-clockwise", "Version history", () => historyOpenStore.set(true))}
+    {#if showVersions}
+      {@render barButton("ph:clock-counter-clockwise", "Version history", () => historyOpenStore.set(true))}
+    {/if}
     {@render barButton("ph:chats", "Comments and suggestions", () => reviewPanelOpenStore.update((open) => !open), $reviewPanelOpenStore)}
   </div>
 {/if}

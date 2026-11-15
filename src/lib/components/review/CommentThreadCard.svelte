@@ -3,10 +3,11 @@
   import CommentMessage from "./CommentMessage.svelte";
   import CommentComposer from "./CommentComposer.svelte";
   import { createComment, updateComment, type CommentThread, type CommentView } from "#lib/ts/review/comments";
+  import type { ReviewScope } from "#lib/ts/review/session";
 
-  let { thread, docId, expanded, canComment, isOwner, onToggle, onRequestDelete }: {
+  let { thread, scope, expanded, canComment, isOwner, onToggle, onRequestDelete }: {
     thread: CommentThread;
-    docId: string;
+    scope: ReviewScope;
     expanded: boolean;
     canComment: boolean;
     isOwner: boolean;
@@ -24,7 +25,7 @@
   async function toggleResolved() {
     busy = true;
     try {
-      await updateComment(docId, thread.root.id, { resolved: !thread.root.resolved });
+      await updateComment(scope, thread.root.id, { resolved: !thread.root.resolved });
     } catch (err) {
       alert((err as Error).message);
     }
@@ -32,11 +33,11 @@
   }
 
   async function reply(content: string) {
-    await createComment(docId, content, { parentId: thread.root.id });
+    await createComment(scope, content, { parentId: thread.root.id });
   }
 
   async function edit(comment: CommentView, content: string) {
-    await updateComment(docId, comment.id, { content });
+    await updateComment(scope, comment.id, { content });
   }
 </script>
 

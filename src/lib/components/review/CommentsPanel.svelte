@@ -7,7 +7,7 @@
   import SuggestionsList from "./SuggestionsList.svelte";
   import { activeSuggestionStore, loadSuggestions, suggestionsStore } from "#lib/ts/review/suggestions";
   import { get } from "svelte/store";
-  import { editorViewStore, reviewSessionStore } from "#lib/ts/review/session";
+  import { editorViewStore, reviewSessionStore, type ReviewScope } from "#lib/ts/review/session";
   import { resolveRange } from "#lib/ts/review/anchors";
   import {
     activeThreadStore,
@@ -23,8 +23,8 @@
 
   type PanelTab = "open" | "resolved" | "suggestions";
 
-  let { docId, canComment, canReview, isOwner, onClose }: {
-    docId: string;
+  let { scope, canComment, canReview, isOwner, onClose }: {
+    scope: ReviewScope;
     canComment: boolean;
     canReview: boolean;
     isOwner: boolean;
@@ -52,7 +52,7 @@
 
   async function refresh() {
     try {
-      await Promise.all([loadComments(docId), loadSuggestions(docId)]);
+      await Promise.all([loadComments(scope), loadSuggestions(scope)]);
       loadError = "";
     } catch (err) {
       loadError = (err as Error).message;
@@ -78,7 +78,7 @@
   }
 
   async function startThread(content: string) {
-    const created = await createComment(docId, content, { pending: $pendingCommentStore });
+    const created = await createComment(scope, content, { pending: $pendingCommentStore });
     pendingCommentStore.set(null);
     filter = "open";
     activeThreadStore.set(created.id);
@@ -89,7 +89,7 @@
     commentToDelete = null;
     if (!comment) return;
     try {
-      await deleteComment(docId, comment.id);
+      await deleteComment(scope, comment.id);
     } catch (err) {
       alert((err as Error).message);
     }
@@ -150,7 +150,7 @@
     {#if loading}
       <div class="flex h-full items-center justify-center"><Icon icon="ph:circle-notch" class="animate-spin text-2xl" /></div>
     {:else if filter === 'suggestions'}
-      <SuggestionsList {docId} {canReview} />
+      <SuggestionsList {scope} {canReview} />
     {:else if loadError}
       <p class="rounded-lg border border-[var(--color-danger)]/20 bg-[var(--color-danger)]/8 p-3 text-center text-xs text-[var(--color-danger)]">{loadError}</p>
     {:else if visibleThreads.length === 0}
@@ -165,7 +165,7 @@
       {#each visibleThreads as thread (thread.root.id)}
         <CommentThreadCard
           {thread}
-          {docId}
+          {scope}
           {canComment}
           {isOwner}
           expanded={$activeThreadStore === thread.root.id}

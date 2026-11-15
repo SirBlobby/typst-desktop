@@ -4,10 +4,13 @@ import type * as Y from "yjs";
 import type { PersonSummary } from "./people";
 import { anchorRange, type AnchoredRange } from "./anchors";
 import { reviewPanelOpenStore, reviewRequest } from "./client";
+import { createPath, inScope, itemPath, listPath } from "./endpoints";
+import type { ReviewScope } from "./session";
 
 export interface CommentView {
   id: string;
-  document_id: string;
+  document_id?: string;
+  file_id?: string;
   parent_id: string | null;
   author: PersonSummary | null;
   user_id: string;
@@ -33,34 +36,35 @@ export const commentsStore = writable<CommentView[]>([]);
 export const activeThreadStore = writable<string | null>(null);
 export const pendingCommentStore = writable<PendingComment | null>(null);
 
-export async function loadComments(documentId: string) {
-  commentsStore.set(await reviewRequest<CommentView[]>("GET", `/documents/${documentId}/comments`));
+export async function loadComments(scope: ReviewScope) {
+  const comments = await reviewRequest<CommentView[]>("GET", listPath(scope, "comments"));
+  commentsStore.set(inScope(scope, comments));
 }
 
 export async function createComment(
-  documentId: string,
+  scope: ReviewScope,
   content: string,
   options: { parentId?: string; pending?: PendingComment | null } = {},
 ): Promise<CommentView> {
-  const created = await reviewRequest<CommentView>("POST", `/documents/${documentId}/comments`, {
+  const created = await reviewRequest<CommentView>("POST", createPath(scope, "comments"), {
     content,
     parent_id: options.parentId ?? null,
     anchor_start: options.pending?.anchor_start ?? null,
     anchor_end: options.pending?.anchor_end ?? null,
     quoted_text: options.pending?.quoted_text ?? null,
   });
-  await loadComments(documentId);
+  await loadComments(scope);
   return created;
 }
 
-export async function updateComment(documentId: string, commentId: string, changes: { content?: string; resolved?: boolean }) {
-  await reviewRequest("PATCH", `/comments/${commentId}`, changes);
-  await loadComments(documentId);
+export async function updateComment(scope: ReviewScope, commentId: string, changes: { content?: string; resolved?: boolean }) {
+  await reviewRequest("PATCH", itemPath(scope, "comments", commentId), changes);
+  await loadComments(scope);
 }
 
-export async function deleteComment(documentId: string, commentId: string) {
-  await reviewRequest("DELETE", `/comments/${commentId}`);
-  await loadComments(documentId);
+export async function deleteComment(scope: ReviewScope, commentId: string) {
+  await reviewRequest("DELETE", itemPath(scope, "comments", commentId));
+  await loadComments(scope);
 }
 
 export function buildThreads(comments: CommentView[]): CommentThread[] {

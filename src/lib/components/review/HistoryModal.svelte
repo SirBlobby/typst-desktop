@@ -54,7 +54,7 @@
     loading = true;
     errorMessage = "";
     try {
-      versions = await fetchVersions(session.documentId);
+      versions = await fetchVersions(session.scope.id);
       selected = versions.find((version) => version.id === selected?.id) ?? versions[0] ?? null;
     } catch (error) {
       errorMessage = String(error);
@@ -66,7 +66,7 @@
     renaming = false;
     if (!selected) return;
     try {
-      await renameVersion(session.documentId, selected.id, label);
+      await renameVersion(session.scope.id, selected.id, label);
       await load();
     } catch (error) {
       errorMessage = String(error);
@@ -78,7 +78,7 @@
     if (!selected) return;
     busy = true;
     try {
-      await restoreVersion(session.documentId, selected.id);
+      await restoreVersion(session.scope.id, selected.id);
       onClose();
     } catch (error) {
       errorMessage = String(error);

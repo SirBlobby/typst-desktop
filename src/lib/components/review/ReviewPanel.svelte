@@ -7,7 +7,7 @@
 {#if $reviewSessionStore && $reviewPanelOpenStore}
   {#key $reviewSessionStore}
     <CommentsPanel
-      docId={$reviewSessionStore.documentId}
+      scope={$reviewSessionStore.scope}
       canComment={$reviewSessionStore.role !== "viewer"}
       canReview={$reviewSessionStore.role === "owner" || $reviewSessionStore.role === "editor"}
       isOwner={$reviewSessionStore.role === "owner"}

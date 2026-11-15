@@ -1,8 +1,9 @@
 <script lang="ts">
   import type { EditorView } from "@codemirror/view";
   import { app } from "#lib/ts/state.svelte";
-  import { editorViewStore, reviewSessionStore } from "#lib/ts/review/session";
-  import { historyOpenStore, reviewPanelOpenStore } from "#lib/ts/review/client";
+  import { editorViewStore, reviewSessionStore, type ReviewScope } from "#lib/ts/review/session";
+  import { historyOpenStore, reviewPanelOpenStore, reviewRequest } from "#lib/ts/review/client";
+  import { projectScopeFromRoom } from "#lib/ts/review/endpoints";
   import { setLocalAwarenessUser } from "#lib/ts/review/awareness";
   import { resetComments } from "#lib/ts/review/comments";
   import { resetSuggestions, suggestingModeStore } from "#lib/ts/review/suggestions";
@@ -12,6 +13,8 @@
   import HistoryModal from "./HistoryModal.svelte";
 
   let { view, title }: { view: EditorView | null; title: string } = $props();
+
+  let projectRole = $state<string | null>(null);
 
   function clearSession() {
     reviewSessionStore.set(null);
@@ -28,17 +31,34 @@
 
   let collab = $derived(app.collab);
   let documentId = $derived(app.documentLink?.document_id ?? null);
-  let role = $derived(app.documentLink?.role ?? null);
+  let projectScope = $derived(collab && !documentId ? projectScopeFromRoom(collab.provider.roomname) : null);
+  let scope = $derived<ReviewScope | null>(documentId ? { kind: "document", id: documentId, fileId: null } : projectScope);
+  let role = $derived(documentId ? (app.documentLink?.role ?? null) : projectRole);
   let userId = $derived(app.account?.user_id ?? null);
   let username = $derived(app.account?.username ?? "");
 
   $effect(() => {
-    if (!collab || !documentId || !role || !userId) {
+    const currentProject = projectScope;
+    projectRole = null;
+    if (!currentProject) return;
+    let cancelled = false;
+    reviewRequest<{ role?: string }>("GET", `/projects/${currentProject.id}/manifest`)
+      .then((manifest) => {
+        if (!cancelled) projectRole = manifest.role ?? null;
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  });
+
+  $effect(() => {
+    if (!collab || !scope || !role || !userId) {
       clearSession();
       return;
     }
     setLocalAwarenessUser(collab.provider.awareness, { user_id: userId, username });
-    reviewSessionStore.set({ documentId, role, userId, doc: collab.doc, text: collab.text });
+    reviewSessionStore.set({ scope, role, userId, doc: collab.doc, text: collab.text });
     suggestingModeStore.set(role === "suggester");
     return clearSession;
   });
@@ -48,7 +68,7 @@
   {#key $reviewSessionStore}
     <CommentHighlights />
     <SuggestionHighlights />
-    <SuggestionComposer docId={$reviewSessionStore.documentId} />
+    <SuggestionComposer scope={$reviewSessionStore.scope} />
     {#if $historyOpenStore}
       <HistoryModal {title} onClose={() => historyOpenStore.set(false)} />
     {/if}

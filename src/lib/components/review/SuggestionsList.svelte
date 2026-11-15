@@ -2,7 +2,7 @@
   import Icon from "@iconify/svelte";
   import SuggestionCard from "./SuggestionCard.svelte";
   import { get } from "svelte/store";
-  import { editorViewStore, reviewSessionStore } from "#lib/ts/review/session";
+  import { editorViewStore, reviewSessionStore, type ReviewScope } from "#lib/ts/review/session";
   import {
     acceptSuggestion,
     activeSuggestionStore,
@@ -14,7 +14,7 @@
     type SuggestionView
   } from "#lib/ts/review/suggestions";
 
-  let { docId, canReview }: { docId: string; canReview: boolean } = $props();
+  let { scope, canReview }: { scope: ReviewScope; canReview: boolean } = $props();
 
   const { doc, text } = get(reviewSessionStore)!;
 
@@ -34,7 +34,7 @@
 
   async function accept(suggestion: SuggestionView) {
     if (!doc || !text) throw new Error("The editor is not connected yet.");
-    await acceptSuggestion(docId, doc, text, suggestion);
+    await acceptSuggestion(scope, doc, text, suggestion);
   }
 
   function hasChanged(suggestion: SuggestionView) {
@@ -56,8 +56,8 @@
       changedSince={suggestion.status === 'pending' && hasChanged(suggestion)}
       onSelect={() => select(suggestion)}
       onAccept={() => accept(suggestion)}
-      onReject={() => rejectSuggestion(docId, suggestion)}
-      onWithdraw={() => withdrawSuggestion(docId, suggestion)}
+      onReject={() => rejectSuggestion(scope, suggestion)}
+      onWithdraw={() => withdrawSuggestion(scope, suggestion)}
     />
   {:else}
     <div class="flex flex-col items-center gap-2 py-10 text-center text-[var(--color-ink-muted)]">

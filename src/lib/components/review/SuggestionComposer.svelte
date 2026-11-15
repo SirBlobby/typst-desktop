@@ -1,10 +1,10 @@
 <script lang="ts">
   import Icon from "@iconify/svelte";
-  import { editorViewStore } from "#lib/ts/review/session";
+  import { editorViewStore, type ReviewScope } from "#lib/ts/review/session";
   import { focusOnMount } from "#lib/ts/focus-on-mount";
   import { submitSuggestion, suggestionDraftStore, type SuggestionDraft } from "#lib/ts/review/suggestions";
 
-  let { docId }: { docId: string } = $props();
+  let { scope }: { scope: ReviewScope } = $props();
 
   let replacement = $state("");
   let note = $state("");
@@ -50,7 +50,7 @@
     saving = true;
     errorMessage = "";
     try {
-      await submitSuggestion(docId, { ...draft, replacement_text: replacement }, note.trim());
+      await submitSuggestion(scope, { ...draft, replacement_text: replacement }, note.trim());
       close();
     } catch (err) {
       errorMessage = (err as Error).message;

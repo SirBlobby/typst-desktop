@@ -3,7 +3,10 @@ use serde_json::Value;
 use std::io::Read;
 
 const REQUEST_TIMEOUT_SECS: u64 = 30;
-const ALLOWED_PREFIXES: [&str; 3] = ["/documents/", "/comments/", "/suggestions/"];
+const ALLOWED_PREFIXES: [&str; 5] = ["/documents/", "/comments/", "/suggestions/", "/project-comments/", "/project-suggestions/"];
+const PROJECT_PREFIX: &str = "/projects/";
+const PROJECT_REVIEW_ENDINGS: [&str; 2] = ["/comments", "/suggestions"];
+const PROJECT_MANIFEST_ENDING: &str = "/manifest";
 const ALLOWED_METHODS: [&str; 5] = ["GET", "POST", "PUT", "PATCH", "DELETE"];
 const MAX_AVATAR_BYTES: u64 = 4 * 1024 * 1024;
 
@@ -27,11 +30,21 @@ fn describe(error: ureq::Error) -> String {
     }
 }
 
+fn is_project_review_path(method: &str, path: &str) -> bool {
+    if !path.starts_with(PROJECT_PREFIX) {
+        return false;
+    }
+    let is_review = PROJECT_REVIEW_ENDINGS.iter().any(|ending| path.ends_with(ending));
+    let is_manifest = method == "GET" && path.ends_with(PROJECT_MANIFEST_ENDING);
+    is_review || is_manifest
+}
+
 fn check_request(method: &str, path: &str) -> Result<(), String> {
     if !ALLOWED_METHODS.contains(&method) {
         return Err(format!("Unsupported method {method}"));
     }
-    let allowed_path = ALLOWED_PREFIXES.iter().any(|prefix| path.starts_with(prefix)) && !path.contains("..");
+    let known_path = ALLOWED_PREFIXES.iter().any(|prefix| path.starts_with(prefix)) || is_project_review_path(method, path);
+    let allowed_path = known_path && !path.contains("..") && !path.contains('?');
     if !allowed_path {
         return Err(format!("Unsupported path {path}"));
     }
