@@ -24,3 +24,26 @@ export function setPreviewMode(mode: PreviewMode) {
   previewMode.current = mode;
   localStorage.setItem(PREVIEW_MODE_KEY, mode);
 }
+
+export const MIN_SPLIT = 0.2;
+export const MAX_SPLIT = 0.8;
+export const DEFAULT_SPLIT = 0.5;
+
+const SPLIT_RATIO_KEY = "editor-split-ratio";
+
+export function clampSplit(ratio: number) {
+  return Math.min(MAX_SPLIT, Math.max(MIN_SPLIT, ratio));
+}
+
+function loadSplitRatio(): number {
+  if (typeof localStorage === "undefined") return DEFAULT_SPLIT;
+  const saved = Number.parseFloat(localStorage.getItem(SPLIT_RATIO_KEY) ?? "");
+  return Number.isFinite(saved) ? clampSplit(saved) : DEFAULT_SPLIT;
+}
+
+export const splitRatio = $state<{ current: number }>({ current: loadSplitRatio() });
+
+export function setSplitRatio(ratio: number) {
+  splitRatio.current = clampSplit(ratio);
+  localStorage.setItem(SPLIT_RATIO_KEY, String(splitRatio.current));
+}

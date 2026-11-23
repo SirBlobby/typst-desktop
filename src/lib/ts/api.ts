@@ -38,11 +38,25 @@ export interface DocumentStats {
   characters: number;
 }
 
+export interface SpeakerNote {
+  text: string;
+  svg?: string;
+}
+
 export interface CompileResult {
   pages: string[];
   stats: DocumentStats;
   diagnostics: Diagnostic[];
+  notes?: (SpeakerNote | null)[];
 }
+
+export interface PagePoint {
+  page: number;
+  x: number;
+  y: number;
+}
+
+export type ClickTarget = { kind: "source"; path: string; offset: number } | ({ kind: "page" } & PagePoint);
 
 export interface CompileFailure {
   diagnostics: Diagnostic[];
@@ -186,6 +200,21 @@ export const compileTarget = (
   entrypoint?: string,
   overrides?: Record<string, string>,
 ) => invoke<CompileResult>("compile_target", { path, entrypoint, overrides });
+
+export const syncCursor = (
+  path: string,
+  file: string,
+  offset: number,
+  entrypoint?: string,
+  overrides?: Record<string, string>,
+) => invoke<PagePoint[]>("sync_cursor", { path, entrypoint, overrides, file, offset });
+
+export const syncClick = (
+  path: string,
+  point: PagePoint,
+  entrypoint?: string,
+  overrides?: Record<string, string>,
+) => invoke<ClickTarget | null>("sync_click", { path, entrypoint, overrides, ...point });
 
 export const exportTarget = (
   path: string,

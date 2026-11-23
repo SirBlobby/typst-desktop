@@ -10,6 +10,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   TYPST_COMMIT: bd5ebec285505889e8ff1d4f68804ab147a699f3
 

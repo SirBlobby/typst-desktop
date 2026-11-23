@@ -34,6 +34,7 @@ typst-render = { path = "../typst/crates/typst-render" }
 typst-svg = { path = "../typst/crates/typst-svg" }
 typst-html = { path = "../typst/crates/typst-html" }
 typst-layout = { path = "../typst/crates/typst-layout" }
+typst-ide = { path = "../typst/crates/typst-ide" }
 
 chrono = { version = "0.4.45", features = ["serde"] }
 sha2 = "0.11.1"

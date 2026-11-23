@@ -1,4 +1,5 @@
 import type { EditorView } from "@codemirror/view";
+import { formatDocument } from "@codemirror/lsp-client";
 import { insertText, prefixLines, wrapSelection } from "#lib/ts/editor-actions";
 import { insertQuote, openFind, openReplace } from "#lib/ts/editor/insert";
 import { insertDialogStore, insertOptions } from "#lib/ts/editor/insert-dialog";
@@ -107,7 +108,10 @@ export function buildToolbarGroups(
       id: "document",
       label: "Document",
       icon: "ph:file-text",
-      items: [{ icon: "ph:file-text", label: "Page settings", run: onpagesettings }],
+      items: [
+        { icon: "ph:file-text", label: "Page settings", run: onpagesettings },
+        { icon: "ph:magic-wand", label: "Format document (Shift+Alt+F)", run: () => view && formatDocument(view) },
+      ],
       extraWidth: FONT_SELECT_WIDTH,
     },
   ];

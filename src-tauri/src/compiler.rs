@@ -12,6 +12,7 @@ use typst_render::{render, PngFormat, RenderOptions};
 use typst_svg::{SvgFormat, SvgOptions};
 
 use crate::latex;
+use crate::speaker_notes::{self, Note};
 use crate::world::ProjectWorld;
 
 const PAGE_GAP_PT: f64 = 10.0;
@@ -36,6 +37,8 @@ pub struct CompileResult {
     pub pages: Vec<String>,
     pub stats: DocumentStats,
     pub diagnostics: Vec<Diagnostic>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub notes: Option<Vec<Option<Note>>>,
 }
 
 fn extract_frame_text(frame: &Frame, text: &mut String) {
@@ -64,7 +67,7 @@ fn extract_stats(document: &PagedDocument) -> DocumentStats {
     }
 }
 
-fn svg_options(document: &PagedDocument) -> SvgOptions<Complete> {
+pub(crate) fn svg_options(document: &PagedDocument) -> SvgOptions<Complete> {
     let requested: SvgOptions = SvgOptions::default();
     requested.resolve(document.options().get::<SvgFormat>())
 }
@@ -156,6 +159,7 @@ pub fn compile_to_svg(
                 pages,
                 stats: extract_stats(&document),
                 diagnostics: collect_diagnostics(&world, source_text.as_deref(), warnings),
+                notes: speaker_notes::page_notes(&world, &document),
             })
         }
         Warned {

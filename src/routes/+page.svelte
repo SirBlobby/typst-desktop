@@ -37,7 +37,13 @@
   import GithubImportModal from "#lib/components/github/GithubImportModal.svelte";
   import { createFromTemplate, type TemplateAuthor, type UniverseTemplate } from "#lib/ts/templates";
   import { isLatexPath, languageLabel, sourceExtension, type DocumentLanguage } from "#lib/ts/document-language";
-  import { previewMode } from "#lib/ts/preview-mode.svelte";
+  import { previewMode, splitRatio } from "#lib/ts/preview-mode.svelte";
+  import SplitDivider from "#lib/components/SplitDivider.svelte";
+  import PresentMenu from "#lib/components/presentation/PresentMenu.svelte";
+  import PresentationMode from "#lib/components/PresentationMode.svelte";
+  import type { PresentationLayout } from "#lib/ts/presentation-sync";
+  import { cursorClickSync, revealOffset } from "#lib/ts/editor-preview-sync";
+  import { previewPointForCursor, sourceForPreviewClick } from "#lib/ts/preview-sync.svelte";
   import PageSettingsModal from "#lib/components/PageSettingsModal.svelte";
   import CitationsModal from "#lib/components/citations/CitationsModal.svelte";
   import InsertDialogs from "#lib/components/editor/insert/InsertDialogs.svelte";
@@ -51,7 +57,7 @@
   import { formattingCommandIds, runFormattingCommand } from "#lib/ts/editor/formatting-commands";
 
   import * as api from "#lib/ts/api";
-  import type { BrowseEntry, CloudFile, CloudFolder } from "#lib/ts/api";
+  import type { BrowseEntry, CloudFile, CloudFolder, PagePoint } from "#lib/ts/api";
   import { pickFiles } from "#lib/ts/import";
   import { dropDestination, dropMessage, dropPaths } from "#lib/ts/drop";
   import { exportFormat } from "#lib/ts/export-formats";
@@ -119,7 +125,37 @@
   let dialog = $state<Dialog>({ kind: "none" });
   let createLanguage = $state<DocumentLanguage>("typst");
   let editorView = $state<EditorView | null>(null);
-  const editorExtensions = reviewExtensions();
+  const editorExtensions = [reviewExtensions(), cursorClickSync(syncPreviewToCursor)];
+  let jumpTo = $state<(PagePoint & { seq: number }) | null>(null);
+  let pendingSelection = $state<{ path: string; offset: number } | null>(null);
+  let presentationLayout = $state<PresentationLayout | null>(null);
+
+  function jumpPreviewTo(point: PagePoint) {
+    jumpTo = { ...point, seq: (jumpTo?.seq ?? 0) + 1 };
+  }
+
+  async function syncPreviewToCursor(offset: number) {
+    if (previewMode.current === "editor") return;
+    const point = await previewPointForCursor(offset);
+    if (point) jumpPreviewTo(point);
+  }
+
+  async function syncCursorToPreview(point: PagePoint) {
+    const target = await sourceForPreviewClick(point);
+    if (target?.kind === "page") jumpPreviewTo(target);
+    if (target?.kind !== "source") return;
+    pendingSelection = { path: target.path, offset: target.offset };
+    if (target.path !== app.activePath) await openFile(target.path);
+  }
+
+  $effect(() => {
+    const view = editorView;
+    if (!view || !pendingSelection || pendingSelection.path !== app.activePath) return;
+    if (view.state.doc.toString() !== app.editorContent) return;
+    const { offset } = pendingSelection;
+    pendingSelection = null;
+    revealOffset(view, offset);
+  });
   let fileViewer = $state<{ paths: string[]; index: number } | null>(null);
   let selectedEntries = $state<Set<string>>(new Set());
   let selectedEntry = $state<string | null>(null);
@@ -777,6 +813,8 @@
 
       <PreviewModeMenu />
 
+      <PresentMenu disabled={!app.compiled?.pages.length} onpresent={(layout) => (presentationLayout = layout)} />
+
       {#if app.target && !app.target.standalone}
         <button class="btn btn-ghost" onclick={openGithub} title="Pull and push with GitHub">
           <Icon icon="ph:github-logo" />
@@ -1007,8 +1045,15 @@
         </div>
       {/if}
 
-      <div class="flex min-w-0 flex-1">
-        <div class="min-w-0 flex-1 flex-col border-r border-[var(--color-line)] {previewMode.current === 'preview' ? 'hidden' : 'flex'}">
+      <div
+        class="flex min-w-0 flex-1"
+        style="--editor-grow: {splitRatio.current}; --preview-grow: {1 - splitRatio.current};"
+      >
+        <div
+          class="min-w-0 flex-col {previewMode.current === 'preview' ? 'hidden' : 'flex'} {previewMode.current === 'split'
+            ? 'flex-[var(--editor-grow)_1_0%]'
+            : 'flex-1 border-r border-[var(--color-line)]'}"
+        >
           {#if app.activePath && activeFile?.is_text}
             <EditorToolbar
               view={editorView}
@@ -1076,12 +1121,18 @@
           {/if}
         </div>
 
+        {#if previewMode.current === "split"}
+          <SplitDivider />
+        {/if}
+
         {#if previewMode.current !== "editor"}
-          <div class="min-w-0 flex-1">
+          <div class="min-w-0 {previewMode.current === 'split' ? 'flex-[var(--preview-grow)_1_0%]' : 'flex-1'}">
             <Preview
               compiled={app.compiled}
               diagnostics={app.diagnostics}
               compiling={app.compiling}
+              {jumpTo}
+              onpageclick={syncCursorToPreview}
             />
           </div>
         {/if}
@@ -1091,6 +1142,15 @@
     {/if}
   </div>
 </div>
+
+{#if presentationLayout && app.compiled}
+  <PresentationMode
+    mode={presentationLayout}
+    pages={app.compiled.pages}
+    notes={app.compiled.notes}
+    onclose={() => (presentationLayout = null)}
+  />
+{/if}
 
 {#if fileViewer}
   <FileViewerOverlay

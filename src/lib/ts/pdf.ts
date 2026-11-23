@@ -22,7 +22,7 @@ export interface PageRenderOptions {
 
 export async function openPdf(path: string): Promise<PdfDocument> {
   const bytes = await api.readPdf(path);
-  return pdfjs.getDocument({ data: new Uint8Array(bytes) }).promise;
+  return pdfjs.getDocument({ data: new Uint8Array(bytes), isEvalSupported: false }).promise;
 }
 
 export async function pageSizes(document: PdfDocument): Promise<PageSize[]> {

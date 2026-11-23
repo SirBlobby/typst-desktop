@@ -1,10 +1,17 @@
 import hotkeys from "hotkeys-js";
 
+const hotkeyState = { paused: false };
+
+export function setHotkeysPaused(paused: boolean) {
+  hotkeyState.paused = paused;
+}
+
 // The default filter ignores any contenteditable target, which silently
 // blocks every shortcut while the CodeMirror editor (contenteditable) has
 // focus — exactly when these shortcuts are meant to fire. Only keep the
 // exclusion for classic form fields (rename dialogs, prompts, etc).
 hotkeys.filter = (event: KeyboardEvent) => {
+  if (hotkeyState.paused) return false;
   const target = (event.target as HTMLElement | null) ?? null;
   const tagName = target?.tagName;
   return tagName !== "INPUT" && tagName !== "TEXTAREA" && tagName !== "SELECT";

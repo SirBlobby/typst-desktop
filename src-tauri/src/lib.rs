@@ -8,10 +8,12 @@ mod latex;
 mod local_packages;
 mod lsp;
 mod pandoc;
+mod preview_sync;
 mod review;
 mod shortcuts;
 mod sidecar;
 mod spaces;
+mod speaker_notes;
 mod sync;
 mod target_entries;
 mod templates;
@@ -511,17 +513,8 @@ fn compile_target(
     entrypoint: Option<String>,
     overrides: Option<std::collections::HashMap<String, String>>,
 ) -> Result<CompileResult, CompileFailure> {
-    let target = resolve_target(&app, &store, &path).map_err(failure)?;
-    let mut files = read_target_files(&app, &store, &target).map_err(failure)?;
-
-    for (file, content) in overrides.unwrap_or_default() {
-        files.insert(file, content.into_bytes());
-    }
-
-    let entrypoint = match entrypoint {
-        Some(file) if files.contains_key(&file) => file,
-        _ => target.entrypoint,
-    };
+    let (entrypoint, files) =
+        workspace::target_compile_input(&app, &store, &path, entrypoint, overrides).map_err(failure)?;
 
     compiler::compile_to_svg(entrypoint, files)
         .map_err(|diagnostics| CompileFailure { diagnostics })
@@ -1576,6 +1569,8 @@ pub fn run() {
             citations::commands::citation_sync_run,
             citations::commands::citation_sync_delete,
             compile_target,
+            preview_sync::sync_cursor,
+            preview_sync::sync_click,
             export_target,
             set_folder_color,
             shortcuts::list_shortcuts,

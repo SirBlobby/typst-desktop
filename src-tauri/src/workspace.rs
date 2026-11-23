@@ -395,6 +395,28 @@ pub fn read_target_files(
     Ok(map)
 }
 
+pub fn target_compile_input(
+    app: &AppHandle,
+    store: &Store,
+    path: &str,
+    entrypoint: Option<String>,
+    overrides: Option<HashMap<String, String>>,
+) -> Result<(String, HashMap<String, Vec<u8>>), String> {
+    let target = resolve_target(app, store, path)?;
+    let mut files = read_target_files(app, store, &target)?;
+
+    for (file, content) in overrides.unwrap_or_default() {
+        files.insert(file, content.into_bytes());
+    }
+
+    let entrypoint = match entrypoint {
+        Some(file) if files.contains_key(&file) => file,
+        _ => target.entrypoint,
+    };
+
+    Ok((entrypoint, files))
+}
+
 fn collect_loose_files(
     dir: &Path,
     prefix: &str,

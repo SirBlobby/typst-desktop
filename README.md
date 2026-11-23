@@ -77,14 +77,15 @@ The AppImage runs on any distribution, so it also works as a fallback on Debian 
 - **Two views**: A file viewer for browsing local and cloud files, and an editor view for writing.
 - **Single files or projects**: Open a lone `.typ` or `.tex` file, or a project folder with its own `typst.toml`, chapters, bibliography, and assets.
 - **LaTeX**: Create LaTeX documents and projects by picking the language when you create them. LaTeX is converted to Typst with [MiTeX](https://github.com/mitex-rs/mitex), so basic documents, sections, lists, tables, figures and math work, while packages, `\input` and bibliographies do not. `.tex` files get a LaTeX editor, toolbar and keyboard shortcuts, and sync with TypstDrive LaTeX documents.
-- **Live preview**: The preview recompiles as you type, and follows whichever file you are editing rather than only the entrypoint. Saving is not required to see changes. The **View** menu shows the editor and preview, the editor only, or the preview only.
-- **Editor**: Syntax highlighting for Typst, LaTeX, BibTeX, YAML and TOML, snippet autocompletion, a formatting toolbar with heading sizes and quotes, page settings, inline diagnostics, and hover help and richer diagnostics from the bundled `tinymist` language server.
+- **Live preview**: The preview recompiles as you type, and follows whichever file you are editing rather than only the entrypoint. Saving is not required to see changes. The **View** menu shows the editor and preview, the editor only, or the preview only. Drag the line between the editor and preview to resize them, or double-click it to reset. In a Typst file, click the text to scroll the preview there, or click the preview to jump to its source.
+- **Editor**: Syntax highlighting for Typst, LaTeX, BibTeX, YAML and TOML, snippet autocompletion, a formatting toolbar with heading sizes and quotes, page settings, inline diagnostics, Format document (`Shift+Alt+F` or the toolbar), and hover help and richer diagnostics from the bundled `tinymist` language server.
 - **Editor tools**: Find and search and replace, `Ctrl+/` to comment out lines, and quick insert for images, tables, project files, symbols and emoji.
 - **Editor settings**: Font, font size, spell checking, line numbers and a minimap with three sizes.
 - **Review**: For cloud documents and projects open live, see who else is editing with their profile pictures, comment on text, reply and resolve threads, suggest edits that others accept or reject, save versions and browse, compare and restore version history.
 - **Export**: PDF, PNG, SVG, HTML and the source file, plus Word, LaTeX, Markdown and HTML through `pandoc`. LaTeX files are read as LaTeX by `pandoc`. Word, LaTeX, Markdown and HTML files can also be converted into Typst documents.
 - **Team spaces**: Browse and work in the TypstDrive team spaces you belong to from the sidebar.
 - **Viewer**: Open PDFs and images from the file browser, the project file tree, or TypstDrive.
+- **Presenting**: Show the pages as full-screen slides with a laser pointer, pen, highlighter, slide overview and timer, or open a speaker view with the next slide and speaker notes while the slides play in a second window. See [Presenting](#presenting).
 - **Local folders**: Add shortcuts to folders anywhere on your computer to browse and edit them alongside the workspace, and give folders colors.
 - **File explorer**: Folder selection, a right-click menu, drag and drop, rename, duplicate, move, reveal in your file manager, search, sorting by name, date or size, and grid or list views.
 - **Cloud workspace**: Browse your TypstDrive folders, documents, projects, and everything shared with you in a layout that matches the TypstDrive web drive, with search, sorting and grid or list view. Download what you want on this device and open it straight from the cloud view.
@@ -241,6 +242,15 @@ Only document sources, bibliographies, images and fonts are synced. Everything e
 
 Private repositories and pushing need a fine-grained access token with read and write access to repository contents. Add a token to a single link, or connect an account in **Settings > GitHub** to use it for every link. Tokens are stored on this computer.
 
+## Presenting
+
+Choose **Present** in the editor header.
+
+- **Present** shows the slides full screen in the main window. Use the arrow keys or Space to move, `G` for all slides, `L`, `P`, `H` and `E` for the laser, pen, highlighter and eraser, and `C` to clear drawings. Press `Esc` to leave full screen and **Exit** to stop.
+- **Speaker view** opens the slides in a second window for the audience. Drag it to the projector and click **Full screen**. The main window shows the current and next slide, your notes and a timer. Press `B` to black out the audience screen and `F` to freeze it.
+
+Speaker notes come from [Touying](https://touying-typ.github.io/) `#speaker-note[...]`, [Polylux](https://polylux.dev/book/) `#pdfpc.speaker-note(...)` and [Mosaic](https://vincentarelbundock.github.io/mosaic/presenting/notes.html) `#m.note[...]`, or `#metadata((t: "Note", v: [...])) <pdfpc>` without a package.
+
 ## Language Server
 
 Typst Desktop uses [`tinymist`](https://github.com/Myriad-Dreamin/tinymist) for hover documentation, go-to-definition, and richer diagnostics. It ships with the app, and its license is installed alongside it. If the bundled copy is missing, a `tinymist` on your `PATH` is used instead. The Arch package depends on the `tinymist` and `pandoc-cli` packages rather than bundling them.
@@ -283,6 +293,8 @@ bun run tauri dev
 ```
 
 Shared front-end code is imported with `#lib/...`, mapped in `package.json` under `imports`. `#lib/ts/name` points to `src/lib/ts/name.ts`, so leave off the `.ts`. `#lib/components/Name.svelte` keeps its `.svelte`. A new folder under `src/lib` needs its own entry there, because TypeScript does not add extensions to `imports` targets.
+
+Pull requests target `main` and need one approval and passing `frontend`, `backend` and `code-rules` checks. The `code-rules` check fails when a change adds code comments or emojis. Run it locally with `python3 .github/scripts/check_code_rules.py main`.
 
 To build a release bundle for your own platform:
 

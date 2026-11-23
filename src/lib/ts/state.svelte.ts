@@ -9,6 +9,7 @@ import {
 } from "./cloud-sync";
 import { clearCloudSpaces, refreshCloudSpaces } from "./cloud-spaces";
 import type { CollabSession } from "./yjs-client";
+import { recordCompileInput, type CompileInput } from "./preview-sync.svelte";
 import type {
   Account,
   BrowseEntry,
@@ -690,13 +691,21 @@ export async function compile() {
       app.activePath && /\.(typ|tex)$/i.test(app.activePath)
         ? app.activePath
         : undefined;
+    const compileInput: CompileInput = {
+      targetPath: app.target.path,
+      activePath: app.activePath,
+      editorContent: app.editorContent,
+      entrypoint: previewFile,
+      overrides: liveOverrides(),
+    };
     const result = await api.compileTarget(
-      app.target.path,
-      previewFile,
-      liveOverrides(),
+      compileInput.targetPath,
+      compileInput.entrypoint,
+      compileInput.overrides,
     );
     app.compiled = result;
     app.diagnostics = result.diagnostics;
+    recordCompileInput(compileInput);
   } catch (error) {
     if (api.isCompileFailure(error)) {
       app.diagnostics = error.diagnostics;
