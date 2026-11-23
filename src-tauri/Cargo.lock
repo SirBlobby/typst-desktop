@@ -6175,7 +6175,7 @@ dependencies = [
 
 [[package]]
 name = "typst-desktop"
-version = "2.2.2"
+version = "2.3.0"
 dependencies = [
  "base64 0.23.1",
  "chrono",

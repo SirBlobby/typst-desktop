@@ -4,7 +4,7 @@
 
 # Typst Desktop
 
-[![Version](https://img.shields.io/badge/version-2.2.2-blue.svg)](https://github.com/SirBlobby/typst-desktop.git)
+[![Version](https://img.shields.io/badge/version-2.3.0-blue.svg)](https://github.com/SirBlobby/typst-desktop.git)
 [![License](https://img.shields.io/badge/license-Apache_2.0-green.svg)](LICENSE)
 [![Typst Version](https://img.shields.io/badge/Typst-0.15.1-239dad?logo=typst&logoColor=white)](https://typst.app/)
 [![Rust](https://img.shields.io/badge/Rust-1.82+-orange?logo=rust&logoColor=white)](https://www.rust-lang.org/)
@@ -22,7 +22,7 @@ The Typst compiler, the `tinymist` language server and `pandoc` are built into t
 Packages are attached to each [release](https://github.com/SirBlobby/typst-desktop/releases). Set the version you want first:
 
 ```bash
-VERSION=2.2.2
+VERSION=2.3.0
 BASE=https://github.com/SirBlobby/typst-desktop/releases/download/v$VERSION
 ```
 
@@ -251,6 +251,12 @@ Choose **Present** in the editor header.
 
 Speaker notes come from [Touying](https://touying-typ.github.io/) `#speaker-note[...]`, [Polylux](https://polylux.dev/book/) `#pdfpc.speaker-note(...)` and [Mosaic](https://vincentarelbundock.github.io/mosaic/presenting/notes.html) `#m.note[...]`, or `#metadata((t: "Note", v: [...])) <pdfpc>` without a package.
 
+## Security
+
+- Compiled pages, slides and speaker notes have scripts, event handlers, embedded HTML and unsafe links removed before they are shown.
+- The app runs under a content security policy that only allows its own scripts, the Typst compiler's WebAssembly, Google Fonts and the Iconify icon servers.
+- The presentation window gets only the permissions it needs to go full screen and close itself.
+
 ## Language Server
 
 Typst Desktop uses [`tinymist`](https://github.com/Myriad-Dreamin/tinymist) for hover documentation, go-to-definition, and richer diagnostics. It ships with the app, and its license is installed alongside it. If the bundled copy is missing, a `tinymist` on your `PATH` is used instead. The Arch package depends on the `tinymist` and `pandoc-cli` packages rather than bundling them.
@@ -325,7 +331,7 @@ On Linux the app sets `WEBKIT_DISABLE_DMABUF_RENDERER=1` and `__NV_DISABLE_EXPLI
 | `macos-latest` | `.dmg` and `.app` for Apple Silicon and for Intel |
 | `archlinux` container | `.pkg.tar.zst` |
 
-It runs on every `v*` tag and can also be started by hand. A tag push also creates a draft GitHub release with every package attached, ready to review and publish. `.github/workflows/ci.yml` type-checks the front end and checks and tests the Rust code on every push to `main` and every pull request.
+It runs on every `v*` tag and can also be started by hand. A tag push also creates a draft GitHub release with every package attached, ready to review and publish. `.github/workflows/ci.yml` type-checks the front end and checks and tests the Rust code on every push to `main` and every pull request. `.github/workflows/code-rules.yml` runs the code rules check on every pull request.
 
 ### Building locally for another platform
 
