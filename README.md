@@ -4,7 +4,7 @@
 
 # Typst Desktop
 
-[![Version](https://img.shields.io/badge/version-2.3.0-blue.svg)](https://github.com/SirBlobby/typst-desktop.git)
+[![Version](https://img.shields.io/badge/version-2.3.1-blue.svg)](https://github.com/SirBlobby/typst-desktop.git)
 [![License](https://img.shields.io/badge/license-Apache_2.0-green.svg)](LICENSE)
 [![Typst Version](https://img.shields.io/badge/Typst-0.15.1-239dad?logo=typst&logoColor=white)](https://typst.app/)
 [![Rust](https://img.shields.io/badge/Rust-1.82+-orange?logo=rust&logoColor=white)](https://www.rust-lang.org/)
@@ -22,7 +22,7 @@ The Typst compiler, the `tinymist` language server and `pandoc` are built into t
 Packages are attached to each [release](https://github.com/SirBlobby/typst-desktop/releases). Set the version you want first:
 
 ```bash
-VERSION=2.3.0
+VERSION=2.3.1
 BASE=https://github.com/SirBlobby/typst-desktop/releases/download/v$VERSION
 ```
 
